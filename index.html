@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Chess Study Session</title>
+<title>Chess Study Planner — Cloud Sync</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <meta name="color-scheme" content="dark light"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
 <style>
   .no-select{user-select:none;-webkit-user-select:none}
   .drag-ghost{opacity:.4}
@@ -90,15 +91,28 @@
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
 <div class="max-w-5xl mx-auto px-4 py-6">
+
   <!-- Header -->
   <header class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print">
-    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Chess Study Session</h1>
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Chess Study Planner</h1>
+
+    <!-- Auth controls -->
     <div class="flex flex-wrap items-center gap-2">
+      <div id="authArea" class="flex items-center gap-2">
+        <!-- Google-only for now; Sign in / Sign up both trigger the same flow -->
+        <button id="signInBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Sign in</button>
+        <button id="signUpBtn" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500">Sign up</button>
+        <div id="userBadge" class="hidden items-center gap-2">
+          <span id="userEmail" class="text-sm text-slate-300"></span>
+          <button id="signOutBtn" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500">Sign out</button>
+        </div>
+      </div>
       <select id="presetSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm">
         <option value="BOTH">Both (90m)</option>
         <option value="A">Session A (45m)</option>
         <option value="B">Session B (45m)</option>
       </select>
+      <span id="cloudStatus" class="text-xs text-slate-400">Local mode</span>
     </div>
   </header>
 
@@ -108,7 +122,6 @@
       <div class="text-xs uppercase tracking-wide text-slate-400">Progress — drag anywhere to jump</div>
       <div id="progressPct" class="text-xs text-slate-300">0%</div>
     </div>
-    <!-- No front-handle; white ticks at checkpoints -->
     <div id="progressHost" class="relative w-full h-6 bg-slate-800 rounded-2xl overflow-hidden border border-sky-600/50 glow no-select">
       <div id="progressFill" class="absolute left-0 top-0 bottom-0 bg-sky-500/70 transition-[width]" style="width:0%"></div>
       <div id="progressSegments" class="absolute inset-0 flex"></div>
@@ -176,7 +189,7 @@
     <!-- DRAG HANDLE -->
     <div id="splitHandle" class="no-print"></div>
 
-    <!-- RIGHT: OUTLINE (minimal + click to jump + DnD + Edit) -->
+    <!-- RIGHT: OUTLINE -->
     <aside id="rightPane">
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 h-full flex flex-col">
         <div class="flex items-center justify-between">
@@ -232,635 +245,708 @@
   <div class="resizer se" aria-hidden="true"></div>
 </div>
 
-<script>
-/* =========================
-   Data & persistence
-   ========================= */
-const DEFAULTS = {
-  A: [
-    { id:'aim',   name:'Aimchess warmup',              minutes:8,  links:[] },
-    { id:'tac',   name:'Woodpecker: 8–10 familiar puzzles (60–90s each; write motif if miss)', minutes:9, links:[] },
-    { id:'srs',   name:'SRS reviews: previously missed motifs only', minutes:6, links:[] },
-    { id:'opn',   name:'Opening study',                minutes:12, links:[] },
-    { id:'pawn',  name:'Pawn structure notes',         minutes:10, links:[] },
-  ],
-  B: [
-    { id:'viz',   name:'Visualization (blindfold)',    minutes:5,  links:[] },
-    { id:'rapid', name:'Rapid game (10+5)',            minutes:20, links:[] },
-    { id:'anal',  name:'Deep analysis (game review)',  minutes:20, links:[] },
-  ]
-};
+<!-- Firebase v12 (modular) + app code -->
+<script type="module">
+  // --- Firebase SDK imports (modular) ---
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
+  import {
+    getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut
+  } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-const DEFAULT_SHELF = [
-  { id:'w_lichess',  label:'Lichess',           url:'https://lichess.org',              icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-  { id:'w_analysis', label:'Lichess Analysis',  url:'https://lichess.org/analysis',     icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-  { id:'w_chessable',label:'Chessable',         url:'https://www.chessable.com',        icon:'emoji', emoji:'📘' }
-];
+  // --- Your Firebase config (from console) ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyAMyUlfqqOlnt-kHO-C-vB_rzJ-9eudxck",
+    authDomain: "chessstudyplanner.firebaseapp.com",
+    projectId: "chessstudyplanner",
+    storageBucket: "chessstudyplanner.firebasestorage.app",
+    messagingSenderId: "73363049381",
+    appId: "1:73363049381:web:48da4a1e06b9744fccf64c",
+    measurementId: "G-8PE090JLZH"
+  };
 
-let sessions = loadSessions() || structuredClone(DEFAULTS);
-sanitizeSessions(sessions);
-let widgetShelf = loadShelf() || structuredClone(DEFAULT_SHELF);
+  // --- Init Firebase services ---
+  const app = initializeApp(firebaseConfig);
+  getAnalytics(app); // optional
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+  const provider = new GoogleAuthProvider();
 
-function loadSessions(){ try{ return JSON.parse(localStorage.getItem('studySessions_v11')); }catch{ return null; } }
-function saveSessions(){ localStorage.setItem('studySessions_v11', JSON.stringify(sessions)); }
-function sanitizeSessions(ss){
-  ['A','B','BOTH'].forEach(k=>{
-    if(!ss[k]) return;
-    ss[k].forEach(s=>{
-      if(!('links' in s)) s.links=[];
-      if(!('minutes' in s)) s.minutes=5;
-      if(!('name' in s)) s.name='Untitled';
-      if(!('id' in s)) s.id='S'+Math.random().toString(16).slice(2);
+  // ------------------------------
+  // Data & persistence (local + cloud)
+  // ------------------------------
+  const DEFAULTS = {
+    A: [
+      { id:'aim',   name:'Aimchess warmup', minutes:8, links:[] },
+      { id:'tac',   name:'Woodpecker: 8–10 familiar puzzles (60–90s each; write motif if miss)', minutes:9, links:[] },
+      { id:'srs',   name:'SRS reviews: previously missed motifs only', minutes:6, links:[] },
+      { id:'opn',   name:'Opening study', minutes:12, links:[] },
+      { id:'pawn',  name:'Pawn structure notes', minutes:10, links:[] },
+    ],
+    B: [
+      { id:'viz',   name:'Visualization (blindfold)', minutes:5, links:[] },
+      { id:'rapid', name:'Rapid game (10+5)', minutes:20, links:[] },
+      { id:'anal',  name:'Deep analysis (game review)', minutes:20, links:[] },
+    ]
+  };
+
+  const DEFAULT_SHELF = [
+    { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',          icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+    { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+    { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
+  ];
+
+  let sessions = loadSessionsLocal() || structuredClone(DEFAULTS);
+  sanitizeSessions(sessions);
+  let widgetShelf = loadShelfLocal() || structuredClone(DEFAULT_SHELF);
+  let activePreset = localStorage.getItem('preset_v11') || 'BOTH';
+
+  function loadSessionsLocal(){ try{ return JSON.parse(localStorage.getItem('studySessions_v11')); }catch{ return null; } }
+  function saveSessionsLocal(){ localStorage.setItem('studySessions_v11', JSON.stringify(sessions)); }
+  function loadShelfLocal(){ try{ return JSON.parse(localStorage.getItem('linkShelf_v1')); }catch{ return null; } }
+  function saveShelfLocal(){ localStorage.setItem('linkShelf_v1', JSON.stringify(widgetShelf)); }
+
+  function sanitizeSessions(ss){
+    ['A','B','BOTH'].forEach(k=>{
+      if(!ss[k]) return;
+      ss[k].forEach(s=>{
+        if(!('links' in s)) s.links=[];
+        if(!('minutes' in s)) s.minutes=5;
+        if(!('name' in s)) s.name='Untitled';
+        if(!('id' in s)) s.id='S'+Math.random().toString(16).slice(2);
+      });
     });
-  });
-}
-function loadShelf(){ try{ return JSON.parse(localStorage.getItem('linkShelf_v1')); }catch{ return null; } }
-function saveShelf(){ localStorage.setItem('linkShelf_v1', JSON.stringify(widgetShelf)); }
-
-/* =========================
-   Preset handling
-   ========================= */
-const presetSelect = document.getElementById('presetSelect');
-let activePreset = localStorage.getItem('preset_v11') || 'BOTH';
-presetSelect.value = activePreset;
-presetSelect.addEventListener('change', ()=>{
-  activePreset = presetSelect.value;
-  localStorage.setItem('preset_v11', activePreset);
-  if(activePreset==='BOTH' && !sessions.BOTH){
-    sessions.BOTH = [...(sessions.A||[]), ...(sessions.B||[])].map(s=>({...s}));
-    saveSessions();
   }
-  stopTimer();
-  sessionStarted=false;
-  currentIndex=0;
-  secondsLeft = minsToSecs((getSchedule()[0]||{}).minutes||0);
-  lastDisplayedSec=null;
-  isEditingSection=false;
-  updateEditUI();
-  renderAll();
-  updateStartBtnLabel();
-});
 
-function getSchedule(){
-  if(activePreset==='A') return sessions.A || [];
-  if(activePreset==='B') return sessions.B || [];
-  if(!sessions.BOTH){ sessions.BOTH=[...(sessions.A||[]), ...(sessions.B||[])].map(s=>({...s})); saveSessions(); }
-  return sessions.BOTH;
-}
-function getEditableRef(){ return getSchedule(); }
+  // Cloud helpers
+  const cloudStatus = document.getElementById('cloudStatus');
+  let currentUser = null;
+  const userDocRef = (uid)=> doc(db, 'users', uid, 'apps', 'chess_planner_v1');
 
-/* =========================
-   Timer
-   ========================= */
-let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, lastDisplayedSec=null;
-const clockEl = document.getElementById('clock');
-function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
-function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
-function startTimer(){ if(running) return; running=true; syncEnd(); loop(); renderAll(); updateStartBtnLabel(); }
-function stopTimer(){ running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateStartBtnLabel(); }
-function syncEnd(){ endTimeMs = performance.now() + secondsLeft*1000; }
-function loop(){
-  if(!running) return;
-  const sched=getSchedule(); if(!sched.length){ stopTimer(); return; }
-  const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
-  if(remaining !== secondsLeft){ secondsLeft = remaining; lastDisplayedSec=null; renderAll(); }
-  if(secondsLeft<=0){
-    if(currentIndex < sched.length-1){
-      currentIndex++;
-      secondsLeft=minsToSecs(sched[currentIndex].minutes);
-      syncEnd(); beep(); renderAll();
-    } else {
-      stopTimer(); beep(); renderAll();
-      sessionStarted=false;
-      updateStartBtnLabel();
-      return;
+  const debounce = (fn,ms=600)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
+
+  const saveCloudDebounced = debounce(async ()=>{
+    if(!currentUser) return;
+    try{
+      const payload = { sessions, widgetShelf, activePreset, updatedAt: serverTimestamp() };
+      await setDoc(userDocRef(currentUser.uid), payload, { merge:true });
+      cloudStatus.textContent = 'Saved to cloud ✓';
+    }catch(e){ console.error(e); cloudStatus.textContent='Cloud save failed'; }
+  }, 700);
+
+  function saveSessions(){ saveSessionsLocal(); if(currentUser) saveCloudDebounced(); }
+  function saveShelf(){ saveShelfLocal(); if(currentUser) saveCloudDebounced(); }
+
+  // ------------------------------
+  // Presets / Timer / UI (unchanged mechanics)
+  // ------------------------------
+  const presetSelect = document.getElementById('presetSelect');
+  presetSelect.value = activePreset;
+  presetSelect.addEventListener('change', ()=>{
+    activePreset = presetSelect.value;
+    localStorage.setItem('preset_v11', activePreset);
+    if(activePreset==='BOTH' && !sessions.BOTH){
+      sessions.BOTH = [...(sessions.A||[]), ...(sessions.B||[])].map(s=>({...s}));
+      saveSessions();
+    }
+    stopTimer();
+    sessionStarted=false;
+    currentIndex=0;
+    secondsLeft = minsToSecs((getSchedule()[0]||{}).minutes||0);
+    lastDisplayedSec=null;
+    isEditingSection=false;
+    updateEditUI();
+    renderAll();
+    updateStartBtnLabel();
+    if(currentUser) saveCloudDebounced();
+  });
+
+  function getSchedule(){
+    if(activePreset==='A') return sessions.A || [];
+    if(activePreset==='B') return sessions.B || [];
+    if(!sessions.BOTH){ sessions.BOTH=[...(sessions.A||[]), ...(sessions.B||[])].map(s=>({...s})); saveSessions(); }
+    return sessions.BOTH;
+  }
+  function getEditableRef(){ return getSchedule(); }
+
+  let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, lastDisplayedSec=null;
+  const clockEl = document.getElementById('clock');
+  function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
+  function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
+  function startTimer(){ if(running) return; running=true; syncEnd(); loop(); renderAll(); updateStartBtnLabel(); }
+  function stopTimer(){ running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateStartBtnLabel(); }
+  function syncEnd(){ endTimeMs = performance.now() + secondsLeft*1000; }
+  function loop(){
+    if(!running) return;
+    const sched=getSchedule(); if(!sched.length){ stopTimer(); return; }
+    const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
+    if(remaining !== secondsLeft){ secondsLeft = remaining; lastDisplayedSec=null; renderAll(); }
+    if(secondsLeft<=0){
+      if(currentIndex < sched.length-1){
+        currentIndex++;
+        secondsLeft=minsToSecs(sched[currentIndex].minutes);
+        syncEnd(); beep(); renderAll();
+      } else {
+        stopTimer(); beep(); renderAll();
+        sessionStarted=false;
+        updateStartBtnLabel();
+        return;
+      }
+    }
+    rafId=requestAnimationFrame(loop);
+  }
+
+  const startBtn = document.getElementById('startBtn');
+  let sessionStarted=false;
+  function updateStartBtnLabel(){
+    if(!sessionStarted) startBtn.textContent='Start Study Session';
+    else if(running) startBtn.textContent='Pause Session';
+    else startBtn.textContent='Resume Session';
+  }
+  startBtn.onclick=()=>{
+    const s=getSchedule(); if(!s.length) return;
+    if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(s[0].minutes); sessionStarted=true; startTimer(); }
+    else { if(running) stopTimer(); else startTimer(); }
+  };
+  document.getElementById('prevBtn').onclick=()=>{ const s=getSchedule(); if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(s[currentIndex].minutes); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); } updateStartBtnLabel(); };
+  document.getElementById('nextBtn').onclick=()=>{ const s=getSchedule(); if(currentIndex<s.length-1){ currentIndex++; secondsLeft=minsToSecs(s[currentIndex].minutes); if(running) syncEnd(); } else stopTimer(); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); };
+  document.getElementById('resetBtn').onclick=()=>{ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((getSchedule()[0]||{}).minutes||0); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); };
+
+  function jumpToSection(i){
+    const sched=getSchedule(); if(!sched[i]) return;
+    currentIndex=i;
+    secondsLeft=minsToSecs(sched[i].minutes);
+    if(running) syncEnd();
+    lastDisplayedSec=null;
+    renderAll();
+  }
+
+  const progressHost=document.getElementById('progressHost'),
+        progressFill=document.getElementById('progressFill'),
+        progressSegments=document.getElementById('progressSegments'),
+        progressTicks=document.getElementById('progressTicks'),
+        progressPctEl=document.getElementById('progressPct'),
+        legend=document.getElementById('legend'),
+        scrubOverlay=document.getElementById('scrubOverlay');
+
+  function scheduleTotalSecs(s){ return s.reduce((a,b)=>a+minsToSecs(b.minutes),0); }
+  function elapsedSeconds(sched, idx, secsLeft){
+    const past=sched.slice(0,idx).reduce((a,b)=>a+minsToSecs(b.minutes),0);
+    const cur=sched[idx]?minsToSecs(sched[idx].minutes)-secsLeft:0;
+    return past+cur;
+  }
+  function buildProgress(){
+    const sched=getSchedule(); const total=scheduleTotalSecs(sched)||1;
+    progressSegments.innerHTML=''; legend.innerHTML=''; progressTicks.innerHTML='';
+
+    sched.forEach((sec)=>{
+      const w=(minsToSecs(sec.minutes)/total)*100;
+      const seg=document.createElement('div');
+      seg.className='h-full relative bg-slate-900/40';
+      seg.style.width=`${w}%`;
+      progressSegments.appendChild(seg);
+    });
+
+    let cum=0;
+    for(let i=1;i<sched.length;i++){
+      cum+=minsToSecs(sched[i-1].minutes);
+      const pct=(cum/total)*100;
+      const tick=document.createElement('div');
+      tick.style.position='absolute';
+      tick.style.left=pct+'%';
+      tick.style.top='0'; tick.style.bottom='0';
+      tick.style.width='2px';
+      tick.style.background='white';
+      tick.style.boxShadow='0 0 10px rgba(255,255,255,.95)';
+      progressTicks.appendChild(tick);
+    }
+
+    sched.forEach((sec,i)=>{
+      const chip=document.createElement('button');
+      chip.type='button';
+      chip.className='chip';
+      chip.dataset.idx=String(i);
+      chip.innerHTML = `${escapeHtml(sec.name)} <span class="opacity-80">(${sec.minutes}m)</span>`;
+      chip.addEventListener('click', ()=>jumpToSection(i));
+      legend.appendChild(chip);
+    });
+  }
+  function updateLegendActive(){
+    legend.querySelectorAll('.chip').forEach((el, i)=>{
+      el.classList.toggle('chip-active', i===currentIndex);
+    });
+  }
+  function updateProgress(){
+    const sched=getSchedule(); const total=scheduleTotalSecs(sched)||1; const elapsed=elapsedSeconds(sched,currentIndex,secondsLeft);
+    const pct=Math.min(100,Math.max(0,(elapsed/total)*100));
+    progressFill.style.width=pct+'%';
+    progressPctEl.textContent=Math.floor(pct)+'%';
+    updateLegendActive();
+  }
+  let scrubbing=false;
+  function pctFromEvent(e){ const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0)) - rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
+  function jumpFromPct(p){
+    const sched=getSchedule(); const total=scheduleTotalSecs(sched); let target=p*total; let cum=0;
+    for(let i=0;i<sched.length;i++){
+      const dur=minsToSecs(sched[i].minutes);
+      if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); return; }
+      cum+=dur;
+    }
+    currentIndex=sched.length-1; secondsLeft=0; stopTimer(); lastDisplayedSec=null; renderAll();
+  }
+  scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true; scrubOverlay.setPointerCapture(e.pointerId); jumpFromPct(pctFromEvent(e));});
+  scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing) jumpFromPct(pctFromEvent(e));});
+  scrubOverlay.addEventListener('pointerup',()=>{scrubbing=false;});
+  scrubOverlay.addEventListener('pointercancel',()=>{scrubbing=false;});
+
+  const currentTitleEl=document.getElementById('currentTitle');
+  const linksDiv=document.getElementById('links');
+  const sectionDescEl=document.getElementById('sectionDesc');
+  const shelfWrap=document.getElementById('shelfWrap');
+  const clearSectionLinksBtn=document.getElementById('clearSectionLinks');
+  let isEditingSection=false;
+
+  const editSectionBtn=document.getElementById('editSectionBtn');
+  editSectionBtn.addEventListener('click', ()=>{
+    isEditingSection = !isEditingSection;
+    updateEditUI();
+  });
+
+  function updateEditUI(){
+    shelfWrap.classList.toggle('hidden', !isEditingSection);
+    clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
+    editSectionBtn.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
+    renderCurrentLinks();
+  }
+
+  function currentSectionRef(){ return getSchedule()[currentIndex]; }
+
+  function renderCurrentLinks(){
+    const sec=currentSectionRef();
+    const arr=sec?.links||[];
+    linksDiv.innerHTML = arr.map((w,i)=>`
+      <div class="link-card section-link" draggable="true" data-idx="${i}">
+        ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
+        <a class="text-slate-100 truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
+        ${isEditingSection ? `
+        <div class="ml-auto flex items-center gap-1">
+          <button class="btn-xs" data-act="edit">Edit</button>
+          <button class="btn-xs" data-act="remove">Del</button>
+        </div>` : ''}
+      </div>
+    `).join('');
+
+    linksDiv.querySelectorAll('.section-link').forEach(card=>{
+      card.addEventListener('dragstart', e=>{
+        if(!isEditingSection) { e.preventDefault(); return; }
+        const index=Number(card.dataset.idx);
+        e.dataTransfer.setData('application/json', JSON.stringify({type:'reorder', index}));
+        card.classList.add('drag-ghost');
+      });
+      card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+    });
+
+    if(isEditingSection){
+      linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const i=Number(btn.closest('[data-idx]').dataset.idx);
+          const target=sec.links[i];
+          editWidget(target, upd=>{ Object.assign(target, upd); saveSessions(); });
+        });
+      });
+      linksDiv.querySelectorAll('[data-act="remove"]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const i=Number(btn.closest('[data-idx]').dataset.idx);
+          sec.links.splice(i,1); saveSessions();
+        });
+      });
     }
   }
-  rafId=requestAnimationFrame(loop);
-}
-
-/* Start/Pause/Resume (single button) */
-const startBtn = document.getElementById('startBtn');
-let sessionStarted=false;
-function updateStartBtnLabel(){
-  if(!sessionStarted) startBtn.textContent='Start Study Session';
-  else if(running) startBtn.textContent='Pause Session';
-  else startBtn.textContent='Resume Session';
-}
-startBtn.onclick=()=>{
-  const s=getSchedule(); if(!s.length) return;
-  if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(s[0].minutes); sessionStarted=true; startTimer(); }
-  else { if(running) stopTimer(); else startTimer(); }
-};
-document.getElementById('prevBtn').onclick=()=>{ const s=getSchedule(); if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(s[currentIndex].minutes); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); } updateStartBtnLabel(); };
-document.getElementById('nextBtn').onclick=()=>{ const s=getSchedule(); if(currentIndex<s.length-1){ currentIndex++; secondsLeft=minsToSecs(s[currentIndex].minutes); if(running) syncEnd(); } else stopTimer(); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); };
-document.getElementById('resetBtn').onclick=()=>{ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((getSchedule()[0]||{}).minutes||0); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); };
-
-/* Jump helper (used by chips + outline + scrub) */
-function jumpToSection(i){
-  const sched=getSchedule(); if(!sched[i]) return;
-  currentIndex=i;
-  secondsLeft=minsToSecs(sched[i].minutes);
-  if(running) syncEnd();
-  lastDisplayedSec=null;
-  renderAll();
-}
-
-/* =========================
-   Progress bar + legend chips
-   ========================= */
-const progressHost=document.getElementById('progressHost'),
-      progressFill=document.getElementById('progressFill'),
-      progressSegments=document.getElementById('progressSegments'),
-      progressTicks=document.getElementById('progressTicks'),
-      progressPctEl=document.getElementById('progressPct'),
-      legend=document.getElementById('legend'),
-      scrubOverlay=document.getElementById('scrubOverlay');
-
-function scheduleTotalSecs(s){ return s.reduce((a,b)=>a+minsToSecs(b.minutes),0); }
-function elapsedSeconds(sched, idx, secsLeft){
-  const past=sched.slice(0,idx).reduce((a,b)=>a+minsToSecs(b.minutes),0);
-  const cur=sched[idx]?minsToSecs(sched[idx].minutes)-secsLeft:0;
-  return past+cur;
-}
-function buildProgress(){
-  const sched=getSchedule(); const total=scheduleTotalSecs(sched)||1;
-  progressSegments.innerHTML=''; legend.innerHTML=''; progressTicks.innerHTML='';
-
-  // segments (just background tint)
-  sched.forEach((sec)=>{
-    const w=(minsToSecs(sec.minutes)/total)*100;
-    const seg=document.createElement('div');
-    seg.className='h-full relative bg-slate-900/40';
-    seg.style.width=`${w}%`;
-    progressSegments.appendChild(seg);
+  clearSectionLinksBtn.addEventListener('click', ()=>{
+    if(!isEditingSection) return;
+    const sec=currentSectionRef(); if(!sec) return;
+    if(confirm('Remove all links from this section?')){ sec.links=[]; saveSessions(); }
   });
 
-  // white ticks at boundaries
-  let cum=0;
-  for(let i=1;i<sched.length;i++){
-    cum+=minsToSecs(sched[i-1].minutes);
-    const pct=(cum/total)*100;
-    const tick=document.createElement('div');
-    tick.style.position='absolute';
-    tick.style.left=pct+'%';
-    tick.style.top='0'; tick.style.bottom='0';
-    tick.style.width='2px';
-    tick.style.background='white';
-    tick.style.boxShadow='0 0 10px rgba(255,255,255,.95)';
-    progressTicks.appendChild(tick);
-  }
+  const linkShelfDiv=document.getElementById('linkShelf');
+  const addWidgetBtn=document.getElementById('addWidgetBtn');
+  const resetShelfBtn=document.getElementById('resetShelfBtn');
 
-  // legend chips — clickable
-  sched.forEach((sec,i)=>{
-    const chip=document.createElement('button');
-    chip.type='button';
-    chip.className='chip';
-    chip.dataset.idx=String(i);
-    chip.innerHTML = `${escapeHtml(sec.name)} <span class="opacity-80">(${sec.minutes}m)</span>`;
-    chip.addEventListener('click', ()=>jumpToSection(i));
-    legend.appendChild(chip);
-  });
-}
-function updateLegendActive(){
-  legend.querySelectorAll('.chip').forEach((el, i)=>{
-    el.classList.toggle('chip-active', i===currentIndex);
-  });
-}
-function updateProgress(){
-  const sched=getSchedule(); const total=scheduleTotalSecs(sched)||1; const elapsed=elapsedSeconds(sched,currentIndex,secondsLeft);
-  const pct=Math.min(100,Math.max(0,(elapsed/total)*100));
-  progressFill.style.width=pct+'%';
-  progressPctEl.textContent=Math.floor(pct)+'%';
-  updateLegendActive();
-}
-let scrubbing=false;
-function pctFromEvent(e){ const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0)) - rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
-function jumpFromPct(p){
-  const sched=getSchedule(); const total=scheduleTotalSecs(sched); let target=p*total; let cum=0;
-  for(let i=0;i<sched.length;i++){
-    const dur=minsToSecs(sched[i].minutes);
-    if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); return; }
-    cum+=dur;
-  }
-  currentIndex=sched.length-1; secondsLeft=0; stopTimer(); lastDisplayedSec=null; renderAll();
-}
-scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true; scrubOverlay.setPointerCapture(e.pointerId); jumpFromPct(pctFromEvent(e));});
-scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing) jumpFromPct(pctFromEvent(e));});
-scrubOverlay.addEventListener('pointerup',()=>{scrubbing=false;});
-scrubOverlay.addEventListener('pointercancel',()=>{scrubbing=false;});
-
-/* =========================
-   Current section + Links (edit mode)
-   ========================= */
-const currentTitleEl=document.getElementById('currentTitle');
-const linksDiv=document.getElementById('links');
-const sectionDescEl=document.getElementById('sectionDesc');
-const shelfWrap=document.getElementById('shelfWrap');
-const clearSectionLinksBtn=document.getElementById('clearSectionLinks');
-let isEditingSection=false;
-
-const editSectionBtn=document.getElementById('editSectionBtn');
-editSectionBtn.addEventListener('click', ()=>{
-  // "Save" just exits edit mode – changes persist immediately.
-  isEditingSection = !isEditingSection;
-  updateEditUI();
-});
-
-function updateEditUI(){
-  shelfWrap.classList.toggle('hidden', !isEditingSection);
-  clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
-  editSectionBtn.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
-  renderCurrentLinks(); // re-render to show/hide inline edit buttons
-}
-
-function currentSectionRef(){ return getSchedule()[currentIndex]; }
-
-function renderCurrentLinks(){
-  const sec=currentSectionRef();
-  const arr=sec?.links||[];
-  linksDiv.innerHTML = arr.map((w,i)=>`
-    <div class="link-card section-link" draggable="true" data-idx="${i}">
-      ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
-      <a class="text-slate-100 truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
-      ${isEditingSection ? `
+  function widgetCardHTML(w){
+    const icon = (w.icon==='img' && w.img) ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>`
+                : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
+    return `<div class="link-card draggable-shelf" draggable="true" data-wid="${w.id}">
+      ${icon}
+      <div class="min-w-0">
+        <div class="text-slate-100 truncate">${escapeHtml(w.label||'Untitled')}</div>
+        <div class="text-xs text-slate-400 truncate">${escapeHtml(w.url||'')}</div>
+      </div>
       <div class="ml-auto flex items-center gap-1">
         <button class="btn-xs" data-act="edit">Edit</button>
-        <button class="btn-xs" data-act="remove">Del</button>
-      </div>` : ''}
-    </div>
-  `).join('');
-
-  // Reorder within section (drag)
-  linksDiv.querySelectorAll('.section-link').forEach(card=>{
-    card.addEventListener('dragstart', e=>{
-      if(!isEditingSection) { e.preventDefault(); return; }
-      const index=Number(card.dataset.idx);
-      e.dataTransfer.setData('application/json', JSON.stringify({type:'reorder', index}));
-      card.classList.add('drag-ghost');
-    });
-    card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-  });
-
-  // Inline edits (only in edit mode)
-  if(isEditingSection){
-    linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const i=Number(btn.closest('[data-idx]').dataset.idx);
-        const target=sec.links[i];
-        editWidget(target, upd=>{ Object.assign(target, upd); saveSessions(); renderCurrentLinks(); });
-      });
-    });
-    linksDiv.querySelectorAll('[data-act="remove"]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const i=Number(btn.closest('[data-idx]').dataset.idx);
-        sec.links.splice(i,1); saveSessions(); renderCurrentLinks();
-      });
-    });
-  }
-}
-clearSectionLinksBtn.addEventListener('click', ()=>{
-  if(!isEditingSection) return;
-  const sec=currentSectionRef(); if(!sec) return;
-  if(confirm('Remove all links from this section?')){ sec.links=[]; saveSessions(); renderCurrentLinks(); }
-});
-
-/* Link widget shelf */
-const linkShelfDiv=document.getElementById('linkShelf');
-const addWidgetBtn=document.getElementById('addWidgetBtn');
-const resetShelfBtn=document.getElementById('resetShelfBtn');
-
-function widgetCardHTML(w){
-  const icon = (w.icon==='img' && w.img) ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>`
-              : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
-  return `<div class="link-card draggable-shelf" draggable="true" data-wid="${w.id}">
-    ${icon}
-    <div class="min-w-0">
-      <div class="text-slate-100 truncate">${escapeHtml(w.label||'Untitled')}</div>
-      <div class="text-xs text-slate-400 truncate">${escapeHtml(w.url||'')}</div>
-    </div>
-    <div class="ml-auto flex items-center gap-1">
-      <button class="btn-xs" data-act="edit">Edit</button>
-      <button class="btn-xs" data-act="delete">Del</button>
-    </div>
-  </div>`;
-}
-function renderShelf(){
-  linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
-  linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
-    card.addEventListener('dragstart', e=>{
-      if(!isEditingSection) { e.preventDefault(); return; }
-      e.dataTransfer.setData('application/json', JSON.stringify({type:'shelf', id:card.dataset.wid}));
-      card.classList.add('drag-ghost');
-    });
-    card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-  });
-  linkShelfDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      if(!isEditingSection) return;
-      const id=btn.closest('[data-wid]').dataset.wid;
-      const w=widgetShelf.find(x=>x.id===id);
-      editWidget(w, upd=>{ Object.assign(w,upd); saveShelf(); renderShelf(); });
-    });
-  });
-  linkShelfDiv.querySelectorAll('[data-act="delete"]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      if(!isEditingSection) return;
-      const id=btn.closest('[data-wid]').dataset.wid;
-      widgetShelf=widgetShelf.filter(w=>w.id!==id);
-      saveShelf(); renderShelf();
-    });
-  });
-}
-function editWidget(target, onSave){
-  const label = prompt('Title:', target?.label || '') ?? null; if(label===null) return;
-  const url   = prompt('URL:', target?.url || '') ?? null; if(url===null) return;
-  const type  = prompt('Icon type: emoji / img (leave empty to keep current)', target?.icon || '') || target?.icon || 'emoji';
-  let emoji   = target?.emoji || '🔗';
-  let img     = target?.img || '';
-  if(type==='emoji'){ emoji = prompt('Emoji (or short text):', emoji) || '🔗'; img=''; }
-  if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
-  onSave({label,url,icon:type,emoji,img});
-}
-addWidgetBtn.addEventListener('click', ()=>{
-  if(!isEditingSection) return;
-  const base={ id:'w_'+Date.now(), label:'New Link', url:'', icon:'emoji', emoji:'🔗', img:'' };
-  editWidget(base, upd=>{ widgetShelf.push({...base,...upd}); saveShelf(); renderShelf(); });
-});
-resetShelfBtn.addEventListener('click', ()=>{ if(!isEditingSection) return; if(confirm('Reset shelf to defaults?')){ widgetShelf=structuredClone(DEFAULT_SHELF); saveShelf(); renderShelf(); }});
-
-// Drop shelf card into current section
-linksDiv.addEventListener('dragover', e=>{ if(!isEditingSection) return; e.preventDefault(); linksDiv.classList.add('drag-over'); });
-linksDiv.addEventListener('dragleave', ()=> linksDiv.classList.remove('drag-over'));
-linksDiv.addEventListener('drop', e=>{
-  if(!isEditingSection) return;
-  e.preventDefault(); linksDiv.classList.remove('drag-over');
-  const data=e.dataTransfer.getData('application/json'); if(!data) return;
-  const payload=JSON.parse(data);
-  const sec=currentSectionRef(); if(!sec) return;
-
-  if(payload.type==='shelf'){
-    const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
-    sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
-    saveSessions(); renderCurrentLinks();
-  } else if(payload.type==='reorder'){
-    const from=payload.index;
-    const cards=[...linksDiv.querySelectorAll('.section-link')];
-    let to=cards.length;
-    for(let i=0;i<cards.length;i++){
-      const r=cards[i].getBoundingClientRect();
-      if(e.clientY < r.top + r.height/2){ to=i; break; }
-    }
-    if(from===to || from==null || to==null) return;
-    const [m]=sec.links.splice(from,1);
-    sec.links.splice(to,0,m);
-    saveSessions(); renderCurrentLinks();
-  }
-});
-
-/* =========================
-   Session Outline (minimal + click-to-jump + DnD + Edit)
-   ========================= */
-const outline=document.getElementById('outline');
-const totalMins=document.getElementById('totalMins');
-
-function renderOutline(){
-  const sched=getSchedule();
-  outline.innerHTML = sched.map((s,i)=>`
-    <li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}" draggable="true">
-      <div class="flex items-center justify-between gap-3">
-        <button class="text-left min-w-0 flex-1 truncate text-sm focus:outline-none">${escapeHtml(s.name)}</button>
-        <div class="flex items-center gap-2 shrink-0">
-          <span class="text-xs text-slate-300 w-10 text-right">${Number(s.minutes)}m</span>
-          <button class="btn-xs" data-act="edit">Edit</button>
-        </div>
+        <button class="btn-xs" data-act="delete">Del</button>
       </div>
-    </li>
-  `).join('');
-
-  // click to jump (anywhere except the edit button)
-  outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
-    li.addEventListener('click', (e)=>{
-      if(e.target.closest('[data-act="edit"]')) return;
-      jumpToSection(idx);
+    </div>`;
+  }
+  function renderShelf(){
+    linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
+    linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
+      card.addEventListener('dragstart', e=>{
+        if(!isEditingSection) { e.preventDefault(); return; }
+        e.dataTransfer.setData('application/json', JSON.stringify({type:'shelf', id:card.dataset.wid}));
+        card.classList.add('drag-ghost');
+      });
+      card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
     });
+    linkShelfDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if(!isEditingSection) return;
+        const id=btn.closest('[data-wid]').dataset.wid;
+        const w=widgetShelf.find(x=>x.id===id);
+        editWidget(w, upd=>{ Object.assign(w,upd); saveShelf(); });
+      });
+    });
+    linkShelfDiv.querySelectorAll('[data-act="delete"]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if(!isEditingSection) return;
+        const id=btn.closest('[data-wid]').dataset.wid;
+        widgetShelf=widgetShelf.filter(w=>w.id!==id);
+        saveShelf();
+      });
+    });
+  }
+  function editWidget(target, onSave){
+    const label = prompt('Title:', target?.label || '') ?? null; if(label===null) return;
+    const url   = prompt('URL:', target?.url || '') ?? null; if(url===null) return;
+    const type  = prompt('Icon type: emoji / img (leave empty to keep current)', target?.icon || '') || target?.icon || 'emoji';
+    let emoji   = target?.emoji || '🔗';
+    let img     = target?.img || '';
+    if(type==='emoji'){ emoji = prompt('Emoji (or short text):', emoji) || '🔗'; img=''; }
+    if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
+    onSave({label,url,icon:type,emoji,img});
+  }
+  addWidgetBtn.addEventListener('click', ()=>{
+    if(!isEditingSection) return;
+    const base={ id:'w_'+Date.now(), label:'New Link', url:'', icon:'emoji', emoji:'🔗', img:'' };
+    editWidget(base, upd=>{ widgetShelf.push({...base,...upd}); saveShelf(); });
   });
+  resetShelfBtn.addEventListener('click', ()=>{ if(!isEditingSection) return; if(confirm('Reset shelf to defaults?')){ widgetShelf=structuredClone(DEFAULT_SHELF); saveShelf(); }});
 
-  // inline edit (prompts)
-  outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const id=btn.closest('[data-id]').dataset.id;
-      const ref=getEditableRef();
-      const idx=ref.findIndex(x=>x.id===id);
-      if(idx<0) return;
-      const cur=ref[idx];
-      const t=prompt('Section title:', cur.name); if(t===null) return;
-      const m=prompt('Minutes:', String(cur.minutes)); if(m===null) return;
-      cur.name=t.trim()||cur.name; cur.minutes=Math.max(1, Number(m)||cur.minutes);
+  linksDiv.addEventListener('dragover', e=>{ if(!isEditingSection) return; e.preventDefault(); linksDiv.classList.add('drag-over'); });
+  linksDiv.addEventListener('dragleave', ()=> linksDiv.classList.remove('drag-over'));
+  linksDiv.addEventListener('drop', e=>{
+    if(!isEditingSection) return;
+    e.preventDefault(); linksDiv.classList.remove('drag-over');
+    const data=e.dataTransfer.getData('application/json'); if(!data) return;
+    const payload=JSON.parse(data);
+    const sec=currentSectionRef(); if(!sec) return;
+
+    if(payload.type==='shelf'){
+      const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
+      sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
       saveSessions();
-      if(getSchedule()[currentIndex]?.id===cur.id){
-        secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes));
-        if(running) syncEnd();
+    } else if(payload.type==='reorder'){
+      const from=payload.index;
+      const cards=[...linksDiv.querySelectorAll('.section-link')];
+      let to=cards.length;
+      for(let i=0;i<cards.length;i++){
+        const r=cards[i].getBoundingClientRect();
+        if(e.clientY < r.top + r.height/2){ to=i; break; }
       }
-      renderAll();
-    });
+      if(from===to || from==null || to==null) return;
+      const [m]=sec.links.splice(from,1);
+      sec.links.splice(to,0,m);
+      saveSessions();
+    }
   });
 
-  makeOutlineDnD(outline, getEditableRef());
-  totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(getSchedule())/60)} minutes`;
-}
+  const outline=document.getElementById('outline');
+  const totalMins=document.getElementById('totalMins');
 
-function makeOutlineDnD(listEl, backingArray){
-  let draggingEl=null;
-  let startedOnEdit=false;
+  function renderOutline(){
+    const sched=getSchedule();
+    outline.innerHTML = sched.map((s,i)=>`
+      <li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}" draggable="true">
+        <div class="flex items-center justify-between gap-3">
+          <button class="text-left min-w-0 flex-1 truncate text-sm focus:outline-none">${escapeHtml(s.name)}</button>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-xs text-slate-300 w-10 text-right">${Number(s.minutes)}m</span>
+            <button class="btn-xs" data-act="edit">Edit</button>
+          </div>
+        </div>
+      </li>
+    `).join('');
 
-  listEl.querySelectorAll('li[draggable="true"]').forEach(li=>{
-    li.addEventListener('pointerdown', (e)=>{ startedOnEdit = !!e.target.closest('[data-act="edit"]'); });
-    li.addEventListener('dragstart', (e)=>{
-      if(startedOnEdit){ e.preventDefault(); startedOnEdit=false; return; }
-      draggingEl = li;
-      li.classList.add('drag-ghost');
-      e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setData('text/plain', li.dataset.id); } catch {}
+    outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
+      li.addEventListener('click', (e)=>{
+        if(e.target.closest('[data-act="edit"]')) return;
+        jumpToSection(idx);
+      });
     });
-    li.addEventListener('dragend', ()=>{
+
+    outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id=btn.closest('[data-id]').dataset.id;
+        const ref=getEditableRef();
+        const idx=ref.findIndex(x=>x.id===id);
+        if(idx<0) return;
+        const cur=ref[idx];
+        const t=prompt('Section title:', cur.name); if(t===null) return;
+        const m=prompt('Minutes:', String(cur.minutes)); if(m===null) return;
+        cur.name=t.trim()||cur.name; cur.minutes=Math.max(1, Number(m)||cur.minutes);
+        saveSessions();
+        if(getSchedule()[currentIndex]?.id===cur.id){
+          secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes));
+          if(running) syncEnd();
+        }
+        renderAll();
+      });
+    });
+
+    makeOutlineDnD(outline, getEditableRef());
+    totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(getSchedule())/60)} minutes`;
+  }
+
+  function makeOutlineDnD(listEl, backingArray){
+    let draggingEl=null;
+    let startedOnEdit=false;
+
+    listEl.querySelectorAll('li[draggable="true"]').forEach(li=>{
+      li.addEventListener('pointerdown', (e)=>{ startedOnEdit = !!e.target.closest('[data-act="edit"]'); });
+      li.addEventListener('dragstart', (e)=>{
+        if(startedOnEdit){ e.preventDefault(); startedOnEdit=false; return; }
+        draggingEl = li;
+        li.classList.add('drag-ghost');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', li.dataset.id); } catch {}
+      });
+      li.addEventListener('dragend', ()=>{
+        if(!draggingEl) return;
+        draggingEl.classList.remove('drag-ghost');
+        const currentId = getSchedule()[currentIndex]?.id;
+        const ids = [...listEl.querySelectorAll('li[data-id]')].map(n=>n.dataset.id);
+        const map = Object.fromEntries(backingArray.map(x=>[x.id,x]));
+        backingArray.splice(0, backingArray.length, ...ids.map(id=>map[id]).filter(Boolean));
+        saveSessions();
+        const newIndex = getSchedule().findIndex(s=>s.id===currentId);
+        if(newIndex>=0) currentIndex=newIndex;
+        renderAll();
+        draggingEl=null;
+      });
+    });
+
+    listEl.addEventListener('dragover', (e)=>{
       if(!draggingEl) return;
-      draggingEl.classList.remove('drag-ghost');
-      const currentId = getSchedule()[currentIndex]?.id;
-      const ids = [...listEl.querySelectorAll('li[data-id]')].map(n=>n.dataset.id);
-      const map = Object.fromEntries(backingArray.map(x=>[x.id,x]));
-      backingArray.splice(0, backingArray.length, ...ids.map(id=>map[id]).filter(Boolean));
-      saveSessions();
-      const newIndex = getSchedule().findIndex(s=>s.id===currentId);
-      if(newIndex>=0) currentIndex=newIndex;
-      renderAll();
-      draggingEl=null;
+      e.preventDefault();
+      const after = getDragAfterElement(listEl, e.clientY);
+      if(after==null) listEl.appendChild(draggingEl);
+      else if(after !== draggingEl) listEl.insertBefore(draggingEl, after);
     });
+    listEl.addEventListener('drop', (e)=>{ e.preventDefault(); });
+  }
+  function getDragAfterElement(container, y){
+    const els=[...container.querySelectorAll('li[data-id]:not(.drag-ghost)')];
+    return els.reduce((closest,child)=>{
+      const box=child.getBoundingClientRect();
+      const offset=y - (box.top + box.height/2);
+      if(offset<0 && offset>closest.offset) return {offset, element:child};
+      else return closest;
+    }, {offset: Number.NEGATIVE_INFINITY, element:null}).element;
+  }
+
+  document.getElementById('addOutlineItem').addEventListener('click', ()=>{
+    const ref=getEditableRef();
+    const title = prompt('New section title:','New section');
+    if(title===null) return;
+    const minsRaw = prompt('Minutes:','5');
+    if(minsRaw===null) return;
+    const mins = Math.max(1, Number(minsRaw)||5);
+    ref.push({ id:'S'+Date.now(), name:title.trim()||'New section', minutes:mins, links:[] });
+    saveSessions(); renderAll();
   });
 
-  listEl.addEventListener('dragover', (e)=>{
-    if(!draggingEl) return;
-    e.preventDefault();
-    const after = getDragAfterElement(listEl, e.clientY);
-    if(after==null) listEl.appendChild(draggingEl);
-    else if(after !== draggingEl) listEl.insertBefore(draggingEl, after);
+  const split = document.getElementById('split');
+  const splitHandle = document.getElementById('splitHandle');
+  const showOutlineBtn = document.getElementById('showOutlineBtn');
+  const collapseOutlineBtn = document.getElementById('collapseOutlineBtn');
+  let splitRatio = Number(localStorage.getItem('split_ratio_v2')) || 66;
+  applySplit(splitRatio);
+  function applySplit(pct){ pct=Math.max(40,Math.min(85,pct)); split.style.setProperty('--leftRatio', pct + '%'); localStorage.setItem('split_ratio_v2', String(pct)); }
+  let resizing=false;
+  splitHandle.addEventListener('pointerdown', (e)=>{ if(split.classList.contains('collapsed')) return; resizing=true; splitHandle.setPointerCapture(e.pointerId); });
+  splitHandle.addEventListener('pointermove', (e)=>{ if(!resizing) return; const rect=split.getBoundingClientRect(); const x=Math.max(rect.left+120, Math.min(e.clientX, rect.right-260)); const pct=((x-rect.left)/rect.width)*100; applySplit(pct); });
+  splitHandle.addEventListener('pointerup', ()=>{ resizing=false; });
+  collapseOutlineBtn.addEventListener('click', ()=>{ split.classList.add('collapsed'); showOutlineBtn.classList.remove('hidden'); });
+  showOutlineBtn.addEventListener('click', ()=>{ split.classList.remove('collapsed'); showOutlineBtn.classList.add('hidden'); });
+
+  const floatBtn = document.getElementById('floatBtn');
+  const boardWin = document.getElementById('boardWin');
+  const boardHeader = document.getElementById('boardHeader');
+  const boardIframe = document.getElementById('boardIframe');
+  const fenBar = document.getElementById('fenBar');
+  const applyFenBtn = document.getElementById('applyFen');
+  const openViewerBtn = document.getElementById('openViewer');
+  const popOut = document.getElementById('popOut');
+  const minimizeBoard = document.getElementById('minimizeBoard');
+  const closeBoard = document.getElementById('closeBoard');
+
+  function setIframeToAnalysisFen(fen){
+    const url = `https://lichess.org/embed/analysis?fen=${encodeURIComponent(fen)}&theme=auto&bg=auto`;
+    boardIframe.src = url; popOut.href = url;
+  }
+  function setIframeToGame(gameIdOrUrl){
+    const id = (gameIdOrUrl||'').split('/').pop().split('#')[0].split('?')[0];
+    const url = `https://lichess.org/embed/${id}#0?theme=auto&bg=auto`;
+    boardIframe.src = url; popOut.href = url;
+  }
+  function showBoard(){ boardWin.classList.remove('minimized'); minimizeBoard.textContent='Minimize'; minimizeBoard.setAttribute('aria-expanded','true'); boardWin.style.display='block'; }
+  function hideBoard(){ boardWin.style.display='none'; }
+  floatBtn.addEventListener('click', ()=> showBoard());
+  minimizeBoard.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const isMin=boardWin.classList.toggle('minimized');
+    minimizeBoard.textContent=isMin?'Restore':'Minimize';
+    minimizeBoard.setAttribute('aria-expanded', String(!isMin));
   });
-  listEl.addEventListener('drop', (e)=>{ e.preventDefault(); });
-}
-function getDragAfterElement(container, y){
-  const els=[...container.querySelectorAll('li[data-id]:not(.drag-ghost)')];
-  return els.reduce((closest,child)=>{
-    const box=child.getBoundingClientRect();
-    const offset=y - (box.top + box.height/2);
-    if(offset<0 && offset>closest.offset) return {offset, element:child};
-    else return closest;
-  }, {offset: Number.NEGATIVE_INFINITY, element:null}).element;
-}
-
-/* Add a new outline item */
-document.getElementById('addOutlineItem').addEventListener('click', ()=>{
-  const ref=getEditableRef();
-  const title = prompt('New section title:','New section');
-  if(title===null) return;
-  const minsRaw = prompt('Minutes:','5');
-  if(minsRaw===null) return;
-  const mins = Math.max(1, Number(minsRaw)||5);
-  ref.push({ id:'S'+Date.now(), name:title.trim()||'New section', minutes:mins, links:[] });
-  saveSessions(); renderAll();
-});
-
-/* =========================
-   Splitter & floating board
-   ========================= */
-const split = document.getElementById('split');
-const splitHandle = document.getElementById('splitHandle');
-const showOutlineBtn = document.getElementById('showOutlineBtn');
-const collapseOutlineBtn = document.getElementById('collapseOutlineBtn');
-let splitRatio = Number(localStorage.getItem('split_ratio_v2')) || 66;
-applySplit(splitRatio);
-function applySplit(pct){ pct=Math.max(40,Math.min(85,pct)); split.style.setProperty('--leftRatio', pct + '%'); localStorage.setItem('split_ratio_v2', String(pct)); }
-let resizing=false;
-splitHandle.addEventListener('pointerdown', (e)=>{ if(split.classList.contains('collapsed')) return; resizing=true; splitHandle.setPointerCapture(e.pointerId); });
-splitHandle.addEventListener('pointermove', (e)=>{ if(!resizing) return; const rect=split.getBoundingClientRect(); const x=Math.max(rect.left+120, Math.min(e.clientX, rect.right-260)); const pct=((x-rect.left)/rect.width)*100; applySplit(pct); });
-splitHandle.addEventListener('pointerup', ()=>{ resizing=false; });
-collapseOutlineBtn.addEventListener('click', ()=>{ split.classList.add('collapsed'); showOutlineBtn.classList.remove('hidden'); });
-showOutlineBtn.addEventListener('click', ()=>{ split.classList.remove('collapsed'); showOutlineBtn.classList.add('hidden'); });
-
-const floatBtn = document.getElementById('floatBtn');
-const boardWin = document.getElementById('boardWin');
-const boardHeader = document.getElementById('boardHeader');
-const boardIframe = document.getElementById('boardIframe');
-const fenBar = document.getElementById('fenBar');
-const applyFenBtn = document.getElementById('applyFen');
-const openViewerBtn = document.getElementById('openViewer');
-const popOut = document.getElementById('popOut');
-const minimizeBoard = document.getElementById('minimizeBoard');
-const closeBoard = document.getElementById('closeBoard');
-
-function setIframeToAnalysisFen(fen){
-  const url = `https://lichess.org/embed/analysis?fen=${encodeURIComponent(fen)}&theme=auto&bg=auto`;
-  boardIframe.src = url; popOut.href = url;
-}
-function setIframeToGame(gameIdOrUrl){
-  const id = (gameIdOrUrl||'').split('/').pop().split('#')[0].split('?')[0];
-  const url = `https://lichess.org/embed/${id}#0?theme=auto&bg=auto`;
-  boardIframe.src = url; popOut.href = url;
-}
-function showBoard(){ boardWin.classList.remove('minimized'); minimizeBoard.textContent='Minimize'; minimizeBoard.setAttribute('aria-expanded','true'); boardWin.style.display='block'; }
-function hideBoard(){ boardWin.style.display='none'; }
-floatBtn.addEventListener('click', ()=> showBoard());
-minimizeBoard.addEventListener('click', (e)=>{
-  e.stopPropagation();
-  const isMin=boardWin.classList.toggle('minimized');
-  minimizeBoard.textContent=isMin?'Restore':'Minimize';
-  minimizeBoard.setAttribute('aria-expanded', String(!isMin));
-});
-closeBoard.addEventListener('click', (e)=>{
-  e.stopPropagation();
-  try{ boardIframe.src='about:blank'; popOut.href='#'; }catch{}
-  boardWin.classList.remove('minimized'); minimizeBoard.textContent='Minimize'; minimizeBoard.setAttribute('aria-expanded','true'); hideBoard();
-});
-
-// draggable floating button (persist pos)
-(function(){
-  let pos=JSON.parse(localStorage.getItem('float_btn_pos_v1')||'null')||{x:null,y:null};
-  if(pos.x!=null&&pos.y!=null){ floatBtn.style.left=pos.x+'px'; floatBtn.style.top=pos.y+'px'; floatBtn.style.right='auto'; floatBtn.style.bottom='auto'; }
-  let dragging=false, offX=0, offY=0;
-  floatBtn.addEventListener('pointerdown', e=>{ dragging=true; floatBtn.setPointerCapture(e.pointerId); const r=floatBtn.getBoundingClientRect(); offX=e.clientX-r.left; offY=e.clientY-r.top; });
-  floatBtn.addEventListener('pointermove', e=>{ if(!dragging) return; floatBtn.style.left=(e.clientX-offX)+'px'; floatBtn.style.top=(e.clientY-offY)+'px'; floatBtn.style.right='auto'; floatBtn.style.bottom='auto'; });
-  function end(){ if(!dragging) return; dragging=false; const r=floatBtn.getBoundingClientRect(); localStorage.setItem('float_btn_pos_v1', JSON.stringify({x:r.left,y:r.top})); }
-  floatBtn.addEventListener('pointerup', end); floatBtn.addEventListener('pointercancel', end);
-})();
-
-// board window drag/resize
-(function(){
-  const saved=JSON.parse(localStorage.getItem('board_win_rc_v1')||'null');
-  if(saved){ boardWin.style.width=saved.w; boardWin.style.height=saved.h; boardWin.style.left=saved.l; boardWin.style.top=saved.t; boardWin.style.right='auto'; boardWin.style.bottom='auto'; }
-  let dragging=false, dx=0, dy=0;
-  boardHeader.addEventListener('pointerdown', e=>{
-    if (e.target.closest('button, a, input, select, textarea')) return;
-    dragging=true; boardHeader.setPointerCapture(e.pointerId);
-    const r=boardWin.getBoundingClientRect(); dx=e.clientX-r.left; dy=e.clientY-r.top;
+  closeBoard.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    try{ boardIframe.src='about:blank'; popOut.href='#'; }catch{}
+    boardWin.classList.remove('minimized'); minimizeBoard.textContent='Minimize'; minimizeBoard.setAttribute('aria-expanded','true'); hideBoard();
   });
-  boardHeader.addEventListener('pointermove', e=>{ if(!dragging) return; const ww=innerWidth, wh=innerHeight; const nx=Math.min(ww-40,Math.max(10,e.clientX-dx)); const ny=Math.min(wh-40,Math.max(10,e.clientY-dy)); boardWin.style.left=nx+'px'; boardWin.style.top=ny+'px'; boardWin.style.right='auto'; boardWin.style.bottom='auto'; });
-  function endDrag(){ if(!dragging) return; dragging=false; const r=boardWin.getBoundingClientRect(); localStorage.setItem('board_win_rc_v1', JSON.stringify({w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'})); }
-  boardHeader.addEventListener('pointerup', endDrag); boardHeader.addEventListener('pointercancel', endDrag);
 
-  function startResize(handle, mode){
-    return function(e){
-      e.preventDefault(); handle.setPointerCapture(e.pointerId);
-      const start={x:e.clientX,y:e.clientY}; const rect=boardWin.getBoundingClientRect();
-      function mm(ev){
-        const dx=ev.clientX-start.x, dy=ev.clientY-start.y;
-        let w=rect.width, h=rect.height;
-        if(mode.includes('ew')) w=Math.max(380, rect.width+dx);
-        if(mode.includes('ns')) h=Math.max(320, rect.height+dy);
-        if(mode.includes('nwse')){ w=Math.max(380, rect.width+dx); h=Math.max(320, rect.height+dy); }
-        boardWin.style.width=w+'px'; boardWin.style.height=h+'px';
+  (function(){
+    let pos=JSON.parse(localStorage.getItem('float_btn_pos_v1')||'null')||{x:null,y:null};
+    if(pos.x!=null&&pos.y!=null){ floatBtn.style.left=pos.x+'px'; floatBtn.style.top=pos.y+'px'; floatBtn.style.right='auto'; floatBtn.style.bottom='auto'; }
+    let dragging=false, offX=0, offY=0;
+    floatBtn.addEventListener('pointerdown', e=>{ dragging=true; floatBtn.setPointerCapture(e.pointerId); const r=floatBtn.getBoundingClientRect(); offX=e.clientX-r.left; offY=e.clientY-r.top; });
+    floatBtn.addEventListener('pointermove', e=>{ if(!dragging) return; floatBtn.style.left=(e.clientX-offX)+'px'; floatBtn.style.top=(e.clientY-offY)+'px'; floatBtn.style.right='auto'; floatBtn.style.bottom='auto'; });
+    function end(){ if(!dragging) return; dragging=false; const r=floatBtn.getBoundingClientRect(); localStorage.setItem('float_btn_pos_v1', JSON.stringify({x:r.left,y:r.top})); }
+    floatBtn.addEventListener('pointerup', end); floatBtn.addEventListener('pointercancel', end);
+  })();
+
+  (function(){
+    const saved=JSON.parse(localStorage.getItem('board_win_rc_v1')||'null');
+    if(saved){ boardWin.style.width=saved.w; boardWin.style.height=saved.h; boardWin.style.left=saved.l; boardWin.style.top=saved.t; boardWin.style.right='auto'; boardWin.style.bottom='auto'; }
+    let dragging=false, dx=0, dy=0;
+    boardHeader.addEventListener('pointerdown', e=>{
+      if (e.target.closest('button, a, input, select, textarea')) return;
+      dragging=true; boardHeader.setPointerCapture(e.pointerId);
+      const r=boardWin.getBoundingClientRect(); dx=e.clientX-r.left; dy=e.clientY-r.top;
+    });
+    boardHeader.addEventListener('pointermove', e=>{ if(!dragging) return; const ww=innerWidth, wh=innerHeight; const nx=Math.min(ww-40,Math.max(10,e.clientX-dx)); const ny=Math.min(wh-40,Math.max(10,e.clientY-dy)); boardWin.style.left=nx+'px'; boardWin.style.top=ny+'px'; boardWin.style.right='auto'; boardWin.style.bottom='auto'; });
+    function endDrag(){ if(!dragging) return; dragging=false; const r=boardWin.getBoundingClientRect(); localStorage.setItem('board_win_rc_v1', JSON.stringify({w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'})); }
+    boardHeader.addEventListener('pointerup', endDrag); boardHeader.addEventListener('pointercancel', endDrag);
+
+    function startResize(handle, mode){
+      return function(e){
+        e.preventDefault(); handle.setPointerCapture(e.pointerId);
+        const start={x:e.clientX,y:e.clientY}; const rect=boardWin.getBoundingClientRect();
+        function mm(ev){
+          const dx=ev.clientX-start.x, dy=ev.clientY-start.y;
+          let w=rect.width, h=rect.height;
+          if(mode.includes('ew')) w=Math.max(380, rect.width+dx);
+          if(mode.includes('ns')) h=Math.max(320, rect.height+dy);
+          if(mode.includes('nwse')){ w=Math.max(380, rect.width+dx); h=Math.max(320, rect.height+dy); }
+          boardWin.style.width=w+'px'; boardWin.style.height=h+'px';
+        }
+        function end(){
+          try{ handle.releasePointerCapture(e.pointerId);}catch{}
+          document.removeEventListener('pointermove',mm);
+          document.removeEventListener('pointerup',end);
+          const r=boardWin.getBoundingClientRect();
+          localStorage.setItem('board_win_rc_v1', JSON.stringify({w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'}));
+        }
+        document.addEventListener('pointermove',mm);
+        document.addEventListener('pointerup',end);
       }
-      function end(){
-        try{ handle.releasePointerCapture(e.pointerId);}catch{}
-        document.removeEventListener('pointermove',mm);
-        document.removeEventListener('pointerup',end);
-        const r=boardWin.getBoundingClientRect();
-        localStorage.setItem('board_win_rc_v1', JSON.stringify({w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'}));
-      }
-      document.addEventListener('pointermove',mm);
-      document.addEventListener('pointerup',end);
+    }
+    document.querySelector('.resizer.e').addEventListener('pointerdown', startResize(document.querySelector('.resizer.e'),'ew'));
+    document.querySelector('.resizer.s').addEventListener('pointerdown', startResize(document.querySelector('.resizer.s'),'ns'));
+    document.querySelector('.resizer.se').addEventListener('pointerdown', startResize(document.querySelector('.resizer.se'),'nwse'));
+  })();
+
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+  function beep(){ try{ const AC=window.AudioContext||window.webkitAudioContext; const ctx=new AC(); const now=ctx.currentTime; const o1=ctx.createOscillator(), g1=ctx.createGain(); o1.type='sine'; o1.frequency.value=880; o1.connect(g1); g1.connect(ctx.destination); g1.gain.setValueAtTime(.0001,now); g1.gain.exponentialRampToValueAtTime(.18,now+.01); o1.start(now); o1.stop(now+.12); const o2=ctx.createOscillator(), g2=ctx.createGain(); o2.type='sine'; o2.frequency.value=1318.5; o2.connect(g2); g2.connect(ctx.destination); g2.gain.setValueAtTime(.0001,now+.13); g2.gain.exponentialRampToValueAtTime(.16,now+.15); o2.start(now+.13); o2.stop(now+.28);}catch{} }
+
+  function renderCurrent(){
+    const sched=getSchedule(); const cur=sched[currentIndex];
+    currentTitleEl.textContent=cur?cur.name:'—';
+    if(secondsLeft!==lastDisplayedSec){ clockEl.textContent=secsToClock(secondsLeft); lastDisplayedSec=secondsLeft; }
+
+    const key = cur ? ('section_desc_'+cur.id) : null;
+    if(key){ sectionDescEl.value = localStorage.getItem(key) || ''; sectionDescEl.oninput = ()=> localStorage.setItem(key, sectionDescEl.value); }
+
+    renderCurrentLinks();
+  }
+  function renderAll(){ buildProgress(); updateProgress(); updateLegendActive(); renderCurrent(); renderShelf(); renderOutline(); }
+
+  let secondsInit = minsToSecs((getSchedule()[0]||{}).minutes||0);
+  secondsLeft = secondsInit;
+  renderAll();
+  if(!loadSessionsLocal()) saveSessionsLocal();
+  updateStartBtnLabel();
+  updateEditUI();
+
+  // ------------------------------
+  // Auth UI wiring (Google only)
+  // ------------------------------
+  const signInBtn  = document.getElementById('signInBtn');
+  const signUpBtn  = document.getElementById('signUpBtn');
+  const userBadge  = document.getElementById('userBadge');
+  const userEmail  = document.getElementById('userEmail');
+  const signOutBtn = document.getElementById('signOutBtn');
+
+  function setAuthUI(signedIn, email=''){
+    if(signedIn){
+      signInBtn.classList.add('hidden');
+      signUpBtn.classList.add('hidden');
+      userBadge.classList.remove('hidden');
+      userEmail.textContent = email;
+      cloudStatus.textContent = 'Cloud sync on';
+    }else{
+      userBadge.classList.add('hidden');
+      signInBtn.classList.remove('hidden');
+      signUpBtn.classList.remove('hidden');
+      cloudStatus.textContent = 'Local mode';
     }
   }
-  document.querySelector('.resizer.e').addEventListener('pointerdown', startResize(document.querySelector('.resizer.e'),'ew'));
-  document.querySelector('.resizer.s').addEventListener('pointerdown', startResize(document.querySelector('.resizer.s'),'ns'));
-  document.querySelector('.resizer.se').addEventListener('pointerdown', startResize(document.querySelector('.resizer.se'),'nwse'));
-})();
 
-/* =========================
-   Lichess helpers (optional)
-   ========================= */
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
-function beep(){ try{ const AC=window.AudioContext||window.webkitAudioContext; const ctx=new AC(); const now=ctx.currentTime; const o1=ctx.createOscillator(), g1=ctx.createGain(); o1.type='sine'; o1.frequency.value=880; o1.connect(g1); g1.connect(ctx.destination); g1.gain.setValueAtTime(.0001,now); g1.gain.exponentialRampToValueAtTime(.18,now+.01); o1.start(now); o1.stop(now+.12); const o2=ctx.createOscillator(), g2=ctx.createGain(); o2.type='sine'; o2.frequency.value=1318.5; o2.connect(g2); g2.connect(ctx.destination); g2.gain.setValueAtTime(.0001,now+.13); g2.gain.exponentialRampToValueAtTime(.16,now+.15); o2.start(now+.13); o2.stop(now+.28);}catch{} }
+  async function googlePopup(){
+    try{ await signInWithPopup(auth, provider); }
+    catch(e){ alert(e.message); }
+  }
+  signInBtn.addEventListener('click', googlePopup);
+  signUpBtn.addEventListener('click', googlePopup); // same flow; Google creates account if needed
+  signOutBtn.addEventListener('click', ()=> signOut(auth));
 
-/* =========================
-   Render
-   ========================= */
-function renderCurrent(){
-  const sched=getSchedule(); const cur=sched[currentIndex];
-  currentTitleEl.textContent=cur?cur.name:'—';
-  if(secondsLeft!==lastDisplayedSec){ clockEl.textContent=secsToClock(secondsLeft); lastDisplayedSec=secondsLeft; }
-
-  const key = cur ? ('section_desc_'+cur.id) : null;
-  if(key){ sectionDescEl.value = localStorage.getItem(key) || ''; sectionDescEl.oninput = ()=> localStorage.setItem(key, sectionDescEl.value); }
-
-  renderCurrentLinks();
-}
-function renderAll(){ buildProgress(); updateProgress(); updateLegendActive(); renderCurrent(); renderShelf(); renderOutline(); }
-
-let secondsInit = minsToSecs((getSchedule()[0]||{}).minutes||0);
-secondsLeft = secondsInit;
-renderAll();
-if(!loadSessions()) saveSessions();
-updateStartBtnLabel();
-updateEditUI();
+  onAuthStateChanged(auth, async (user)=>{
+    currentUser = user || null;
+    if(!user){ setAuthUI(false); return; }
+    setAuthUI(true, user.email || '');
+    try{
+      const ref = userDocRef(user.uid);
+      const snap = await getDoc(ref);
+      if(snap.exists()){
+        const data = snap.data() || {};
+        if(data.sessions){ sessions = data.sessions; sanitizeSessions(sessions); }
+        if(data.widgetShelf){ widgetShelf = data.widgetShelf; }
+        if(data.activePreset){ activePreset = data.activePreset; presetSelect.value = activePreset; }
+        saveSessionsLocal(); saveShelfLocal();
+        renderAll();
+      }else{
+        await setDoc(ref, {
+          sessions, widgetShelf, activePreset,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        });
+      }
+      cloudStatus.textContent = 'Cloud sync on';
+    }catch(e){
+      console.error(e);
+      cloudStatus.textContent = 'Cloud load failed';
+    }
+  });
 </script>
 </body>
 </html>
