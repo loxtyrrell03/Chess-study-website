@@ -9,20 +9,22 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 <style>
+  :root{ --tabs-accent:#38bdf8; --tabs-muted:#94a3b8; }
+
   .no-select{user-select:none;-webkit-user-select:none}
   .drag-ghost{opacity:.4}
   .drag-over{outline:2px dashed rgba(56,189,248,.9); outline-offset:4px}
   .row-handle{cursor:grab}
   .row-handle:active{cursor:grabbing}
   .btn-xs{font-size:.72rem; padding:.25rem .45rem; border-radius:.45rem; border:1px solid rgb(51,65,85); background:#0b1220}
-  .btn-xxs{font-size:.68rem; padding:.2rem .4rem; border-radius:.35rem; border:1px solid rgb(51,65,85); background:#0b1220}
+  .btn-xxs{font-size:.68rem; padding:.18rem .4rem; border-radius:.35rem; border:1px solid rgb(51,65,85); background:#0b1220}
   .link-card{display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;border-radius:.75rem;border:1px solid rgb(51,65,85);background:rgba(15,23,42,.6)}
   .link-card:hover{background:rgba(30,41,59,.7)}
   .link-icon{width:18px;height:18px;display:inline-block}
   .glow{box-shadow:0 0 0 2px rgba(56,189,248,.35),0 0 18px rgba(56,189,248,.45) inset}
 
-  /* Split layout */
-  #split{display:flex; gap:12px; align-items:stretch; --leftRatio:66%;}
+  /* Split layout (make OUTLINE PANEL WIDER by default) */
+  #split{display:flex; gap:14px; align-items:stretch; --leftRatio:56%;}
   #leftPane{flex: 0 0 var(--leftRatio); min-width:360px}
   #splitHandle{
     width:8px; border-radius:6px; background:linear-gradient(180deg,#0ea5e9,#0284c7);
@@ -33,10 +35,14 @@
     content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
     width:2px; height:36px; background:rgba(255,255,255,.85); border-radius:2px; box-shadow:0 0 10px rgba(255,255,255,.6);
   }
-  #rightPane{flex: 1 1 auto; min-width:260px; max-width:520px}
+  /* Wider right pane */
+  #rightPane{flex: 1 1 auto; min-width:360px; max-width:900px}
   #split.collapsed #rightPane, #split.collapsed #splitHandle{display:none}
   #split.collapsed #leftPane{flex:1 1 auto; min-width:0}
 
+  @media (max-width: 1100px){
+    #rightPane{max-width:none}
+  }
   @media (max-width: 980px){
     #split{display:block}
     #splitHandle{display:none}
@@ -71,38 +77,64 @@
   #boardIframeWrap{position:relative; flex:1}
   #boardIframe{position:absolute; inset:0; width:100%; height:100%; border:0; border-bottom-left-radius:14px; border-bottom-right-radius:14px}
 
-  /* Minimized state */
   #boardWin.minimized{ height:44px !important; }
   #boardWin.minimized #boardContent{ display:none; }
 
-  /* resize handles */
   .resizer{position:absolute; background:transparent}
   .resizer.e{cursor:ew-resize; top:8px; bottom:8px; right:-3px; width:6px}
   .resizer.s{cursor:ns-resize; left:8px; right:8px; bottom:-3px; height:6px}
   .resizer.se{cursor:nwse-resize; right:-3px; bottom:-3px; width:10px; height:10px; border-bottom-right-radius:10px}
 
-  /* Minimal outline */
-  .outline-row{padding:.6rem .4rem; border-bottom:1px solid rgba(51,65,85,.6)}
+  /* Outline rows (unchanged) */
+  .outline-row{padding:.6rem .5rem; border-bottom:1px solid rgba(51,65,85,.6)}
   .outline-row:hover{background:rgba(30,41,59,.35)}
   .outline-active{background:rgba(2,132,199,.15) !important; box-shadow:inset 0 0 0 1px rgba(56,189,248,.6)}
   .chip{padding:.35rem .65rem; border-radius:9999px; border:1px solid rgba(51,65,85,.8); display:inline-flex; gap:.35rem; align-items:center; background:rgba(15,23,42,.5)}
   .chip:hover{background:rgba(30,41,59,.6)}
   .chip-active{border-color:rgba(56,189,248,.85); box-shadow:0 0 0 2px rgba(56,189,248,.35); background:rgba(2,132,199,.18); color:#e2f3ff}
 
-  /* Inline outline editing */
-  .outline-edit{display:flex; align-items:center; gap:.5rem; width:100%}
-  .outline-edit input[type="text"]{min-width:0}
-  .inline-field{background:transparent; border:1px solid rgba(56,189,248,.55); border-radius:.5rem; padding:.25rem .5rem}
-  .inline-number{width:4.5rem}
-  .inline-select{height:30px}
+  /* Inline outline editing (compact + responsive) */
+  .outline-edit{display:flex; align-items:center; gap:.35rem; width:100%}
+  .inline-field{background:transparent; border:1px solid rgba(56,189,248,.55); border-radius:.6rem; padding:.22rem .5rem}
+  .inline-title{flex:1 1 auto; min-width:0}
+  .inline-number{flex:0 0 auto; width:auto; text-align:center; min-width:8ch}
+  .inline-select{flex:0 0 auto; width:auto; height:30px; min-width:6ch}
+
+  /* NAV TABS — professional look with vertical separators */
+  .tabs-bar{
+    display:flex; align-items:center; gap:0;
+    border-bottom:1px solid rgba(71,85,105,.7);
+    background:linear-gradient(180deg,rgba(13,22,40,.8),rgba(8,14,28,.8));
+    border-radius:14px;
+    padding:.35rem;
+  }
+  .tab-link{
+    position:relative;
+    padding:.6rem 1rem; font-weight:600;
+    color:var(--tabs-muted);
+    border-radius:.6rem;
+  }
+  .tab-link:hover{ color:#e2e8f0; background:rgba(148,163,184,.08); }
+  .tab-link.active{
+    color:#e6f6ff; background:rgba(56,189,248,.18);
+    box-shadow:inset 0 0 0 1px rgba(56,189,248,.6);
+  }
+  .tab-sep{
+    width:1px; height:22px;
+    background:linear-gradient(180deg,transparent,rgba(148,163,184,.5),transparent);
+    margin:0 .25rem;
+  }
+
+  /* Cards */
+  .card{background:#0b1220; border:1px solid #1f2a44; border-radius:14px}
 </style>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
-<div class="max-w-5xl mx-auto px-4 py-6">
+<div class="max-w-7xl mx-auto px-5 py-6">
 
   <!-- Header -->
-  <header class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print">
-    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Chess Study Planner</h1>
+  <header class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print">
+    <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Chess Study Planner</h1>
 
     <!-- Auth controls -->
     <div class="flex flex-wrap items-center gap-2">
@@ -113,109 +145,137 @@
           <button id="signOutBtn" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500">Sign out</button>
         </div>
       </div>
+      <span id="cloudStatus" class="text-xs text-slate-400">Local mode</span>
+    </div>
+  </header>
+
+  <!-- Tabs (professional style with separators) -->
+  <nav class="mb-6 no-print">
+    <div class="tabs-bar">
+      <button class="tab-link active" data-tab="homeTab">Home</button>
+      <div class="tab-sep"></div>
+      <button class="tab-link" data-tab="savedTab">Saved Outlines</button>
+    </div>
+  </nav>
+
+  <!-- HOME TAB -->
+  <section id="homeTab">
+    <!-- Preset picker -->
+    <div class="mb-6 flex items-center gap-2">
+      <label class="text-sm text-slate-400">Preset:</label>
       <select id="presetSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm">
         <option value="BOTH">Both (90m)</option>
         <option value="A">Session A (45m)</option>
         <option value="B">Session B (45m)</option>
       </select>
-      <span id="cloudStatus" class="text-xs text-slate-400">Local mode</span>
     </div>
-  </header>
 
-  <!-- Progress -->
-  <section class="mb-4 no-print">
-    <div class="flex items-center justify-between mb-1">
-      <div class="text-xs uppercase tracking-wide text-slate-400">Progress — drag anywhere to jump</div>
-      <div id="progressPct" class="text-xs text-slate-300">0%</div>
-    </div>
-    <div id="progressHost" class="relative w-full h-6 bg-slate-800 rounded-2xl overflow-hidden border border-sky-600/50 glow no-select">
-      <div id="progressFill" class="absolute left-0 top-0 bottom-0 bg-sky-500/70 transition-[width]" style="width:0%"></div>
-      <div id="progressSegments" class="absolute inset-0 flex"></div>
-      <div id="progressTicks" class="absolute inset-0 pointer-events-none"></div>
-      <div id="scrubOverlay" class="absolute inset-0 cursor-pointer"></div>
-    </div>
-    <div id="legend" class="mt-2 flex flex-wrap gap-2 text-sm"></div>
-  </section>
-
-  <!-- Controls -->
-  <section class="flex flex-wrap items-center gap-3 mb-3 no-print">
-    <button id="startBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 shadow-sm">Start Study Session</button>
-    <button id="prevBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700">◀ Prev</button>
-    <button id="nextBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700">Next ▶</button>
-    <button id="resetBtn" class="ml-auto px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700">Reset</button>
-    <button id="showOutlineBtn" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 hidden">Show Outline ▸</button>
-  </section>
-
-  <!-- Split layout -->
-  <div id="split">
-    <!-- LEFT: CURRENT -->
-    <section id="leftPane">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-inner">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <div class="text-xs uppercase tracking-wide text-slate-400">Current Section</div>
-            <h2 id="currentTitle" class="text-2xl font-semibold mt-1">—</h2>
-          </div>
-          <div class="flex items-center gap-2">
-            <button id="editSectionBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Edit Section</button>
-            <div id="clock" class="text-3xl font-mono tabular-nums">00:00</div>
-          </div>
-        </div>
-
-        <!-- LINK WIDGET SHELF (shown only in edit mode) -->
-        <div id="shelfWrap" class="mt-4 hidden">
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm uppercase tracking-wide text-slate-400">Link Widgets</h3>
-            <div class="flex items-center gap-2">
-              <button id="addWidgetBtn" class="btn-xs">+ New Widget</button>
-              <button id="resetShelfBtn" class="btn-xs">Reset Shelf</button>
-            </div>
-          </div>
-          <div id="linkShelf" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl bg-slate-950 border border-slate-800"></div>
-          <div class="text-xs text-slate-400 mt-1">Drag a widget into the current section.</div>
-        </div>
-
-        <!-- Links in CURRENT SECTION -->
-        <div id="linksWrap" class="mt-4">
-          <div class="flex items-center justify-between">
-            <div class="text-sm text-slate-300">Links in this section</div>
-            <button id="clearSectionLinks" class="btn-xs hidden">Clear</button>
-          </div>
-          <div id="links" class="mt-2 flex flex-wrap gap-2 p-2 rounded-xl bg-slate-950 border border-slate-800 min-h-[44px]"></div>
-        </div>
-
-        <!-- Optional description -->
-        <div class="mt-4">
-          <label class="text-sm text-slate-300">Section notes (optional)</label>
-          <textarea id="sectionDesc" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm" placeholder="Add notes, mini-checklist, links…"></textarea>
-        </div>
+    <!-- Progress -->
+    <section class="mb-4 no-print">
+      <div class="flex items-center justify-between mb-1">
+        <div class="text-xs uppercase tracking-wide text-slate-400">PROGRESS — DRAG ANYWHERE TO JUMP</div>
+        <div id="progressPct" class="text-xs text-slate-300">0%</div>
       </div>
+      <div id="progressHost" class="relative w-full h-6 bg-slate-800 rounded-2xl overflow-hidden border border-sky-600/50 glow no-select">
+        <div id="progressFill" class="absolute left-0 top-0 bottom-0 bg-sky-500/70 transition-[width]" style="width:0%"></div>
+        <div id="progressSegments" class="absolute inset-0 flex"></div>
+        <div id="progressTicks" class="absolute inset-0 pointer-events-none"></div>
+        <div id="scrubOverlay" class="absolute inset-0 cursor-pointer"></div>
+      </div>
+      <div id="legend" class="mt-2 flex flex-wrap gap-2 text-sm"></div>
     </section>
 
-    <!-- DRAG HANDLE -->
-    <div id="splitHandle" class="no-print"></div>
+    <!-- Controls -->
+    <section class="flex flex-wrap items-center gap-3 mb-3 no-print">
+      <button id="startBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 shadow-sm">Start Study Session</button>
+      <button id="prevBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700">◀ Prev</button>
+      <button id="nextBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700">Next ▶</button>
+      <button id="resetBtn" class="ml-auto px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700">Reset</button>
+      <button id="showOutlineBtn" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 hidden">Show Outline ▸</button>
+    </section>
 
-    <!-- RIGHT: OUTLINE -->
-    <aside id="rightPane">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 h-full flex flex-col">
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm uppercase tracking-wide text-slate-400">Session Outline</h3>
-          <button id="collapseOutlineBtn" class="text-xs px-2 py-1 rounded-md bg-slate-800 border border-slate-700 hover:bg-slate-700">▾ Hide</button>
+    <!-- Split layout (RIGHT PANEL WIDER by default) -->
+    <div id="split">
+      <!-- LEFT: CURRENT -->
+      <section id="leftPane">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-inner">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-xs uppercase tracking-wide text-slate-400">Current Section</div>
+              <h2 id="currentTitle" class="text-2xl font-semibold mt-1">—</h2>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="editSectionBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Edit Section</button>
+              <div id="clock" class="text-3xl font-mono tabular-nums">00:00</div>
+            </div>
+          </div>
+
+          <!-- LINK WIDGET SHELF (shown only in edit mode) -->
+          <div id="shelfWrap" class="mt-4 hidden">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm uppercase tracking-wide text-slate-400">LINK WIDGETS</h3>
+              <div class="flex items-center gap-2">
+                <button id="addWidgetBtn" class="btn-xs">+ New Widget</button>
+                <button id="resetShelfBtn" class="btn-xs">Reset Shelf</button>
+              </div>
+            </div>
+            <div id="linkShelf" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl bg-slate-950 border border-slate-800"></div>
+            <div class="text-xs text-slate-400 mt-1">Drag a widget into the current section.</div>
+          </div>
+
+          <!-- Links in CURRENT SECTION -->
+          <div id="linksWrap" class="mt-4">
+            <div class="flex items-center justify-between">
+              <div class="text-sm text-slate-300">Links in this section</div>
+              <button id="clearSectionLinks" class="btn-xs hidden">Clear</button>
+            </div>
+            <div id="links" class="mt-2 flex flex-wrap gap-2 p-2 rounded-xl bg-slate-950 border border-slate-800 min-h-[44px]"></div>
+          </div>
+
+          <!-- Optional description -->
+          <div class="mt-4">
+            <label class="text-sm text-slate-300">Section notes (optional)</label>
+            <textarea id="sectionDesc" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm" placeholder="Add notes, mini-checklist, links…"></textarea>
+          </div>
         </div>
+      </section>
 
-        <ul id="outline" class="mt-3 flex-1 overflow-auto"></ul>
+      <!-- DRAG HANDLE -->
+      <div id="splitHandle" class="no-print"></div>
 
-        <div class="mt-3 flex items-center gap-2">
-          <button id="addOutlineItem" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm">+ Add Section</button>
-          <div id="totalMins" class="ml-auto text-xs text-slate-400">Total: 0 minutes</div>
+      <!-- RIGHT: OUTLINE (now wider) -->
+      <aside id="rightPane">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 h-full flex flex-col">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm uppercase tracking-wide text-slate-400">SESSION OUTLINE</h3>
+            <button id="collapseOutlineBtn" class="text-xs px-2 py-1 rounded-md bg-slate-800 border border-slate-700 hover:bg-slate-700">▾ Hide</button>
+          </div>
+
+          <ul id="outline" class="mt-3 flex-1 overflow-auto"></ul>
+
+          <div class="mt-3 flex items-center gap-2">
+            <button id="addOutlineItem" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm">+ Add Section</button>
+            <button id="saveAsOutline" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm">Save current as Outline</button>
+            <div id="totalMins" class="ml-auto text-xs text-slate-400">Total: 0 minutes</div>
+          </div>
         </div>
-      </div>
-    </aside>
-  </div>
+      </aside>
+    </div>
 
-  <footer class="mt-10 text-center text-xs text-slate-500 no-print">
-    Minimal, keyboard-friendly session manager. ♟️
-  </footer>
+    <footer class="mt-10 text-center text-xs text-slate-500 no-print">
+      Minimal, keyboard-friendly session manager. ♟️
+    </footer>
+  </section>
+
+  <!-- SAVED OUTLINES TAB -->
+  <section id="savedTab" class="hidden">
+    <div class="mb-3 flex items-center gap-2">
+      <button id="newEmptyOutline" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm">+ New empty outline</button>
+      <button id="importFromCurrent" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm">+ Save current as outline</button>
+    </div>
+
+    <div id="savedList" class="grid lg:grid-cols-2 gap-4"></div>
+  </section>
 </div>
 
 <!-- Floating analysis launcher -->
@@ -317,7 +377,7 @@
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
 
-  /* ============== Local + Cloud state (expanded) ============== */
+  /* ============== Local + Cloud state ============== */
   const DEFAULTS = {
     A: [
       { id:'aim',   name:'Aimchess warmup', minutes:8, links:[] },
@@ -339,30 +399,32 @@
     { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
   ];
 
-  // sessions + shelf
   let sessions = loadSessionsLocal() || structuredClone(DEFAULTS);
   sanitizeSessions(sessions);
   let widgetShelf = loadShelfLocal() || structuredClone(DEFAULT_SHELF);
   let activePreset = localStorage.getItem('preset_v11') || 'BOTH';
 
-  // new: per-section notes (cloud-synced)
   let sectionNotes = {}; // { [sectionId]: string }
 
-  // new: UI prefs (cloud-synced)
   let prefs = {
-    floatBtnPos: null,      // {x,y}
-    boardWinRC: null,       // {w,h,l,t}
-    splitRatio: Number(localStorage.getItem('split_ratio_v2')) || 66,
+    floatBtnPos: null,
+    boardWinRC: null,
+    splitRatio: Number(localStorage.getItem('split_ratio_v2')) || 56, // wider right by default
     outlineCollapsed: false
   };
 
-  // new: timer state (cloud-synced)
   let timerState = {
     sessionStarted:false,
     currentIndex:0,
     secondsLeft:0,
     activePreset
   };
+
+  // NEW: saved outlines
+  let savedOutlines = loadSavedOutlinesLocal();
+
+  function loadSavedOutlinesLocal(){ try{ return JSON.parse(localStorage.getItem('saved_outlines_v1')) || []; }catch{ return []; } }
+  function saveSavedOutlinesLocal(){ localStorage.setItem('saved_outlines_v1', JSON.stringify(savedOutlines)); }
 
   function loadSessionsLocal(){ try{ return JSON.parse(localStorage.getItem('studySessions_v11')); }catch{ return null; } }
   function saveSessionsLocal(){ localStorage.setItem('studySessions_v11', JSON.stringify(sessions)); }
@@ -397,16 +459,46 @@
         notes: sectionNotes,
         prefs,
         timer: timerState,
+        savedOutlines,
         updatedAt: serverTimestamp()
       };
       await setDoc(userDocRef(currentUser.uid), payload, { merge:true });
       cloudStatus.textContent = 'Saved to cloud ✓';
     }catch(e){ console.error(e); cloudStatus.textContent='Cloud save failed'; }
-  }, 1200);
+  }, 1000);
+
+  async function saveCloudNow(){
+    if(!currentUser) return;
+    try{
+      await setDoc(userDocRef(currentUser.uid), {
+        sessions, widgetShelf, activePreset,
+        notes: sectionNotes, prefs, timer: timerState, savedOutlines,
+        updatedAt: serverTimestamp()
+      }, { merge:true });
+    }catch(e){ /* ignore */ }
+  }
+  window.addEventListener('beforeunload', saveCloudNow);
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) saveCloudNow(); });
 
   function saveSessions(){ saveSessionsLocal(); if(currentUser) saveCloudDebounced(); }
   function saveShelf(){ saveShelfLocal(); if(currentUser) saveCloudDebounced(); }
+  function saveOutlines(){ saveSavedOutlinesLocal(); if(currentUser) saveCloudDebounced(); }
   function touchCloud(){ if(currentUser) saveCloudDebounced(); }
+
+  /* ================= Tabs ================= */
+  const tabButtons=[...document.querySelectorAll('.tab-link')];
+  const homeTab=document.getElementById('homeTab');
+  const savedTab=document.getElementById('savedTab');
+  tabButtons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      tabButtons.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const id=btn.dataset.tab;
+      homeTab.classList.toggle('hidden', id!=='homeTab');
+      savedTab.classList.toggle('hidden', id!=='savedTab');
+      if(id==='savedTab') renderSavedOutlines();
+    });
+  });
 
   /* ================= Presets/Timer/UI ================= */
   const presetSelect = document.getElementById('presetSelect');
@@ -445,8 +537,16 @@
   function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
   function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
 
-  function startTimer(){ if(running) return; running=true; syncEnd(); loop(); renderAll(); updateStartBtnLabel(); }
-  function stopTimer(){ running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateStartBtnLabel(); timerTouch(); }
+  function updateClockColor(){
+    clockEl.classList.remove('text-emerald-400','text-rose-400');
+    if(sessionStarted){
+      if(running) clockEl.classList.add('text-emerald-400');
+      else clockEl.classList.add('text-rose-400');
+    }
+  }
+
+  function startTimer(){ if(running) return; running=true; syncEnd(); loop(); renderAll(); updateStartBtnLabel(); updateClockColor(); }
+  function stopTimer(){ running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateStartBtnLabel(); timerTouch(); updateClockColor(); }
   function syncEnd(){ endTimeMs = performance.now() + secondsLeft*1000; }
 
   function timerTouch(){
@@ -599,6 +699,7 @@
     clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
     editSectionBtn.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
     renderCurrentLinks();
+    renderShelf(); // ensure draggable attr reflects edit mode
   }
 
   function currentSectionRef(){ return getSchedule()[currentIndex]; }
@@ -617,7 +718,7 @@
     const sec=currentSectionRef();
     const arr=sec?.links||[];
     linksDiv.innerHTML = arr.map((w,i)=>`
-      <div class="link-card section-link" draggable="true" data-idx="${i}">
+      <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
         ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
         <a class="text-slate-100 truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
         ${isEditingSection ? `
@@ -628,28 +729,33 @@
       </div>
     `).join('');
 
+    // Reorder within section (drag)
     linksDiv.querySelectorAll('.section-link').forEach(card=>{
       card.addEventListener('dragstart', e=>{
         if(!isEditingSection) { e.preventDefault(); return; }
         const index=Number(card.dataset.idx);
+        e.stopPropagation();
+        e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/json', JSON.stringify({type:'reorder', index}));
+        e.dataTransfer.setData('text/plain', JSON.stringify({type:'reorder', index}));
         card.classList.add('drag-ghost');
       });
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
     });
 
+    // Inline edits
     if(isEditingSection){
       linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
         btn.addEventListener('click', ()=>{
           const i=Number(btn.closest('[data-idx]').dataset.idx);
           const target=sec.links[i];
-          editWidget(target, upd=>{ Object.assign(target, upd); saveSessions(); });
+          editWidget(target, upd=>{ Object.assign(target, upd); saveSessions(); renderCurrentLinks(); });
         });
       });
       linksDiv.querySelectorAll('[data-act="remove"]').forEach(btn=>{
         btn.addEventListener('click', ()=>{
           const i=Number(btn.closest('[data-idx]').dataset.idx);
-          sec.links.splice(i,1); saveSessions();
+          sec.links.splice(i,1); saveSessions(); renderCurrentLinks();
         });
       });
     }
@@ -657,7 +763,7 @@
   clearSectionLinksBtn.addEventListener('click', ()=>{
     if(!isEditingSection) return;
     const sec=currentSectionRef(); if(!sec) return;
-    if(confirm('Remove all links from this section?')){ sec.links=[]; saveSessions(); }
+    if(confirm('Remove all links from this section?')){ sec.links=[]; saveSessions(); renderCurrentLinks(); }
   });
 
   const linkShelfDiv=document.getElementById('linkShelf');
@@ -667,7 +773,7 @@
   function widgetCardHTML(w){
     const icon = (w.icon==='img' && w.img) ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>`
                 : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
-    return `<div class="link-card draggable-shelf" draggable="true" data-wid="${w.id}">
+    return `<div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${w.id}" style="cursor:${isEditingSection?'grab':'default'}">
       ${icon}
       <div class="min-w-0">
         <div class="text-slate-100 truncate">${escapeHtml(w.label||'Untitled')}</div>
@@ -681,20 +787,29 @@
   }
   function renderShelf(){
     linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
+
+    // DRAG from shelf
     linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
       card.addEventListener('dragstart', e=>{
         if(!isEditingSection) { e.preventDefault(); return; }
-        e.dataTransfer.setData('application/json', JSON.stringify({type:'shelf', id:card.dataset.wid}));
+        if(e.target.closest('[data-act]')) { e.preventDefault(); return; }
+        e.stopPropagation();
+        const payload={type:'shelf', id:card.dataset.wid};
+        e.dataTransfer.effectAllowed='copy';
+        e.dataTransfer.setData('application/json', JSON.stringify(payload));
+        e.dataTransfer.setData('text/plain', JSON.stringify(payload));
         card.classList.add('drag-ghost');
       });
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
     });
+
+    // edit/delete
     linkShelfDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         if(!isEditingSection) return;
         const id=btn.closest('[data-wid]').dataset.wid;
         const w=widgetShelf.find(x=>x.id===id);
-        editWidget(w, upd=>{ Object.assign(w,upd); saveShelf(); });
+        editWidget(w, upd=>{ Object.assign(w,upd); saveShelf(); renderShelf(); });
       });
     });
     linkShelfDiv.querySelectorAll('[data-act="delete"]').forEach(btn=>{
@@ -702,7 +817,7 @@
         if(!isEditingSection) return;
         const id=btn.closest('[data-wid]').dataset.wid;
         widgetShelf=widgetShelf.filter(w=>w.id!==id);
-        saveShelf();
+        saveShelf(); renderShelf();
       });
     });
   }
@@ -719,23 +834,39 @@
   addWidgetBtn.addEventListener('click', ()=>{
     if(!isEditingSection) return;
     const base={ id:'w_'+Date.now(), label:'New Link', url:'', icon:'emoji', emoji:'🔗', img:'' };
-    editWidget(base, upd=>{ widgetShelf.push({...base,...upd}); saveShelf(); });
+    editWidget(base, upd=>{ widgetShelf.push({...base,...upd}); saveShelf(); renderShelf(); });
   });
-  resetShelfBtn.addEventListener('click', ()=>{ if(!isEditingSection) return; if(confirm('Reset shelf to defaults?')){ widgetShelf=structuredClone(DEFAULT_SHELF); saveShelf(); }});
+  resetShelfBtn.addEventListener('click', ()=>{ if(!isEditingSection) return; if(confirm('Reset shelf to defaults?')){ widgetShelf=structuredClone(DEFAULT_SHELF); saveShelf(); renderShelf(); }});
 
-  linksDiv.addEventListener('dragover', e=>{ if(!isEditingSection) return; e.preventDefault(); linksDiv.classList.add('drag-over'); });
-  linksDiv.addEventListener('dragleave', ()=> linksDiv.classList.remove('drag-over'));
+  // Robust DROP into "Links in this section"
+  let overCount = 0;
+  linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over'); });
+  linksDiv.addEventListener('dragleave', e=>{ if(!isEditingSection) return; overCount=Math.max(0, overCount-1); if(overCount===0) linksDiv.classList.remove('drag-over'); });
+  linksDiv.addEventListener('dragover', e=>{
+    if(!isEditingSection) return;
+    e.preventDefault();
+    if(e.dataTransfer) e.dataTransfer.dropEffect='copy';
+  });
   linksDiv.addEventListener('drop', e=>{
     if(!isEditingSection) return;
-    e.preventDefault(); linksDiv.classList.remove('drag-over');
-    const data=e.dataTransfer.getData('application/json'); if(!data) return;
-    const payload=JSON.parse(data);
+    e.preventDefault();
+    overCount=0; linksDiv.classList.remove('drag-over');
+
+    let data = e.dataTransfer.getData('application/json');
+    if(!data){ data = e.dataTransfer.getData('text/plain'); }
+    if(!data) return;
+
+    let payload=null;
+    try{ payload = JSON.parse(data); }catch{}
+    if(!payload) return;
+
     const sec=currentSectionRef(); if(!sec) return;
 
     if(payload.type==='shelf'){
       const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
       sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
       saveSessions();
+      renderCurrentLinks(); // immediate UI update
     } else if(payload.type==='reorder'){
       const from=payload.index;
       const cards=[...linksDiv.querySelectorAll('.section-link')];
@@ -748,14 +879,14 @@
       const [m]=sec.links.splice(from,1);
       sec.links.splice(to,0,m);
       saveSessions();
+      renderCurrentLinks(); // immediate
     }
   });
 
-  /* ============== Outline (inline edit, bug-fixed) ============== */
+  /* ============== Outline (inline edit, compact + bug-fixed) ============== */
   const outline=document.getElementById('outline');
   const totalMins=document.getElementById('totalMins');
 
-  // Track whether any row is in edit mode to suppress jump clicks
   let editingOutlineId = null;
 
   const toMinutes = (value, unit)=>{
@@ -799,10 +930,9 @@
         const cur=ref[idx];
         editingOutlineId = id;
 
-        // build compact inline editor in-place
         li.innerHTML = `
           <div class="outline-edit">
-            <input id="edtTitle" class="inline-field text-sm flex-1 min-w-0" type="text" value="${escapeHtml(cur.name)}" />
+            <input id="edtTitle" class="inline-field inline-title text-sm" type="text" value="${escapeHtml(cur.name)}" />
             <input id="edtValue" class="inline-field inline-number text-sm" type="number" step="0.1" min="0.01" value="${(+cur.minutes).toFixed(2).replace(/\.00$/,'')}" />
             <select id="edtUnit" class="inline-field inline-select text-sm">
               <option value="minutes" selected>min</option>
@@ -814,7 +944,7 @@
           </div>
         `;
 
-        // prevent clicks inside editor from bubbling to li (fixes minimize bug)
+        // prevent bubbling
         li.querySelector('.outline-edit').addEventListener('click', ev=>ev.stopPropagation());
 
         const edtTitle = li.querySelector('#edtTitle');
@@ -822,6 +952,17 @@
         const edtUnit  = li.querySelector('#edtUnit');
         const saveBtn  = li.querySelector('#edtSave');
         const cancelBtn= li.querySelector('#edtCancel');
+
+        // responsive widths (but not too slim)
+        const adjustWidths = ()=>{
+          const numLen = String(edtValue.value).length || 1;
+          edtValue.style.width = Math.max(8, numLen + 2) + 'ch';
+          const text = edtUnit.options[edtUnit.selectedIndex].text || 'min';
+          edtUnit.style.width = Math.max(6, text.length + 2) + 'ch';
+        };
+        adjustWidths();
+        edtValue.addEventListener('input', adjustWidths);
+        edtUnit.addEventListener('change', adjustWidths);
 
         const cancel = ()=>{ editingOutlineId=null; renderOutline(); };
         cancelBtn.addEventListener('click', cancel);
@@ -832,7 +973,7 @@
           const mins = Math.max(0.01, toMinutes(edtValue.value, edtUnit.value));
           cur.name = newTitle;
           cur.minutes = mins;
-          saveSessions();
+          saveSessions(); // cloud sync
           if(getSchedule()[currentIndex]?.id===cur.id){
             secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes));
             if(running) syncEnd();
@@ -910,6 +1051,97 @@
     saveSessions(); renderAll();
   });
 
+  // save current schedule as an outline (from Home)
+  document.getElementById('saveAsOutline').addEventListener('click', ()=>{
+    const name = prompt('Title for this outline:', 'New outline');
+    if(name===null) return;
+    const outline = {
+      id: 'O'+Date.now(),
+      title: name.trim() || 'Untitled outline',
+      sections: getSchedule().map(s=>({ id:s.id, name:s.name, minutes:s.minutes, links:s.links||[] })),
+      createdAt: Date.now()
+    };
+    savedOutlines.unshift(outline);
+    saveOutlines();
+    alert('Saved to Outlines tab.');
+  });
+
+  /* ================= Saved Outlines UI ================= */
+  const savedList = document.getElementById('savedList');
+  const newEmptyOutlineBtn = document.getElementById('newEmptyOutline');
+  const importFromCurrentBtn = document.getElementById('importFromCurrent');
+
+  newEmptyOutlineBtn.addEventListener('click', ()=>{
+    const title = prompt('Title for the new outline:', 'New outline');
+    if(title===null) return;
+    savedOutlines.unshift({ id:'O'+Date.now(), title: title.trim()||'New outline', sections: [], createdAt: Date.now() });
+    saveOutlines(); renderSavedOutlines();
+  });
+  importFromCurrentBtn.addEventListener('click', ()=>{
+    const name = prompt('Title for this outline:', 'Current session');
+    if(name===null) return;
+    savedOutlines.unshift({
+      id:'O'+Date.now(),
+      title: name.trim()||'Current session',
+      sections: getSchedule().map(s=>({ id:s.id, name:s.name, minutes:s.minutes, links:s.links||[] })),
+      createdAt: Date.now()
+    });
+    saveOutlines(); renderSavedOutlines();
+  });
+
+  function outlineCardHTML(o, collapsed=true){
+    return `
+      <div class="card p-4" data-oid="${o.id}">
+        <div class="flex items-center gap-2">
+          <input class="bg-transparent border border-slate-700 rounded-lg px-2 py-1 flex-1" value="${escapeHtml(o.title)}" aria-label="Outline title"/>
+          <button class="btn-xs" data-act="toggle">${collapsed?'Expand':'Collapse'}</button>
+          <button class="btn-xs" data-act="apply">Apply to current preset</button>
+          <button class="btn-xs" data-act="delete">Delete</button>
+        </div>
+        <div class="mt-3 ${collapsed?'hidden':''}">
+          ${o.sections.length? o.sections.map(s=>`
+            <div class="flex items-center justify-between border border-slate-800 rounded-lg p-2 mb-2">
+              <div class="text-sm truncate">${escapeHtml(s.name)}</div>
+              <div class="text-xs text-slate-300 ml-2 shrink-0">${Number(s.minutes)}m</div>
+            </div>
+          `).join('') : `<div class="text-sm text-slate-400">No sections yet. Use "Apply" to load an outline, edit in Home, then re-save.</div>`}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderSavedOutlines(){
+    savedList.innerHTML = savedOutlines.map(o=>outlineCardHTML(o, true)).join('');
+    savedList.querySelectorAll('[data-oid]').forEach(card=>{
+      const oid=card.dataset.oid;
+      const titleInput = card.querySelector('input');
+      titleInput.addEventListener('change', ()=>{ const o=savedOutlines.find(x=>x.id===oid); if(!o) return; o.title=titleInput.value.trim()||o.title; saveOutlines(); });
+
+      card.querySelector('[data-act="toggle"]').addEventListener('click', ()=>{
+        const body = card.querySelector('div.mt-3');
+        const btn = card.querySelector('[data-act="toggle"]');
+        const col = body.classList.toggle('hidden');
+        btn.textContent = col?'Expand':'Collapse';
+      });
+
+      card.querySelector('[data-act="apply"]').addEventListener('click', ()=>{
+        const o=savedOutlines.find(x=>x.id===oid); if(!o) return;
+        const clone = o.sections.map(s=>({ id:s.id||('S'+Math.random().toString(16).slice(2)), name:s.name, minutes:s.minutes, links:structuredClone(s.links||[]) }));
+        if(activePreset==='A') sessions.A = clone;
+        else if(activePreset==='B') sessions.B = clone;
+        else sessions.BOTH = clone;
+        saveSessions(); renderAll();
+        alert('Outline applied to current preset "'+activePreset+'".');
+      });
+
+      card.querySelector('[data-act="delete"]').addEventListener('click', ()=>{
+        if(!confirm('Delete outline?')) return;
+        savedOutlines = savedOutlines.filter(x=>x.id!==oid);
+        saveOutlines(); renderSavedOutlines();
+      });
+    });
+  }
+
   /* ================= Splitter & board with cloud prefs ================= */
   const split = document.getElementById('split');
   const splitHandle = document.getElementById('splitHandle');
@@ -977,7 +1209,6 @@
 
   // Floating button (position persisted to cloud)
   (function(){
-    // apply from local storage first
     let pos=JSON.parse(localStorage.getItem('float_btn_pos_v1')||'null')||{x:null,y:null};
     if(pos.x!=null&&pos.y!=null){ floatBtn.style.left=pos.x+'px'; floatBtn.style.top=pos.y+'px'; floatBtn.style.right='auto'; floatBtn.style.bottom='auto'; }
     if(prefs.floatBtnPos){ floatBtn.style.left=prefs.floatBtnPos.x; floatBtn.style.top=prefs.floatBtnPos.y; floatBtn.style.right='auto'; floatBtn.style.bottom='auto'; }
@@ -1056,6 +1287,7 @@
     }
 
     renderCurrentLinks();
+    updateClockColor();
   }
   function renderAll(){ buildProgress(); updateProgress(); updateLegendActive(); renderCurrent(); renderShelf(); renderOutline(); }
 
@@ -1184,6 +1416,7 @@
         if(data.widgetShelf){ widgetShelf = data.widgetShelf; }
         if(typeof data.activePreset==='string'){ activePreset = data.activePreset; presetSelect.value = activePreset; }
         if(data.notes){ sectionNotes = data.notes || {}; }
+        if(data.savedOutlines){ savedOutlines = data.savedOutlines || []; saveSavedOutlinesLocal(); }
         if(data.prefs){
           prefs = Object.assign(prefs, data.prefs);
           if(prefs.splitRatio) applySplit(prefs.splitRatio);
@@ -1199,19 +1432,19 @@
         if(data.timer){
           timerState = Object.assign(timerState, data.timer);
           activePreset = timerState.activePreset || activePreset; presetSelect.value = activePreset;
-          // restore timer vars (do not auto-run)
           sessionStarted = !!timerState.sessionStarted;
           currentIndex = Math.min(Math.max(0, timerState.currentIndex|0), Math.max(0, getSchedule().length-1));
           const cur = getSchedule()[currentIndex];
           const maxSecs = cur ? minsToSecs(cur.minutes) : 0;
           secondsLeft = Math.min(Math.max(0, timerState.secondsLeft|0), maxSecs);
           updateStartBtnLabel();
+          updateClockColor();
         }
         saveSessionsLocal(); saveShelfLocal();
         renderAll();
       }else{
         await setDoc(ref, {
-          sessions, widgetShelf, activePreset,
+          sessions, widgetShelf, activePreset, savedOutlines,
           notes: sectionNotes, prefs, timer: timerState,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
