@@ -87,6 +87,9 @@
   .chip{padding:.35rem .65rem; border-radius:9999px; border:1px solid rgba(51,65,85,.8); display:inline-flex; gap:.35rem; align-items:center; background:rgba(15,23,42,.5)}
   .chip:hover{background:rgba(30,41,59,.6)}
   .chip-active{border-color:rgba(56,189,248,.85); box-shadow:0 0 0 2px rgba(56,189,248,.35); background:rgba(2,132,199,.18); color:#e2f3ff}
+
+  /* Outline inline editing */
+  .outline-editing{background:rgba(2,132,199,.08); border:1px solid rgba(56,189,248,.6)!important; border-radius:12px}
 </style>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
@@ -99,8 +102,7 @@
     <!-- Auth controls -->
     <div class="flex flex-wrap items-center gap-2">
       <div id="authArea" class="flex items-center gap-2">
-        <button id="signInBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Sign in</button>
-        <button id="signUpBtn" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500">Sign up</button>
+        <button id="authOpenBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Sign in / Sign up</button>
         <div id="userBadge" class="hidden items-center gap-2">
           <span id="userEmail" class="text-sm text-slate-300"></span>
           <button id="signOutBtn" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500">Sign out</button>
@@ -139,7 +141,7 @@
     <button id="showOutlineBtn" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 hidden">Show Outline ▸</button>
   </section>
 
-  <!-- Split layout: Current section + splitter + Outline -->
+  <!-- Split layout -->
   <div id="split">
     <!-- LEFT: CURRENT -->
     <section id="leftPane">
@@ -271,7 +273,10 @@
         <label class="text-slate-400"><input id="showPw" type="checkbox" class="mr-1">Show password</label>
         <button id="forgotBtn" class="text-slate-300 hover:text-white underline">Forgot password?</button>
       </div>
-      <button id="authSubmitBtn" class="w-full px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500">Continue</button>
+      <button id="authSubmitBtn" class="w-full px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500">Sign in with email</button>
+      <div class="flex justify-center text-xs text-slate-400">
+        <button id="modeToggleBtn" class="underline hover:text-white">New here? Create an account</button>
+      </div>
       <div id="authError" class="text-sm text-rose-400 min-h-[1rem]"></div>
     </div>
   </div>
@@ -279,7 +284,7 @@
 
 <!-- Firebase v12 (modular) + app code -->
 <script type="module">
-  // --- Firebase SDK imports ---
+  /* ================= Firebase ================= */
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
   import {
@@ -290,7 +295,6 @@
     getFirestore, doc, getDoc, setDoc, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-  // --- Your Firebase config ---
   const firebaseConfig = {
     apiKey: "AIzaSyAMyUlfqqOlnt-kHO-C-vB_rzJ-9eudxck",
     authDomain: "chessstudyplanner.firebaseapp.com",
@@ -301,19 +305,14 @@
     measurementId: "G-8PE090JLZH"
   };
 
-  // --- Init Firebase services ---
   const app = initializeApp(firebaseConfig);
   getAnalytics(app); // optional
   const auth = getAuth(app);
   const db   = getFirestore(app);
-
-  // Configure Google provider
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
 
-  // ------------------------------
-  // Local + Cloud persistence
-  // ------------------------------
+  /* ============== Local + Cloud persistence ============== */
   const DEFAULTS = {
     A: [
       { id:'aim',   name:'Aimchess warmup', minutes:8, links:[] },
@@ -357,7 +356,6 @@
     });
   }
 
-  // Cloud helpers
   const cloudStatus = document.getElementById('cloudStatus');
   let currentUser = null;
   const userDocRef = (uid)=> doc(db, 'users', uid, 'apps', 'chess_planner_v1');
@@ -375,9 +373,7 @@
   function saveSessions(){ saveSessionsLocal(); if(currentUser) saveCloudDebounced(); }
   function saveShelf(){ saveShelfLocal(); if(currentUser) saveCloudDebounced(); }
 
-  // ------------------------------
-  // Presets / Timer / UI (mechanics)
-  // ------------------------------
+  /* ================= Presets/Timer/UI ================= */
   const presetSelect = document.getElementById('presetSelect');
   presetSelect.value = activePreset;
   presetSelect.addEventListener('change', ()=>{
@@ -697,8 +693,20 @@
     }
   });
 
+  /* ============== Outline (with inline edit) ============== */
   const outline=document.getElementById('outline');
   const totalMins=document.getElementById('totalMins');
+
+  const toMinutes = (value, unit)=>{
+    const v = Number(value)||0;
+    if(unit==='seconds') return v/60;
+    if(unit==='hours')   return v*60;
+    return v; // minutes
+  };
+  const fromMinutes = (mins)=>{
+    // Default to minutes display
+    return { value: String((+mins).toFixed(2)).replace(/\.00$/,''), unit:'minutes' };
+  };
 
   function renderOutline(){
     const sched=getSchedule();
@@ -707,36 +715,85 @@
         <div class="flex items-center justify-between gap-3">
           <button class="text-left min-w-0 flex-1 truncate text-sm focus:outline-none">${escapeHtml(s.name)}</button>
           <div class="flex items-center gap-2 shrink-0">
-            <span class="text-xs text-slate-300 w-10 text-right">${Number(s.minutes)}m</span>
+            <span class="text-xs text-slate-300 w-16 text-right">${Number(s.minutes)}m</span>
             <button class="btn-xs" data-act="edit">Edit</button>
           </div>
         </div>
       </li>
     `).join('');
 
+    // click to jump
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
       li.addEventListener('click', (e)=>{
-        if(e.target.closest('[data-act="edit"]')) return;
+        if(e.target.closest('[data-act]')) return;
         jumpToSection(idx);
       });
     });
 
+    // inline edit
     outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        const id=btn.closest('[data-id]').dataset.id;
+        const li = btn.closest('li[data-id]');
+        const id = li.dataset.id;
         const ref=getEditableRef();
         const idx=ref.findIndex(x=>x.id===id);
         if(idx<0) return;
         const cur=ref[idx];
-        const t=prompt('Section title:', cur.name); if(t===null) return;
-        const m=prompt('Minutes:', String(cur.minutes)); if(m===null) return;
-        cur.name=t.trim()||cur.name; cur.minutes=Math.max(1, Number(m)||cur.minutes);
-        saveSessions();
-        if(getSchedule()[currentIndex]?.id===cur.id){
-          secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes));
-          if(running) syncEnd();
-        }
-        renderAll();
+
+        const {value, unit} = fromMinutes(cur.minutes);
+        li.classList.add('outline-editing');
+        li.setAttribute('draggable','false');
+        li.innerHTML = `
+          <div class="flex flex-col gap-2 p-2">
+            <label class="text-xs text-slate-400">Title</label>
+            <input class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-sm" id="edtTitle" value="${escapeHtml(cur.name)}"/>
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="text-xs text-slate-400">Time value</label>
+                <input id="edtValue" type="number" step="0.1" min="0.01" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-sm" value="${value}">
+              </div>
+              <div>
+                <label class="text-xs text-slate-400">Unit</label>
+                <select id="edtUnit" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-sm">
+                  <option value="seconds" ${unit==='seconds'?'selected':''}>seconds</option>
+                  <option value="minutes" ${unit==='minutes'?'selected':''}>minutes</option>
+                  <option value="hours"   ${unit==='hours'  ?'selected':''}>hours</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm" id="edtSave">Save</button>
+              <button class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm" id="edtCancel">Cancel</button>
+            </div>
+          </div>
+        `;
+
+        const edtTitle = li.querySelector('#edtTitle');
+        const edtValue = li.querySelector('#edtValue');
+        const edtUnit  = li.querySelector('#edtUnit');
+        const saveBtn  = li.querySelector('#edtSave');
+        const cancelBtn= li.querySelector('#edtCancel');
+
+        const cancel = ()=> renderOutline();
+        cancelBtn.addEventListener('click', cancel);
+        li.addEventListener('keydown', (e)=>{ if(e.key==='Escape') cancel(); });
+
+        const save = ()=>{
+          const newTitle = edtTitle.value.trim() || cur.name;
+          const mins = Math.max(0.01, toMinutes(edtValue.value, edtUnit.value));
+          cur.name = newTitle;
+          cur.minutes = mins;
+          saveSessions();
+          if(getSchedule()[currentIndex]?.id===cur.id){
+            secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes));
+            if(running) syncEnd();
+          }
+          renderOutline();
+          buildProgress(); updateProgress(); renderCurrent();
+        };
+        saveBtn.addEventListener('click', save);
+        li.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)) save(); });
+        edtTitle.focus();
       });
     });
 
@@ -749,7 +806,7 @@
     let startedOnEdit=false;
 
     listEl.querySelectorAll('li[draggable="true"]').forEach(li=>{
-      li.addEventListener('pointerdown', (e)=>{ startedOnEdit = !!e.target.closest('[data-act="edit"]'); });
+      li.addEventListener('pointerdown', (e)=>{ startedOnEdit = !!e.target.closest('[data-act]'); });
       li.addEventListener('dragstart', (e)=>{
         if(startedOnEdit){ e.preventDefault(); startedOnEdit=false; return; }
         draggingEl = li;
@@ -797,11 +854,12 @@
     if(title===null) return;
     const minsRaw = prompt('Minutes:','5');
     if(minsRaw===null) return;
-    const mins = Math.max(1, Number(minsRaw)||5);
+    const mins = Math.max(0.01, Number(minsRaw)||5);
     ref.push({ id:'S'+Date.now(), name:title.trim()||'New section', minutes:mins, links:[] });
     saveSessions(); renderAll();
   });
 
+  /* ================= Splitter & board (unchanged) ================= */
   const split = document.getElementById('split');
   const splitHandle = document.getElementById('splitHandle');
   const showOutlineBtn = document.getElementById('showOutlineBtn');
@@ -924,11 +982,8 @@
   updateStartBtnLabel();
   updateEditUI();
 
-  // ------------------------------
-  // Auth UI (modal) + handlers
-  // ------------------------------
-  const signInBtn  = document.getElementById('signInBtn');
-  const signUpBtn  = document.getElementById('signUpBtn');
+  /* =================== Auth UI =================== */
+  const authOpenBtn = document.getElementById('authOpenBtn');
   const userBadge  = document.getElementById('userBadge');
   const userEmail  = document.getElementById('userEmail');
   const signOutBtn = document.getElementById('signOutBtn');
@@ -942,21 +997,20 @@
   const showPw = document.getElementById('showPw');
   const forgotBtn = document.getElementById('forgotBtn');
   const authSubmitBtn = document.getElementById('authSubmitBtn');
+  const modeToggleBtn = document.getElementById('modeToggleBtn');
   const authError = document.getElementById('authError');
 
   let authMode = 'signin'; // or 'signup'
 
   function setAuthUI(signedIn, email=''){
     if(signedIn){
-      signInBtn.classList.add('hidden');
-      signUpBtn.classList.add('hidden');
+      authOpenBtn.classList.add('hidden');
       userBadge.classList.remove('hidden');
       userEmail.textContent = email;
       cloudStatus.textContent = 'Cloud sync on';
     }else{
       userBadge.classList.add('hidden');
-      signInBtn.classList.remove('hidden');
-      signUpBtn.classList.remove('hidden');
+      authOpenBtn.classList.remove('hidden');
       cloudStatus.textContent = 'Local mode';
     }
   }
@@ -965,6 +1019,7 @@
     authMode = mode;
     authModalTitle.textContent = mode === 'signin' ? 'Sign in' : 'Create your account';
     authSubmitBtn.textContent = mode === 'signin' ? 'Sign in with email' : 'Sign up with email';
+    modeToggleBtn.textContent = mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in instead';
     forgotBtn.classList.toggle('hidden', mode !== 'signin');
     emailInput.value = '';
     passwordInput.value = '';
@@ -973,10 +1028,10 @@
     authModal.classList.add('flex');
     emailInput.focus();
   }
-  function closeModal(){ authModal.classList.add('hidden'); authModal.classList.remove('flex'); }
+  const closeModal = ()=>{ authModal.classList.add('hidden'); authModal.classList.remove('flex'); };
 
-  signInBtn.addEventListener('click', ()=> openAuthModal('signin'));
-  signUpBtn.addEventListener('click', ()=> openAuthModal('signup'));
+  authOpenBtn.addEventListener('click', ()=> openAuthModal('signin'));
+  modeToggleBtn.addEventListener('click', ()=> openAuthModal(authMode==='signin'?'signup':'signin'));
   closeAuthModal.addEventListener('click', closeModal);
   authModal.addEventListener('click', (e)=>{ if(e.target === authModal) closeModal(); });
 
@@ -988,7 +1043,12 @@
       await signInWithPopup(auth, provider);
       closeModal();
     }catch(e){
-      authError.textContent = e.message || 'Google sign-in failed';
+      // Helpful message for common deploy issue
+      if(e && e.code === 'auth/unauthorized-domain'){
+        authError.textContent = 'This domain is not authorized. In Firebase Console → Authentication → Settings → Authorized domains, add: loxtyrell03.github.io , then refresh.';
+      }else{
+        authError.textContent = e.message || 'Google sign-in failed';
+      }
     }
   });
 
@@ -1025,7 +1085,6 @@
 
   signOutBtn.addEventListener('click', ()=> signOut(auth));
 
-  // Auth state listener: load/save cloud data
   onAuthStateChanged(auth, async (user)=>{
     currentUser = user || null;
     if(!user){ setAuthUI(false); return; }
