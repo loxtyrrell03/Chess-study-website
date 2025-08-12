@@ -22,6 +22,7 @@
   }
   html,body{background:var(--bg); color:var(--fg)}
   .no-select{user-select:none;-webkit-user-select:none}
+  .no-drag{-webkit-user-drag:none; user-drag:none}
   .drag-ghost{opacity:.4}
   .drag-over-outline{outline:2px dashed rgba(14,165,233,.9); outline-offset:4px}
   .btn-xs{font-size:.72rem; padding:.25rem .5rem; border-radius:.5rem; border:var(--borderW) solid var(--border); background:#fff}
@@ -646,7 +647,9 @@
     });
 
     function widgetCardHTML(w){
-      const icon = (w.icon==='img' && w.img) ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
+      const icon = (w.icon==='img' && w.img)
+        ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover no-drag" draggable="false"/>`
+        : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
       return `<div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${w.id}" style="cursor:${isEditingSection?'grab':'default'}">
         ${icon}
         <div class="min-w-0"><div class="truncate">${escapeHtml(w.label||'Untitled')}</div><div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div></div>
@@ -658,11 +661,12 @@
       linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
         card.addEventListener('dragstart', e=>{
           if(!isEditingSection){ e.preventDefault(); return; }
-          e.stopPropagation();
-          const payload={type:'shelf', id:card.dataset.wid};
+          // Always use safe data types; some hosts strip custom MIME types.
+          const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid});
+          try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
+          try{ e.dataTransfer.setData('text', payloadStr); }catch{}
+          try{ e.dataTransfer.setData('application/json', payloadStr); }catch{}
           e.dataTransfer.effectAllowed='copy';
-          e.dataTransfer.setData('application/json', JSON.stringify(payload));
-          e.dataTransfer.setData('text/plain', JSON.stringify(payload));
           card.classList.add('drag-ghost');
         });
         card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
@@ -674,7 +678,7 @@
       if(!linksDiv) return;
       linksDiv.innerHTML = arr.map((w,i)=>`
         <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
-          ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
+          ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover no-drag" draggable="false"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
           <a class="truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
           ${isEditingSection ? `<div class="ml-auto flex items-center gap-1"><button class="btn-xs" data-act="edit">Edit</button><button class="btn-xs" data-act="remove">Del</button></div>` : ''}
         </div>`).join('');
@@ -682,10 +686,11 @@
         card.addEventListener('dragstart', e=>{
           if(!isEditingSection){ e.preventDefault(); return; }
           const index=Number(card.dataset.idx); e.stopPropagation();
+          const payloadStr = JSON.stringify({type:'reorder', index});
+          try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
+          try{ e.dataTransfer.setData('text', payloadStr); }catch{}
+          try{ e.dataTransfer.setData('application/json', payloadStr); }catch{}
           e.dataTransfer.effectAllowed='move';
-          const p={type:'reorder', index};
-          e.dataTransfer.setData('application/json', JSON.stringify(p));
-          e.dataTransfer.setData('text/plain', JSON.stringify(p));
           card.classList.add('drag-ghost');
         });
         card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
@@ -719,8 +724,22 @@
     linksDiv?.addEventListener('dragover', e=>{ if(!isEditingSection) return; e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy'; });
     linksDiv?.addEventListener('drop', e=>{
       if(!isEditingSection) return; e.preventDefault(); overCount=0; linksDiv.classList.remove('drag-over-outline');
-      let data = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain'); if(!data) return;
-      let payload=null; try{ payload = JSON.parse(data); }catch{} if(!payload) return;
+
+      // Read robustly across hosts/iframes
+      let data = '';
+      const types = e.dataTransfer.types ? Array.from(e.dataTransfer.types) : [];
+      if(types.includes('text/plain')) data = e.dataTransfer.getData('text/plain');
+      if(!data && types.includes('text')) data = e.dataTransfer.getData('text');
+      if(!data) data = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('Text') || '';
+
+      let payload=null;
+      try{ payload = JSON.parse(data); }
+      catch{
+        if(typeof data === 'string' && data.startsWith('shelf:')) payload = {type:'shelf', id:data.slice(6)};
+        else if(typeof data === 'string' && data.startsWith('reorder:')) payload = {type:'reorder', index:Number(data.slice(8))};
+      }
+      if(!payload){ console.warn('Drop payload missing/invalid', {data, types}); return; }
+
       const sec=currentSectionRef(); if(!sec) return;
 
       if(payload.type==='shelf'){
@@ -730,7 +749,7 @@
       } else if(payload.type==='reorder'){
         const from=payload.index; const cards=[...linksDiv.querySelectorAll('.section-link')];
         let to=cards.length; for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
-        if(from===to || from==null || to==null) return; const sec=currentSectionRef(); const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks();
+        if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks();
       }
     });
 
