@@ -99,7 +99,6 @@
     <!-- Auth controls -->
     <div class="flex flex-wrap items-center gap-2">
       <div id="authArea" class="flex items-center gap-2">
-        <!-- Google-only for now; Sign in / Sign up both trigger the same flow -->
         <button id="signInBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Sign in</button>
         <button id="signUpBtn" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500">Sign up</button>
         <div id="userBadge" class="hidden items-center gap-2">
@@ -245,19 +244,53 @@
   <div class="resizer se" aria-hidden="true"></div>
 </div>
 
+<!-- ---------- Auth Modal (Google + Email/Password) ---------- -->
+<div id="authModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-[100]">
+  <div class="w-[92vw] max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-5">
+    <div class="flex items-start justify-between mb-4">
+      <h3 id="authModalTitle" class="text-xl font-semibold">Sign in</h3>
+      <button id="closeAuthModal" class="text-slate-400 hover:text-slate-200" title="Close">✕</button>
+    </div>
+
+    <div class="space-y-3">
+      <button id="googleAuthBtn" class="w-full px-3 py-2 rounded-xl bg-white text-slate-900 hover:bg-slate-200 flex items-center justify-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.5 31.9 29.2 35 24 35c-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.4 1.1 7.4 2.9l5.7-5.7C33.2 7.1 28.8 5 24 5 12.9 5 4 13.9 4 25s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16.6 19 13 24 13c2.8 0 5.4 1.1 7.4 2.9l5.7-5.7C33.2 7.1 28.8 5 24 5 16.4 5 10 9.1 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.1 0 9.6-1.9 13-5.1l-6-4.9C29.1 36.8 26.7 38 24 38c-5.2 0-9.5-3.3-11.1-8l-6.6 5.1C10 41 16.5 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.1 3.2-3.5 5.7-6.3 7.1l6 4.9C36.4 41.8 44 36 44 25c0-1.3-.1-2.7-.4-4.5z"/></svg>
+        Continue with Google
+      </button>
+
+      <div class="relative">
+        <div class="absolute inset-x-0 top-1/2 border-t border-slate-700"></div>
+        <div class="relative flex justify-center">
+          <span class="px-2 text-xs text-slate-400 bg-slate-900">or with email</span>
+        </div>
+      </div>
+
+      <input id="emailInput" type="email" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2" placeholder="Email"/>
+      <input id="passwordInput" type="password" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2" placeholder="Password (min 6 chars)"/>
+      <div class="flex items-center justify-between text-xs">
+        <label class="text-slate-400"><input id="showPw" type="checkbox" class="mr-1">Show password</label>
+        <button id="forgotBtn" class="text-slate-300 hover:text-white underline">Forgot password?</button>
+      </div>
+      <button id="authSubmitBtn" class="w-full px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500">Continue</button>
+      <div id="authError" class="text-sm text-rose-400 min-h-[1rem]"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Firebase v12 (modular) + app code -->
 <script type="module">
-  // --- Firebase SDK imports (modular) ---
+  // --- Firebase SDK imports ---
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
   import {
-    getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut
+    getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut,
+    createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail
   } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, setDoc, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-  // --- Your Firebase config (from console) ---
+  // --- Your Firebase config ---
   const firebaseConfig = {
     apiKey: "AIzaSyAMyUlfqqOlnt-kHO-C-vB_rzJ-9eudxck",
     authDomain: "chessstudyplanner.firebaseapp.com",
@@ -273,10 +306,13 @@
   getAnalytics(app); // optional
   const auth = getAuth(app);
   const db   = getFirestore(app);
+
+  // Configure Google provider
   const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
 
   // ------------------------------
-  // Data & persistence (local + cloud)
+  // Local + Cloud persistence
   // ------------------------------
   const DEFAULTS = {
     A: [
@@ -327,7 +363,6 @@
   const userDocRef = (uid)=> doc(db, 'users', uid, 'apps', 'chess_planner_v1');
 
   const debounce = (fn,ms=600)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
-
   const saveCloudDebounced = debounce(async ()=>{
     if(!currentUser) return;
     try{
@@ -341,7 +376,7 @@
   function saveShelf(){ saveShelfLocal(); if(currentUser) saveCloudDebounced(); }
 
   // ------------------------------
-  // Presets / Timer / UI (unchanged mechanics)
+  // Presets / Timer / UI (mechanics)
   // ------------------------------
   const presetSelect = document.getElementById('presetSelect');
   presetSelect.value = activePreset;
@@ -890,13 +925,26 @@
   updateEditUI();
 
   // ------------------------------
-  // Auth UI wiring (Google only)
+  // Auth UI (modal) + handlers
   // ------------------------------
   const signInBtn  = document.getElementById('signInBtn');
   const signUpBtn  = document.getElementById('signUpBtn');
   const userBadge  = document.getElementById('userBadge');
   const userEmail  = document.getElementById('userEmail');
   const signOutBtn = document.getElementById('signOutBtn');
+
+  const authModal = document.getElementById('authModal');
+  const authModalTitle = document.getElementById('authModalTitle');
+  const closeAuthModal = document.getElementById('closeAuthModal');
+  const googleAuthBtn = document.getElementById('googleAuthBtn');
+  const emailInput = document.getElementById('emailInput');
+  const passwordInput = document.getElementById('passwordInput');
+  const showPw = document.getElementById('showPw');
+  const forgotBtn = document.getElementById('forgotBtn');
+  const authSubmitBtn = document.getElementById('authSubmitBtn');
+  const authError = document.getElementById('authError');
+
+  let authMode = 'signin'; // or 'signup'
 
   function setAuthUI(signedIn, email=''){
     if(signedIn){
@@ -913,14 +961,71 @@
     }
   }
 
-  async function googlePopup(){
-    try{ await signInWithPopup(auth, provider); }
-    catch(e){ alert(e.message); }
+  function openAuthModal(mode='signin'){
+    authMode = mode;
+    authModalTitle.textContent = mode === 'signin' ? 'Sign in' : 'Create your account';
+    authSubmitBtn.textContent = mode === 'signin' ? 'Sign in with email' : 'Sign up with email';
+    forgotBtn.classList.toggle('hidden', mode !== 'signin');
+    emailInput.value = '';
+    passwordInput.value = '';
+    authError.textContent = '';
+    authModal.classList.remove('hidden');
+    authModal.classList.add('flex');
+    emailInput.focus();
   }
-  signInBtn.addEventListener('click', googlePopup);
-  signUpBtn.addEventListener('click', googlePopup); // same flow; Google creates account if needed
+  function closeModal(){ authModal.classList.add('hidden'); authModal.classList.remove('flex'); }
+
+  signInBtn.addEventListener('click', ()=> openAuthModal('signin'));
+  signUpBtn.addEventListener('click', ()=> openAuthModal('signup'));
+  closeAuthModal.addEventListener('click', closeModal);
+  authModal.addEventListener('click', (e)=>{ if(e.target === authModal) closeModal(); });
+
+  showPw.addEventListener('change', ()=>{ passwordInput.type = showPw.checked ? 'text' : 'password'; });
+
+  googleAuthBtn.addEventListener('click', async ()=>{
+    authError.textContent = '';
+    try{
+      await signInWithPopup(auth, provider);
+      closeModal();
+    }catch(e){
+      authError.textContent = e.message || 'Google sign-in failed';
+    }
+  });
+
+  async function handleEmailSubmit(){
+    authError.textContent = '';
+    const email = emailInput.value.trim();
+    const pw = passwordInput.value;
+    if(!email || !pw){ authError.textContent = 'Please enter email and password.'; return; }
+    try{
+      if(authMode === 'signin'){
+        await signInWithEmailAndPassword(auth, email, pw);
+      }else{
+        await createUserWithEmailAndPassword(auth, email, pw);
+      }
+      closeModal();
+    }catch(e){
+      authError.textContent = e.message || 'Authentication failed';
+    }
+  }
+  authSubmitBtn.addEventListener('click', handleEmailSubmit);
+  emailInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') handleEmailSubmit(); });
+  passwordInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') handleEmailSubmit(); });
+
+  forgotBtn.addEventListener('click', async ()=>{
+    const email = emailInput.value.trim();
+    if(!email){ authError.textContent = 'Enter your email first.'; return; }
+    try{
+      await sendPasswordResetEmail(auth, email);
+      authError.textContent = 'Password reset email sent.';
+    }catch(e){
+      authError.textContent = e.message || 'Could not send reset email.';
+    }
+  });
+
   signOutBtn.addEventListener('click', ()=> signOut(auth));
 
+  // Auth state listener: load/save cloud data
   onAuthStateChanged(auth, async (user)=>{
     currentUser = user || null;
     if(!user){ setAuthUI(false); return; }
