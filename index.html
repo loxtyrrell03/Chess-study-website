@@ -85,7 +85,7 @@
   .resizer.s{cursor:ns-resize; left:8px; right:8px; bottom:-3px; height:6px}
   .resizer.se{cursor:nwse-resize; right:-3px; bottom:-3px; width:10px; height:10px; border-bottom-right-radius:10px}
 
-  /* Outline rows (unchanged) */
+  /* Outline rows */
   .outline-row{padding:.6rem .5rem; border-bottom:1px solid rgba(51,65,85,.6)}
   .outline-row:hover{background:rgba(30,41,59,.35)}
   .outline-active{background:rgba(2,132,199,.15) !important; box-shadow:inset 0 0 0 1px rgba(56,189,248,.6)}
@@ -93,39 +93,20 @@
   .chip:hover{background:rgba(30,41,59,.6)}
   .chip-active{border-color:rgba(56,189,248,.85); box-shadow:0 0 0 2px rgba(56,189,248,.35); background:rgba(2,132,199,.18); color:#e2f3ff}
 
-  /* Inline outline editing (compact + responsive) */
+  /* Inline outline editing */
   .outline-edit{display:flex; align-items:center; gap:.35rem; width:100%}
   .inline-field{background:transparent; border:1px solid rgba(56,189,248,.55); border-radius:.6rem; padding:.22rem .5rem}
   .inline-title{flex:1 1 auto; min-width:0}
   .inline-number{flex:0 0 auto; width:auto; text-align:center; min-width:8ch}
   .inline-select{flex:0 0 auto; width:auto; height:30px; min-width:6ch}
 
-  /* NAV TABS — professional look with vertical separators */
-  .tabs-bar{
-    display:flex; align-items:center; gap:0;
-    border-bottom:1px solid rgba(71,85,105,.7);
-    background:linear-gradient(180deg,rgba(13,22,40,.8),rgba(8,14,28,.8));
-    border-radius:14px;
-    padding:.35rem;
-  }
-  .tab-link{
-    position:relative;
-    padding:.6rem 1rem; font-weight:600;
-    color:var(--tabs-muted);
-    border-radius:.6rem;
-  }
+  /* Tabs */
+  .tabs-bar{display:flex; align-items:center; gap:0; border-bottom:1px solid rgba(71,85,105,.7); background:linear-gradient(180deg,rgba(13,22,40,.8),rgba(8,14,28,.8)); border-radius:14px; padding:.35rem;}
+  .tab-link{position:relative; padding:.6rem 1rem; font-weight:600; color:var(--tabs-muted); border-radius:.6rem;}
   .tab-link:hover{ color:#e2e8f0; background:rgba(148,163,184,.08); }
-  .tab-link.active{
-    color:#e6f6ff; background:rgba(56,189,248,.18);
-    box-shadow:inset 0 0 0 1px rgba(56,189,248,.6);
-  }
-  .tab-sep{
-    width:1px; height:22px;
-    background:linear-gradient(180deg,transparent,rgba(148,163,184,.5),transparent);
-    margin:0 .25rem;
-  }
+  .tab-link.active{ color:#e6f6ff; background:rgba(56,189,248,.18); box-shadow:inset 0 0 0 1px rgba(56,189,248,.6); }
+  .tab-sep{ width:1px; height:22px; background:linear-gradient(180deg,transparent,rgba(148,163,184,.5),transparent); margin:0 .25rem; }
 
-  /* Cards */
   .card{background:#0b1220; border:1px solid #1f2a44; border-radius:14px}
 </style>
 </head>
@@ -149,7 +130,7 @@
     </div>
   </header>
 
-  <!-- Tabs (professional style with separators) -->
+  <!-- Tabs -->
   <nav class="mb-6 no-print">
     <div class="tabs-bar">
       <button class="tab-link active" data-tab="homeTab">Home</button>
@@ -194,7 +175,7 @@
       <button id="showOutlineBtn" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 hidden">Show Outline ▸</button>
     </section>
 
-    <!-- Split layout (RIGHT PANEL WIDER by default) -->
+    <!-- Split layout -->
     <div id="split">
       <!-- LEFT: CURRENT -->
       <section id="leftPane">
@@ -243,9 +224,19 @@
       <!-- DRAG HANDLE -->
       <div id="splitHandle" class="no-print"></div>
 
-      <!-- RIGHT: OUTLINE (now wider) -->
+      <!-- RIGHT: OUTLINE -->
       <aside id="rightPane">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 h-full flex flex-col">
+
+          <!-- Quick-load Saved Outlines (top of Home outline panel) -->
+          <div id="homeSavedRow" class="mb-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs uppercase tracking-wide text-slate-400">Saved Outlines</h4>
+              <button id="manageOutlinesLink" class="text-xs underline hover:text-white">Manage</button>
+            </div>
+            <div id="homeSavedScroller" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl bg-slate-950 border border-slate-800"></div>
+          </div>
+
           <div class="flex items-center justify-between">
             <h3 class="text-sm uppercase tracking-wide text-slate-400">SESSION OUTLINE</h3>
             <button id="collapseOutlineBtn" class="text-xs px-2 py-1 rounded-md bg-slate-800 border border-slate-700 hover:bg-slate-700">▾ Hide</button>
@@ -255,7 +246,6 @@
 
           <div class="mt-3 flex items-center gap-2">
             <button id="addOutlineItem" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm">+ Add Section</button>
-            <button id="saveAsOutline" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm">Save current as Outline</button>
             <div id="totalMins" class="ml-auto text-xs text-slate-400">Total: 0 minutes</div>
           </div>
         </div>
@@ -270,8 +260,16 @@
   <!-- SAVED OUTLINES TAB -->
   <section id="savedTab" class="hidden">
     <div class="mb-3 flex items-center gap-2">
-      <button id="newEmptyOutline" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm">+ New empty outline</button>
-      <button id="importFromCurrent" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm">+ Save current as outline</button>
+      <button id="createOutlineBtn" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm">+ Create new outline</button>
+
+    <div id="createOutlineForm" class="card p-4 mb-4 hidden">
+      <label class="text-sm text-slate-300">Outline title</label>
+      <div class="mt-2 flex items-center gap-2">
+        <input id="newOutlineTitle" class="bg-slate-950 border border-slate-800 rounded-xl p-2 flex-1" placeholder="e.g., 90-min Balanced Plan"/>
+        <button id="createOutlineConfirm" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm">Create</button>
+        <button id="createOutlineCancel" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm">Cancel</button>
+      </div>
+    </div>
     </div>
 
     <div id="savedList" class="grid lg:grid-cols-2 gap-4"></div>
@@ -497,6 +495,7 @@
       homeTab.classList.toggle('hidden', id!=='homeTab');
       savedTab.classList.toggle('hidden', id!=='savedTab');
       if(id==='savedTab') renderSavedOutlines();
+      if(id==='homeTab') renderHomeSavedBar();
     });
   });
 
@@ -699,12 +698,12 @@
     clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
     editSectionBtn.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
     renderCurrentLinks();
-    renderShelf(); // ensure draggable attr reflects edit mode
+    renderShelf();
   }
 
   function currentSectionRef(){ return getSchedule()[currentIndex]; }
 
-  // --- notes persistence (local + cloud) ---
+  // notes persistence
   function loadNoteFor(id){
     return sectionNotes[id] ?? localStorage.getItem('section_desc_'+id) ?? '';
   }
@@ -729,7 +728,6 @@
       </div>
     `).join('');
 
-    // Reorder within section (drag)
     linksDiv.querySelectorAll('.section-link').forEach(card=>{
       card.addEventListener('dragstart', e=>{
         if(!isEditingSection) { e.preventDefault(); return; }
@@ -743,7 +741,6 @@
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
     });
 
-    // Inline edits
     if(isEditingSection){
       linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
         btn.addEventListener('click', ()=>{
@@ -788,7 +785,6 @@
   function renderShelf(){
     linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
 
-    // DRAG from shelf
     linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
       card.addEventListener('dragstart', e=>{
         if(!isEditingSection) { e.preventDefault(); return; }
@@ -803,7 +799,6 @@
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
     });
 
-    // edit/delete
     linkShelfDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         if(!isEditingSection) return;
@@ -838,7 +833,6 @@
   });
   resetShelfBtn.addEventListener('click', ()=>{ if(!isEditingSection) return; if(confirm('Reset shelf to defaults?')){ widgetShelf=structuredClone(DEFAULT_SHELF); saveShelf(); renderShelf(); }});
 
-  // Robust DROP into "Links in this section"
   let overCount = 0;
   linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over'); });
   linksDiv.addEventListener('dragleave', e=>{ if(!isEditingSection) return; overCount=Math.max(0, overCount-1); if(overCount===0) linksDiv.classList.remove('drag-over'); });
@@ -866,7 +860,7 @@
       const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
       sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
       saveSessions();
-      renderCurrentLinks(); // immediate UI update
+      renderCurrentLinks();
     } else if(payload.type==='reorder'){
       const from=payload.index;
       const cards=[...linksDiv.querySelectorAll('.section-link')];
@@ -879,11 +873,11 @@
       const [m]=sec.links.splice(from,1);
       sec.links.splice(to,0,m);
       saveSessions();
-      renderCurrentLinks(); // immediate
+      renderCurrentLinks();
     }
   });
 
-  /* ============== Outline (inline edit, compact + bug-fixed) ============== */
+  /* ============== Outline (inline edit) ============== */
   const outline=document.getElementById('outline');
   const totalMins=document.getElementById('totalMins');
 
@@ -910,7 +904,6 @@
       </li>
     `).join('');
 
-    // click to jump (disabled while editing)
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
       li.addEventListener('click', (e)=>{
         if(editingOutlineId) return;
@@ -919,7 +912,6 @@
       });
     });
 
-    // inline edit
     outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const li = btn.closest('li[data-id]');
@@ -944,7 +936,6 @@
           </div>
         `;
 
-        // prevent bubbling
         li.querySelector('.outline-edit').addEventListener('click', ev=>ev.stopPropagation());
 
         const edtTitle = li.querySelector('#edtTitle');
@@ -953,7 +944,6 @@
         const saveBtn  = li.querySelector('#edtSave');
         const cancelBtn= li.querySelector('#edtCancel');
 
-        // responsive widths (but not too slim)
         const adjustWidths = ()=>{
           const numLen = String(edtValue.value).length || 1;
           edtValue.style.width = Math.max(8, numLen + 2) + 'ch';
@@ -973,7 +963,7 @@
           const mins = Math.max(0.01, toMinutes(edtValue.value, edtUnit.value));
           cur.name = newTitle;
           cur.minutes = mins;
-          saveSessions(); // cloud sync
+          saveSessions();
           if(getSchedule()[currentIndex]?.id===cur.id){
             secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes));
             if(running) syncEnd();
@@ -1051,98 +1041,309 @@
     saveSessions(); renderAll();
   });
 
-  // save current schedule as an outline (from Home)
-  document.getElementById('saveAsOutline').addEventListener('click', ()=>{
-    const name = prompt('Title for this outline:', 'New outline');
-    if(name===null) return;
-    const outline = {
-      id: 'O'+Date.now(),
-      title: name.trim() || 'Untitled outline',
-      sections: getSchedule().map(s=>({ id:s.id, name:s.name, minutes:s.minutes, links:s.links||[] })),
-      createdAt: Date.now()
-    };
-    savedOutlines.unshift(outline);
-    saveOutlines();
-    alert('Saved to Outlines tab.');
-  });
-
   /* ================= Saved Outlines UI ================= */
   const savedList = document.getElementById('savedList');
-  const newEmptyOutlineBtn = document.getElementById('newEmptyOutline');
-  const importFromCurrentBtn = document.getElementById('importFromCurrent');
+  const createOutlineBtn = document.getElementById('createOutlineBtn');
+  const createOutlineForm = document.getElementById('createOutlineForm');
+  const newOutlineTitleInput = document.getElementById('newOutlineTitle');
+  const createOutlineConfirm = document.getElementById('createOutlineConfirm');
+  const createOutlineCancel = document.getElementById('createOutlineCancel');
 
-  newEmptyOutlineBtn.addEventListener('click', ()=>{
-    const title = prompt('Title for the new outline:', 'New outline');
-    if(title===null) return;
-    savedOutlines.unshift({ id:'O'+Date.now(), title: title.trim()||'New outline', sections: [], createdAt: Date.now() });
-    saveOutlines(); renderSavedOutlines();
-  });
-  importFromCurrentBtn.addEventListener('click', ()=>{
-    const name = prompt('Title for this outline:', 'Current session');
-    if(name===null) return;
-    savedOutlines.unshift({
-      id:'O'+Date.now(),
-      title: name.trim()||'Current session',
-      sections: getSchedule().map(s=>({ id:s.id, name:s.name, minutes:s.minutes, links:s.links||[] })),
-      createdAt: Date.now()
+  function defaultSection(){
+    return { id:'S'+Date.now()+Math.random().toString(16).slice(2), name:'New section', minutes:5, desc:'', links:[] };
+  }
+
+  function ensureOutlineShapes(){
+    savedOutlines.forEach(o=>{
+      o.sections = o.sections || [];
+      o.sections.forEach(s=>{
+        if(typeof s.minutes!=='number') s.minutes = Number(s.minutes)||5;
+        if(!('desc' in s)) s.desc='';
+        if(!('links' in s)) s.links=[];
+        if(!('name' in s)) s.name='Untitled';
+        if(!('id' in s)) s.id='S'+Math.random().toString(16).slice(2);
+      });
     });
-    saveOutlines(); renderSavedOutlines();
+  }
+  ensureOutlineShapes();
+
+  createOutlineBtn.addEventListener('click', ()=>{
+    createOutlineForm.classList.toggle('hidden', false);
+    newOutlineTitleInput.value = '';
+    newOutlineTitleInput.focus();
+  });
+  createOutlineCancel.addEventListener('click', ()=>{
+    createOutlineForm.classList.add('hidden');
+  });
+  createOutlineConfirm.addEventListener('click', ()=>{
+    const title = newOutlineTitleInput.value.trim() || 'New outline';
+    const outline = { id:'O'+Date.now(), title, sections:[], createdAt: Date.now() };
+    savedOutlines.unshift(outline);
+    saveOutlines();
+    createOutlineForm.classList.add('hidden');
+    renderSavedOutlines();
+    renderHomeSavedBar();
   });
 
-  function outlineCardHTML(o, collapsed=true){
-    return `
+  function gotoHome(){
+    const homeBtn = [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='homeTab');
+    const savedBtn= [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='savedTab');
+    if(homeBtn && savedBtn){
+      homeBtn.classList.add('active'); savedBtn.classList.remove('active');
+    }
+    document.getElementById('homeTab').classList.remove('hidden');
+    document.getElementById('savedTab').classList.add('hidden');
+  }
+
+  function applyOutlineToPreset(outline){
+    const clone = outline.sections.map(s=>({ id:s.id||('S'+Math.random().toString(16).slice(2)), name:s.name, minutes:s.minutes, links:structuredClone(s.links||[]) }));
+    if(activePreset==='A') sessions.A = clone;
+    else if(activePreset==='B') sessions.B = clone;
+    else sessions.BOTH = clone;
+    clone.forEach(sec=>{
+      const src = outline.sections.find(ss=>ss.id===sec.id);
+      if(src && src.desc!=null) sectionNotes[sec.id] = src.desc;
+    });
+    saveSessions(); renderAll(); timerTouch();
+  }
+
+  function renderSavedOutlines(){
+    ensureOutlineShapes();
+    savedList.innerHTML = savedOutlines.map(o=>`
       <div class="card p-4" data-oid="${o.id}">
         <div class="flex items-center gap-2">
-          <input class="bg-transparent border border-slate-700 rounded-lg px-2 py-1 flex-1" value="${escapeHtml(o.title)}" aria-label="Outline title"/>
-          <button class="btn-xs" data-act="toggle">${collapsed?'Expand':'Collapse'}</button>
-          <button class="btn-xs" data-act="apply">Apply to current preset</button>
-          <button class="btn-xs" data-act="delete">Delete</button>
+          <input class="bg-transparent border border-slate-700 rounded-lg px-2 py-1 flex-1 outline-title" value="${escapeHtml(o.title)}" aria-label="Outline title"/>
+          <div class="ml-auto flex items-center gap-2">
+            <button class="btn-xs" data-act="edit">Edit</button>
+            <button class="btn-xs" data-act="load">Load</button>
+            <button class="btn-xs" data-act="delete">Delete</button>
+          </div>
         </div>
-        <div class="mt-3 ${collapsed?'hidden':''}">
-          ${o.sections.length? o.sections.map(s=>`
-            <div class="flex items-center justify-between border border-slate-800 rounded-lg p-2 mb-2">
-              <div class="text-sm truncate">${escapeHtml(s.name)}</div>
-              <div class="text-xs text-slate-300 ml-2 shrink-0">${Number(s.minutes)}m</div>
-            </div>
-          `).join('') : `<div class="text-sm text-slate-400">No sections yet. Use "Apply" to load an outline, edit in Home, then re-save.</div>`}
+        <div class="mt-3 hidden editor"></div>
+      </div>
+    `).join('');
+
+    savedList.querySelectorAll('[data-oid]').forEach(card=>{
+      const oid = card.dataset.oid;
+      const outline = savedOutlines.find(x=>x.id===oid);
+
+      const titleInput = card.querySelector('.outline-title');
+      titleInput.addEventListener('input', ()=>{ outline.title = titleInput.value; saveOutlines(); renderHomeSavedBar(); });
+
+      card.querySelector('[data-act="edit"]').addEventListener('click', ()=>{
+        const editor = card.querySelector('.editor');
+        const isHidden = editor.classList.contains('hidden');
+        editor.classList.toggle('hidden', !isHidden);
+        if(isHidden) renderOutlineEditor(editor, outline);
+      });
+
+      card.querySelector('[data-act="load"]').addEventListener('click', ()=>{
+        applyOutlineToPreset(outline);
+        gotoHome();
+      });
+
+      card.querySelector('[data-act="delete"]').addEventListener('click', ()=>{
+        if(!confirm('Delete this outline?')) return;
+        const idx = savedOutlines.findIndex(x=>x.id===oid);
+        if(idx>=0){ savedOutlines.splice(idx,1); saveOutlines(); renderSavedOutlines(); renderHomeSavedBar(); }
+      });
+    });
+  }
+
+  function renderOutlineEditor(container, outline){
+    const secRows = outline.sections.map((s, i)=> sectionEditorRowHTML(s, i)).join('');
+    container.innerHTML = `
+      <div class="space-y-3">
+        <div class="flex items-center gap-2">
+          <button class="btn-xs" data-act="add-section">+ Add Section</button>
+        </div>
+        <div class="space-y-3" data-role="sections">
+          ${secRows || '<div class="text-sm text-slate-400">No sections yet. Add one.</div>'}
+        </div>
+      </div>
+    `;
+    const sectionsHost = container.querySelector('[data-role="sections"]');
+
+    container.querySelector('[data-act="add-section"]').addEventListener('click', ()=>{
+      const s = defaultSection();
+      outline.sections.push(s); saveOutlines();
+      sectionsHost.insertAdjacentHTML('beforeend', sectionEditorRowHTML(s, outline.sections.length-1));
+      wireSectionRow(sectionsHost.lastElementChild, outline, outline.sections.length-1);
+      renderHomeSavedBar();
+    });
+
+    [...sectionsHost.children].forEach((row, idx)=> wireSectionRow(row, outline, idx));
+  }
+
+  function sectionEditorRowHTML(s, index){
+    const linksHTML = (s.links||[]).map((l, li)=> linkEditorRowHTML(l, index, li)).join('');
+    return `
+      <div class="border border-slate-800 rounded-lg p-3" data-idx="${index}">
+        <div class="flex flex-wrap items-center gap-2">
+          <input class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 flex-1 sec-title" value="${escapeHtml(s.name)}" placeholder="Section title"/>
+          <input class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 w-24 sec-mins" type="number" min="0.25" step="0.25" value="${(+s.minutes||5)}"/>
+          <span class="text-xs text-slate-400">min</span>
+          <div class="ml-auto flex items-center gap-1">
+            <button class="btn-xxs" data-act="up">↑</button>
+            <button class="btn-xxs" data-act="down">↓</button>
+            <button class="btn-xxs" data-act="remove">Del</button>
+          </div>
+        </div>
+        <div class="mt-2">
+          <label class="text-xs text-slate-400">Description</label>
+          <textarea class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 sec-desc" rows="2" placeholder="Notes or checklist…">${escapeHtml(s.desc||'')}</textarea>
+        </div>
+        <div class="mt-2">
+          <div class="flex items-center justify-between">
+            <label class="text-xs text-slate-400">Link widgets</label>
+            <button class="btn-xxs" data-act="add-link">+ Add Link</button>
+          </div>
+          <div class="mt-2 space-y-2 links-host">
+            ${linksHTML || '<div class="text-xs text-slate-500">No links yet.</div>'}
+          </div>
         </div>
       </div>
     `;
   }
 
-  function renderSavedOutlines(){
-    savedList.innerHTML = savedOutlines.map(o=>outlineCardHTML(o, true)).join('');
-    savedList.querySelectorAll('[data-oid]').forEach(card=>{
-      const oid=card.dataset.oid;
-      const titleInput = card.querySelector('input');
-      titleInput.addEventListener('change', ()=>{ const o=savedOutlines.find(x=>x.id===oid); if(!o) return; o.title=titleInput.value.trim()||o.title; saveOutlines(); });
+  function linkEditorRowHTML(l, secIdx, linkIdx){
+    const isEmoji = (l.icon||'emoji') === 'emoji';
+    return `
+      <div class="link-card items-start" data-link-idx="${linkIdx}">
+        <div class="grid grid-cols-12 gap-2 w-full">
+          <div class="col-span-3">
+            <label class="text-xs text-slate-400">Label</label>
+            <input class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 link-label" value="${escapeHtml(l.label||'')}" placeholder="e.g., Lichess Analysis"/>
+          </div>
+          <div class="col-span-5">
+            <label class="text-xs text-slate-400">URL</label>
+            <input class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 link-url" value="${escapeHtml(l.url||'')}" placeholder="https://..."/>
+          </div>
+          <div class="col-span-2">
+            <label class="text-xs text-slate-400">Icon</label>
+            <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 link-icon">
+              <option value="emoji"${isEmoji?' selected':''}>emoji</option>
+              <option value="img"${!isEmoji?' selected':''}>img</option>
+            </select>
+          </div>
+          <div class="col-span-2">
+            <label class="text-xs text-slate-400 link-extra-label">${isEmoji?'Emoji/Text':'Image URL'}</label>
+            <input class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 link-extra" value="${escapeHtml(isEmoji?(l.emoji||'🔗'):(l.img||''))}" placeholder="${isEmoji?'🔗 or ♟️':'https://...png'}"/>
+          </div>
+        </div>
+        <div class="mt-2 flex items-center gap-2">
+          <button class="btn-xxs" data-act="remove-link">Remove</button>
+        </div>
+      </div>
+    `;
+  }
 
-      card.querySelector('[data-act="toggle"]').addEventListener('click', ()=>{
-        const body = card.querySelector('div.mt-3');
-        const btn = card.querySelector('[data-act="toggle"]');
-        const col = body.classList.toggle('hidden');
-        btn.textContent = col?'Expand':'Collapse';
-      });
+  function wireSectionRow(row, outline, idx){
+    const sec = outline.sections[idx];
+    const titleEl = row.querySelector('.sec-title');
+    const minsEl = row.querySelector('.sec-mins');
+    const descEl = row.querySelector('.sec-desc');
+    const linksHost = row.querySelector('.links-host');
 
-      card.querySelector('[data-act="apply"]').addEventListener('click', ()=>{
-        const o=savedOutlines.find(x=>x.id===oid); if(!o) return;
-        const clone = o.sections.map(s=>({ id:s.id||('S'+Math.random().toString(16).slice(2)), name:s.name, minutes:s.minutes, links:structuredClone(s.links||[]) }));
-        if(activePreset==='A') sessions.A = clone;
-        else if(activePreset==='B') sessions.B = clone;
-        else sessions.BOTH = clone;
-        saveSessions(); renderAll();
-        alert('Outline applied to current preset "'+activePreset+'".');
-      });
+    const save = ()=>{ saveOutlines(); renderHomeSavedBar(); };
 
-      card.querySelector('[data-act="delete"]').addEventListener('click', ()=>{
-        if(!confirm('Delete outline?')) return;
-        savedOutlines = savedOutlines.filter(x=>x.id!==oid);
-        saveOutlines(); renderSavedOutlines();
+    titleEl.addEventListener('input', ()=>{ sec.name = titleEl.value; save(); });
+    minsEl.addEventListener('input', ()=>{ sec.minutes = Math.max(0.25, Number(minsEl.value)||5); save(); });
+    descEl.addEventListener('input', ()=>{ sec.desc = descEl.value; save(); });
+
+    row.querySelector('[data-act="up"]').addEventListener('click', ()=>{
+      if(idx<=0) return;
+      const [m]=outline.sections.splice(idx,1);
+      outline.sections.splice(idx-1,0,m);
+      save();
+      renderOutlineEditor(row.parentElement.parentElement, outline);
+    });
+    row.querySelector('[data-act="down"]').addEventListener('click', ()=>{
+      if(idx>=outline.sections.length-1) return;
+      const [m]=outline.sections.splice(idx,1);
+      outline.sections.splice(idx+1,0,m);
+      save();
+      renderOutlineEditor(row.parentElement.parentElement, outline);
+    });
+    row.querySelector('[data-act="remove"]').addEventListener('click', ()=>{
+      outline.sections.splice(idx,1);
+      save();
+      renderOutlineEditor(row.parentElement.parentElement, outline);
+    });
+
+    row.querySelector('[data-act="add-link"]').addEventListener('click', ()=>{
+      const newLink = { id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:'New link', url:'', icon:'emoji', emoji:'🔗', img:'' };
+      sec.links.push(newLink); save();
+      linksHost.insertAdjacentHTML('beforeend', linkEditorRowHTML(newLink, idx, sec.links.length-1));
+      wireLinkRow(linksHost.lastElementChild, sec, sec.links.length-1, row, outline);
+    });
+
+    [...linksHost.children].forEach((lnRow, linkIdx)=> wireLinkRow(lnRow, sec, linkIdx, row, outline));
+  }
+
+  function wireLinkRow(lnRow, sec, linkIdx, sectionRow, outline){
+    const link = sec.links[linkIdx];
+    const labelEl = lnRow.querySelector('.link-label');
+    const urlEl = lnRow.querySelector('.link-url');
+    const iconEl = lnRow.querySelector('.link-icon');
+    const extraEl = lnRow.querySelector('.link-extra');
+    const save = ()=> saveOutlines();
+
+    function syncIconExtra(){
+      const isEmoji = iconEl.value==='emoji';
+      lnRow.querySelector('.link-extra-label').textContent = isEmoji? 'Emoji/Text' : 'Image URL';
+      extraEl.placeholder = isEmoji? '🔗 or ♟️' : 'https://...png';
+    }
+
+    labelEl.addEventListener('input', ()=>{ link.label = labelEl.value; save(); });
+    urlEl.addEventListener('input', ()=>{ link.url = urlEl.value; save(); });
+    iconEl.addEventListener('change', ()=>{
+      link.icon = iconEl.value;
+      if(link.icon==='emoji'){ link.img=''; if(!link.emoji) link.emoji='🔗'; }
+      else { link.emoji=''; if(!link.img) link.img=''; }
+      syncIconExtra(); save();
+    });
+    extraEl.addEventListener('input', ()=>{
+      if((link.icon||'emoji')==='emoji') link.emoji = extraEl.value;
+      else link.img = extraEl.value;
+      save();
+    });
+    lnRow.querySelector('[data-act="remove-link"]').addEventListener('click', ()=>{
+      sec.links.splice(linkIdx,1); save(); renderOutlineEditor(sectionRow.parentElement.parentElement, outline);
+    });
+
+    syncIconExtra();
+  }
+
+  const manageOutlinesLink = document.getElementById('manageOutlinesLink');
+  manageOutlinesLink.addEventListener('click', ()=>{
+    const savedBtn= [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='savedTab');
+    const homeBtn = [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='homeTab');
+    if(savedBtn && homeBtn){
+      savedBtn.classList.add('active'); homeBtn.classList.remove('active');
+    }
+    document.getElementById('savedTab').classList.remove('hidden');
+    document.getElementById('homeTab').classList.add('hidden');
+    renderSavedOutlines();
+  });
+
+  function renderHomeSavedBar(){
+    const scroller = document.getElementById('homeSavedScroller');
+    if(!scroller) return;
+    scroller.innerHTML = savedOutlines.map(o=>`
+      <button class="link-card whitespace-nowrap" data-load-oid="${o.id}" title="Load into ${activePreset}">
+        <span class="text-sm">${escapeHtml(o.title)}</span>
+      </button>
+    `).join('');
+    scroller.querySelectorAll('[data-load-oid]').forEach(btn=>{
+      const o = savedOutlines.find(x=>x.id===btn.dataset.loadOid);
+      btn.addEventListener('click', ()=>{
+        applyOutlineToPreset(o);
       });
     });
   }
 
-  /* ================= Splitter & board with cloud prefs ================= */
+  /* ================= Splitter & board prefs ================= */
   const split = document.getElementById('split');
   const splitHandle = document.getElementById('splitHandle');
   const showOutlineBtn = document.getElementById('showOutlineBtn');
@@ -1207,7 +1408,6 @@
     boardWin.classList.remove('minimized'); minimizeBoard.textContent='Minimize'; minimizeBoard.setAttribute('aria-expanded','true'); hideBoard();
   });
 
-  // Floating button (position persisted to cloud)
   (function(){
     let pos=JSON.parse(localStorage.getItem('float_btn_pos_v1')||'null')||{x:null,y:null};
     if(pos.x!=null&&pos.y!=null){ floatBtn.style.left=pos.x+'px'; floatBtn.style.top=pos.y+'px'; floatBtn.style.right='auto'; floatBtn.style.bottom='auto'; }
@@ -1224,7 +1424,6 @@
     floatBtn.addEventListener('pointerup', end); floatBtn.addEventListener('pointercancel', end);
   })();
 
-  // Board window RC (persist to cloud)
   (function(){
     const ls=JSON.parse(localStorage.getItem('board_win_rc_v1')||'null');
     const saved= prefs.boardWinRC || ls;
@@ -1256,9 +1455,8 @@
           document.removeEventListener('pointermove',mm);
           document.removeEventListener('pointerup',end);
           const r=boardWin.getBoundingClientRect();
-          const rc={w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'};
-          localStorage.setItem('board_win_rc_v1', JSON.stringify(rc));
-          prefs.boardWinRC=rc; touchCloud();
+          localStorage.setItem('board_win_rc_v1', JSON.stringify({w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'}));
+          prefs.boardWinRC={w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'}; touchCloud();
         }
         document.addEventListener('pointermove',mm);
         document.addEventListener('pointerup',end);
@@ -1277,35 +1475,30 @@
     currentTitleEl.textContent=cur?cur.name:'—';
     if(secondsLeft!==lastDisplayedSec){ clockEl.textContent=secsToClock(secondsLeft); lastDisplayedSec=secondsLeft; }
 
-    if(cur){
-      const key = cur.id;
-      sectionDescEl.value = loadNoteFor(key);
-      sectionDescEl.oninput = ()=> saveNoteFor(key, sectionDescEl.value);
-    }else{
-      sectionDescEl.value = '';
-      sectionDescEl.oninput = null;
-    }
+    const key = cur ? ('section_desc_'+cur.id) : null;
+    if(key){ sectionDescEl.value = loadNoteFor(cur.id); sectionDescEl.oninput = ()=> saveNoteFor(cur.id, sectionDescEl.value); }
 
     renderCurrentLinks();
-    updateClockColor();
   }
   function renderAll(){ buildProgress(); updateProgress(); updateLegendActive(); renderCurrent(); renderShelf(); renderOutline(); }
 
-  // Initial render & default timer state
+  /* --- Fixed: don't redeclare existing variables here --- */
   let secondsInit = minsToSecs((getSchedule()[0]||{}).minutes||0);
-  secondsLeft = secondsInit;
-  timerState.secondsLeft = secondsLeft;
-  timerState.currentIndex = currentIndex;
-  renderAll();
+  secondsLeft = secondsInit;   /* ← assignment only, no 'let' */
+  currentIndex = 0;            /* ← assignment only, no 'let' */
+
+  renderAll(); renderHomeSavedBar();
   if(!loadSessionsLocal()) saveSessionsLocal();
   updateStartBtnLabel();
   updateEditUI();
 
-  /* =================== Auth UI =================== */
-  const authOpenBtn = document.getElementById('authOpenBtn');
-  const userBadge  = document.getElementById('userBadge');
-  const userEmail  = document.getElementById('userEmail');
+  /* ------------------------------ Auth (abbrev) ------------------------------ */
   const signOutBtn = document.getElementById('signOutBtn');
+  signOutBtn.addEventListener('click', ()=> signOut(auth));
+
+  const userBadge  = document.getElementById('userBadge');
+  const authOpenBtn= document.getElementById('authOpenBtn');
+  const userEmail  = document.getElementById('userEmail');
 
   const authModal = document.getElementById('authModal');
   const authModalTitle = document.getElementById('authModalTitle');
@@ -1319,13 +1512,13 @@
   const modeToggleBtn = document.getElementById('modeToggleBtn');
   const authError = document.getElementById('authError');
 
-  let authMode = 'signin'; // or 'signup'
+  let authMode = 'signin';
 
   function setAuthUI(signedIn, email=''){
     if(signedIn){
       authOpenBtn.classList.add('hidden');
       userBadge.classList.remove('hidden');
-      userEmail.textContent = email;
+      userEmail.textContent = email || '';
       cloudStatus.textContent = 'Cloud sync on';
     }else{
       userBadge.classList.add('hidden');
@@ -1338,7 +1531,6 @@
     authMode = mode;
     authModalTitle.textContent = mode === 'signin' ? 'Sign in' : 'Create your account';
     authSubmitBtn.textContent = mode === 'signin' ? 'Sign in with email' : 'Sign up with email';
-    modeToggleBtn.textContent = mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in instead';
     forgotBtn.classList.toggle('hidden', mode !== 'signin');
     emailInput.value = '';
     passwordInput.value = '';
@@ -1347,10 +1539,9 @@
     authModal.classList.add('flex');
     emailInput.focus();
   }
-  const closeModal = ()=>{ authModal.classList.add('hidden'); authModal.classList.remove('flex'); };
+  function closeModal(){ authModal.classList.add('hidden'); authModal.classList.remove('flex'); }
 
   authOpenBtn.addEventListener('click', ()=> openAuthModal('signin'));
-  modeToggleBtn.addEventListener('click', ()=> openAuthModal(authMode==='signin'?'signup':'signin'));
   closeAuthModal.addEventListener('click', closeModal);
   authModal.addEventListener('click', (e)=>{ if(e.target === authModal) closeModal(); });
 
@@ -1362,11 +1553,7 @@
       await signInWithPopup(auth, provider);
       closeModal();
     }catch(e){
-      if(e && e.code === 'auth/unauthorized-domain'){
-        authError.textContent = 'This domain is not authorized. In Firebase Console → Authentication → Settings → Authorized domains, add your deployed domain (e.g., loxtyrell03.github.io), then refresh.';
-      }else{
-        authError.textContent = e.message || 'Google sign-in failed';
-      }
+      authError.textContent = e.message || 'Google sign-in failed';
     }
   });
 
@@ -1401,8 +1588,6 @@
     }
   });
 
-  signOutBtn.addEventListener('click', ()=> signOut(auth));
-
   onAuthStateChanged(auth, async (user)=>{
     currentUser = user || null;
     if(!user){ setAuthUI(false); return; }
@@ -1414,38 +1599,17 @@
         const data = snap.data() || {};
         if(data.sessions){ sessions = data.sessions; sanitizeSessions(sessions); }
         if(data.widgetShelf){ widgetShelf = data.widgetShelf; }
-        if(typeof data.activePreset==='string'){ activePreset = data.activePreset; presetSelect.value = activePreset; }
+        if(data.activePreset){ activePreset = data.activePreset; presetSelect.value = activePreset; }
         if(data.notes){ sectionNotes = data.notes || {}; }
-        if(data.savedOutlines){ savedOutlines = data.savedOutlines || []; saveSavedOutlinesLocal(); }
-        if(data.prefs){
-          prefs = Object.assign(prefs, data.prefs);
-          if(prefs.splitRatio) applySplit(prefs.splitRatio);
-          if(prefs.outlineCollapsed) setOutlineCollapsed(true);
-          if(prefs.floatBtnPos){
-            floatBtn.style.left=prefs.floatBtnPos.x; floatBtn.style.top=prefs.floatBtnPos.y; floatBtn.style.right='auto'; floatBtn.style.bottom='auto';
-          }
-          if(prefs.boardWinRC){
-            const rc=prefs.boardWinRC;
-            boardWin.style.width=rc.w; boardWin.style.height=rc.h; boardWin.style.left=rc.l; boardWin.style.top=rc.t; boardWin.style.right='auto'; boardWin.style.bottom='auto';
-          }
-        }
-        if(data.timer){
-          timerState = Object.assign(timerState, data.timer);
-          activePreset = timerState.activePreset || activePreset; presetSelect.value = activePreset;
-          sessionStarted = !!timerState.sessionStarted;
-          currentIndex = Math.min(Math.max(0, timerState.currentIndex|0), Math.max(0, getSchedule().length-1));
-          const cur = getSchedule()[currentIndex];
-          const maxSecs = cur ? minsToSecs(cur.minutes) : 0;
-          secondsLeft = Math.min(Math.max(0, timerState.secondsLeft|0), maxSecs);
-          updateStartBtnLabel();
-          updateClockColor();
-        }
-        saveSessionsLocal(); saveShelfLocal();
-        renderAll();
+        if(data.prefs){ prefs = {...prefs, ...data.prefs}; }
+        if(data.timer){ timerState = {...timerState, ...data.timer}; }
+        if(data.savedOutlines){ savedOutlines = data.savedOutlines || []; }
+        saveSessionsLocal(); saveShelfLocal(); saveSavedOutlinesLocal();
+        renderAll(); renderHomeSavedBar();
       }else{
         await setDoc(ref, {
-          sessions, widgetShelf, activePreset, savedOutlines,
-          notes: sectionNotes, prefs, timer: timerState,
+          sessions, widgetShelf, activePreset, notes: sectionNotes,
+          prefs, timer: timerState, savedOutlines,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
       }
