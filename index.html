@@ -5,112 +5,131 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Chess Study Planner — Cloud Sync</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<meta name="color-scheme" content="dark light"/>
+<meta name="color-scheme" content="light dark"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 <style>
-  :root{ --tabs-accent:#38bdf8; --tabs-muted:#94a3b8; }
+  :root{
+    --bg: #ffffff;
+    --fg: #0f172a;        /* slate-900 */
+    --muted: #475569;     /* slate-600 */
+    --border: #e5e7eb;    /* slate-200 */
+    --panel: #ffffff;
+    --panel-muted:#f8fafc;/* slate-50 */
+    --accent:#0ea5e9;     /* sky-500 */
+    --accent-600:#0284c7; /* sky-600 */
+    --accent-100:#e0f2fe; /* sky-100 */
+  }
 
+  /* Base */
+  html,body{background:var(--bg); color:var(--fg)}
   .no-select{user-select:none;-webkit-user-select:none}
   .drag-ghost{opacity:.4}
-  .drag-over{outline:2px dashed rgba(56,189,248,.9); outline-offset:4px}
+  .drag-over-outline{outline:2px dashed rgba(14,165,233,.9); outline-offset:4px}
   .row-handle{cursor:grab}
   .row-handle:active{cursor:grabbing}
-  .btn-xs{font-size:.72rem; padding:.25rem .45rem; border-radius:.45rem; border:1px solid rgb(51,65,85); background:#0b1220}
-  .btn-xxs{font-size:.68rem; padding:.18rem .4rem; border-radius:.35rem; border:1px solid rgb(51,65,85); background:#0b1220}
-  .link-card{display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;border-radius:.75rem;border:1px solid rgb(51,65,85);background:rgba(15,23,42,.6)}
-  .link-card:hover{background:rgba(30,41,59,.7)}
+  .btn-xs{font-size:.72rem; padding:.25rem .5rem; border-radius:.5rem; border:1px solid var(--border); background:#fff}
+  .btn-xxs{font-size:.68rem; padding:.18rem .45rem; border-radius:.4rem; border:1px solid var(--border); background:#fff}
+  .link-card{display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;border-radius:.75rem;border:1px solid var(--border);background:var(--panel)}
+  .link-card:hover{background:var(--panel-muted)}
   .link-icon{width:18px;height:18px;display:inline-block}
-  .glow{box-shadow:0 0 0 2px rgba(56,189,248,.35),0 0 18px rgba(56,189,248,.45) inset}
+  .chip{padding:.35rem .65rem; border-radius:9999px; border:1px solid var(--border); display:inline-flex; gap:.35rem; align-items:center; background:#fff}
+  .chip:hover{background:var(--panel-muted)}
+  .chip-active{border-color:var(--accent); box-shadow:0 0 0 2px rgba(14,165,233,.2); background:var(--accent-100); color:#0b4661}
 
-  /* Split layout (make OUTLINE PANEL WIDER by default) */
+  /* Cards / panels */
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:14px}
+  .muted{color:var(--muted)}
+
+  /* Tabs */
+  .tabs-bar{display:flex; align-items:center; gap:0; border-bottom:1px solid var(--border); background:var(--panel); border-radius:14px; padding:.35rem;}
+  .tab-link{position:relative; padding:.6rem 1rem; font-weight:600; color:var(--muted); border-radius:.6rem;}
+  .tab-link:hover{ color:#111827; background:var(--panel-muted); }
+  .tab-link.active{ color:#0b4661; background:var(--accent-100); box-shadow:inset 0 0 0 1px rgba(14,165,233,.5); }
+  .tab-sep{ width:1px; height:22px; background:linear-gradient(180deg,transparent,#cbd5e1,transparent); margin:0 .25rem; }
+
+  /* Split layout */
   #split{display:flex; gap:14px; align-items:stretch; --leftRatio:56%;}
   #leftPane{flex: 0 0 var(--leftRatio); min-width:360px}
   #splitHandle{
-    width:8px; border-radius:6px; background:linear-gradient(180deg,#0ea5e9,#0284c7);
+    width:8px; border-radius:6px; background:linear-gradient(180deg,var(--accent),var(--accent-600));
     opacity:.65; cursor:col-resize; align-self:stretch; position:relative;
   }
   #splitHandle:hover{opacity:.95}
   #splitHandle::after{
     content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-    width:2px; height:36px; background:rgba(255,255,255,.85); border-radius:2px; box-shadow:0 0 10px rgba(255,255,255,.6);
+    width:2px; height:36px; background:rgba(0,0,0,.2); border-radius:2px;
   }
-  /* Wider right pane */
   #rightPane{flex: 1 1 auto; min-width:360px; max-width:900px}
   #split.collapsed #rightPane, #split.collapsed #splitHandle{display:none}
   #split.collapsed #leftPane{flex:1 1 auto; min-width:0}
 
-  @media (max-width: 1100px){
-    #rightPane{max-width:none}
-  }
+  @media (max-width: 1100px){ #rightPane{max-width:none} }
   @media (max-width: 980px){
     #split{display:block}
     #splitHandle{display:none}
     #leftPane, #rightPane{width:100%}
   }
 
-  @media print{ .no-print{display:none!important} body{background:#fff} }
+  /* Outline rows */
+  .outline-row{padding:.6rem .5rem; border-bottom:1px solid var(--border); background:#fff}
+  .outline-row:hover{background:var(--panel-muted)}
+  .outline-active{background:var(--accent-100) !important; box-shadow:inset 0 0 0 1px rgba(14,165,233,.5)}
 
-  /* Floating analysis launcher + board window */
+  /* Inline outline editing */
+  .outline-edit{display:flex; align-items:center; gap:.35rem; width:100%}
+  .inline-field{background:#fff; border:1px solid var(--accent); border-radius:.6rem; padding:.22rem .5rem}
+  .inline-title{flex:1 1 auto; min-width:0}
+  .inline-number{flex:0 0 auto; width:auto; text-align:center; min-width:8ch}
+  .inline-select{flex:0 0 auto; width:auto; height:30px; min-width:6ch}
+
+  /* Progress */
+  #progressHost{ box-shadow: inset 0 1px 0 rgba(0,0,0,.03); }
+  .glow{box-shadow:0 0 0 2px rgba(14,165,233,.2),0 0 18px rgba(14,165,233,.15) inset}
+
+  /* Floating analysis launcher + board window (light) */
   #floatBtn{
     position:fixed; bottom:24px; right:24px; width:58px; height:58px;
-    border-radius:50%; background:linear-gradient(135deg,#0284c7,#0ea5e9);
+    border-radius:50%; background:linear-gradient(135deg,var(--accent-600),var(--accent));
     display:flex; align-items:center; justify-content:center; color:#fff;
-    box-shadow:0 10px 25px rgba(2,132,199,.35); cursor:grab; z-index:50;
+    box-shadow:0 10px 25px rgba(2,132,199,.25); cursor:grab; z-index:50;
   }
   #floatBtn:active{cursor:grabbing}
   #floatBtn svg{width:28px; height:28px}
 
   #boardWin{
     position:fixed; bottom:96px; right:36px; width:560px; height:620px;
-    background:#0b1220; border:1px solid #1f2a44; border-radius:14px;
-    box-shadow:0 16px 40px rgba(2,132,199,.35); z-index:60; display:none;
+    background:#fff; border:1px solid var(--border); border-radius:14px;
+    box-shadow:0 16px 40px rgba(2,132,199,.2); z-index:60; display:none;
   }
   #boardHeader{
     height:44px; display:flex; align-items:center; justify-content:space-between;
-    padding:0 10px; background:linear-gradient(180deg,rgba(20,31,53,.9),rgba(10,17,32,.95));
-    border-bottom:1px solid #1f2a44; cursor:grab; border-top-left-radius:14px; border-top-right-radius:14px;
+    padding:0 10px; background:linear-gradient(180deg,#ffffff,#f8fafc);
+    border-bottom:1px solid var(--border); cursor:grab; border-top-left-radius:14px; border-top-right-radius:14px;
   }
   #boardHeader:active{cursor:grabbing}
   #boardContent{position:absolute; inset:44px 0 0 0; display:flex; flex-direction:column}
-  #boardToolbar{padding:8px 10px; display:flex; gap:8px; align-items:center; border-bottom:1px solid #1f2a44}
+  #boardToolbar{padding:8px 10px; display:flex; gap:8px; align-items:center; border-bottom:1px solid var(--border)}
   #boardIframeWrap{position:relative; flex:1}
   #boardIframe{position:absolute; inset:0; width:100%; height:100%; border:0; border-bottom-left-radius:14px; border-bottom-right-radius:14px}
-
   #boardWin.minimized{ height:44px !important; }
   #boardWin.minimized #boardContent{ display:none; }
-
   .resizer{position:absolute; background:transparent}
   .resizer.e{cursor:ew-resize; top:8px; bottom:8px; right:-3px; width:6px}
   .resizer.s{cursor:ns-resize; left:8px; right:8px; bottom:-3px; height:6px}
   .resizer.se{cursor:nwse-resize; right:-3px; bottom:-3px; width:10px; height:10px; border-bottom-right-radius:10px}
 
-  /* Outline rows */
-  .outline-row{padding:.6rem .5rem; border-bottom:1px solid rgba(51,65,85,.6)}
-  .outline-row:hover{background:rgba(30,41,59,.35)}
-  .outline-active{background:rgba(2,132,199,.15) !important; box-shadow:inset 0 0 0 1px rgba(56,189,248,.6)}
-  .chip{padding:.35rem .65rem; border-radius:9999px; border:1px solid rgba(51,65,85,.8); display:inline-flex; gap:.35rem; align-items:center; background:rgba(15,23,42,.5)}
-  .chip:hover{background:rgba(30,41,59,.6)}
-  .chip-active{border-color:rgba(56,189,248,.85); box-shadow:0 0 0 2px rgba(56,189,248,.35); background:rgba(2,132,199,.18); color:#e2f3ff}
+  /* Merge UI */
+  #mergeBar{ display:none; }
+  #mergeBar.active{ display:block; }
 
-  /* Inline outline editing */
-  .outline-edit{display:flex; align-items:center; gap:.35rem; width:100%}
-  .inline-field{background:transparent; border:1px solid rgba(56,189,248,.55); border-radius:.6rem; padding:.22rem .5rem}
-  .inline-title{flex:1 1 auto; min-width:0}
-  .inline-number{flex:0 0 auto; width:auto; text-align:center; min-width:8ch}
-  .inline-select{flex:0 0 auto; width:auto; height:30px; min-width:6ch}
+  /* Inputs */
+  .input{ background:#fff; border:1px solid var(--border); border-radius:.75rem; padding:.55rem .7rem; }
+  .input:focus{ outline: 2px solid var(--accent-100); box-shadow: 0 0 0 2px rgba(14,165,233,.25); }
 
-  /* Tabs */
-  .tabs-bar{display:flex; align-items:center; gap:0; border-bottom:1px solid rgba(71,85,105,.7); background:linear-gradient(180deg,rgba(13,22,40,.8),rgba(8,14,28,.8)); border-radius:14px; padding:.35rem;}
-  .tab-link{position:relative; padding:.6rem 1rem; font-weight:600; color:var(--tabs-muted); border-radius:.6rem;}
-  .tab-link:hover{ color:#e2e8f0; background:rgba(148,163,184,.08); }
-  .tab-link.active{ color:#e6f6ff; background:rgba(56,189,248,.18); box-shadow:inset 0 0 0 1px rgba(56,189,248,.6); }
-  .tab-sep{ width:1px; height:22px; background:linear-gradient(180deg,transparent,rgba(148,163,184,.5),transparent); margin:0 .25rem; }
-
-  .card{background:#0b1220; border:1px solid #1f2a44; border-radius:14px}
 </style>
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100">
+<body class="min-h-screen">
 <div class="max-w-7xl mx-auto px-5 py-6">
 
   <!-- Header -->
@@ -120,13 +139,13 @@
     <!-- Auth controls -->
     <div class="flex flex-wrap items-center gap-2">
       <div id="authArea" class="flex items-center gap-2">
-        <button id="authOpenBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Sign in / Sign up</button>
+        <button id="authOpenBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Sign in / Sign up</button>
         <div id="userBadge" class="hidden items-center gap-2">
-          <span id="userEmail" class="text-sm text-slate-300"></span>
-          <button id="signOutBtn" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500">Sign out</button>
+          <span id="userEmail" class="text-sm muted"></span>
+          <button id="signOutBtn" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white">Sign out</button>
         </div>
       </div>
-      <span id="cloudStatus" class="text-xs text-slate-400">Local mode</span>
+      <span id="cloudStatus" class="text-xs muted">Local mode</span>
     </div>
   </header>
 
@@ -136,6 +155,8 @@
       <button class="tab-link active" data-tab="homeTab">Home</button>
       <div class="tab-sep"></div>
       <button class="tab-link" data-tab="savedTab">Saved Outlines</button>
+      <div class="tab-sep"></div>
+      <button class="tab-link" data-tab="helpTab">How to use</button>
     </div>
   </nav>
 
@@ -143,8 +164,8 @@
   <section id="homeTab">
     <!-- Preset picker -->
     <div class="mb-6 flex items-center gap-2">
-      <label class="text-sm text-slate-400">Preset:</label>
-      <select id="presetSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm">
+      <label class="text-sm muted">Preset:</label>
+      <select id="presetSelect" class="input text-sm">
         <option value="BOTH">Both (90m)</option>
         <option value="A">Session A (45m)</option>
         <option value="B">Session B (45m)</option>
@@ -154,11 +175,11 @@
     <!-- Progress -->
     <section class="mb-4 no-print">
       <div class="flex items-center justify-between mb-1">
-        <div class="text-xs uppercase tracking-wide text-slate-400">PROGRESS — DRAG ANYWHERE TO JUMP</div>
-        <div id="progressPct" class="text-xs text-slate-300">0%</div>
+        <div class="text-xs uppercase tracking-wide muted">PROGRESS — DRAG ANYWHERE TO JUMP</div>
+        <div id="progressPct" class="text-xs muted">0%</div>
       </div>
-      <div id="progressHost" class="relative w-full h-6 bg-slate-800 rounded-2xl overflow-hidden border border-sky-600/50 glow no-select">
-        <div id="progressFill" class="absolute left-0 top-0 bottom-0 bg-sky-500/70 transition-[width]" style="width:0%"></div>
+      <div id="progressHost" class="relative w-full h-6 bg-slate-200 rounded-2xl overflow-hidden border border-[var(--accent)]/40 glow no-select">
+        <div id="progressFill" class="absolute left-0 top-0 bottom-0 bg-sky-500/80 transition-[width]" style="width:0%"></div>
         <div id="progressSegments" class="absolute inset-0 flex"></div>
         <div id="progressTicks" class="absolute inset-0 pointer-events-none"></div>
         <div id="scrubOverlay" class="absolute inset-0 cursor-pointer"></div>
@@ -168,25 +189,25 @@
 
     <!-- Controls -->
     <section class="flex flex-wrap items-center gap-3 mb-3 no-print">
-      <button id="startBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 shadow-sm">Start Study Session</button>
-      <button id="prevBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700">◀ Prev</button>
-      <button id="nextBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700">Next ▶</button>
-      <button id="resetBtn" class="ml-auto px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700">Reset</button>
-      <button id="showOutlineBtn" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 hidden">Show Outline ▸</button>
+      <button id="startBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm">Start Study Session</button>
+      <button id="prevBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">◀ Prev</button>
+      <button id="nextBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Next ▶</button>
+      <button id="resetBtn" class="ml-auto px-3 py-2 rounded-xl border border-[var(--border)]">Reset</button>
+      <button id="showOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] hidden">Show Outline ▸</button>
     </section>
 
     <!-- Split layout -->
     <div id="split">
       <!-- LEFT: CURRENT -->
       <section id="leftPane">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-inner">
+        <div class="card p-5 shadow-sm">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <div class="text-xs uppercase tracking-wide text-slate-400">Current Section</div>
+              <div class="text-xs uppercase tracking-wide muted">Current Section</div>
               <h2 id="currentTitle" class="text-2xl font-semibold mt-1">—</h2>
             </div>
             <div class="flex items-center gap-2">
-              <button id="editSectionBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Edit Section</button>
+              <button id="editSectionBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Edit Section</button>
               <div id="clock" class="text-3xl font-mono tabular-nums">00:00</div>
             </div>
           </div>
@@ -194,29 +215,29 @@
           <!-- LINK WIDGET SHELF (shown only in edit mode) -->
           <div id="shelfWrap" class="mt-4 hidden">
             <div class="flex items-center justify-between">
-              <h3 class="text-sm uppercase tracking-wide text-slate-400">LINK WIDGETS</h3>
+              <h3 class="text-sm uppercase tracking-wide muted">LINK WIDGETS</h3>
               <div class="flex items-center gap-2">
                 <button id="addWidgetBtn" class="btn-xs">+ New Widget</button>
                 <button id="resetShelfBtn" class="btn-xs">Reset Shelf</button>
               </div>
             </div>
-            <div id="linkShelf" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl bg-slate-950 border border-slate-800"></div>
-            <div class="text-xs text-slate-400 mt-1">Drag a widget into the current section.</div>
+            <div id="linkShelf" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
+            <div class="text-xs muted mt-1">Drag a widget into the current section.</div>
           </div>
 
           <!-- Links in CURRENT SECTION -->
           <div id="linksWrap" class="mt-4">
             <div class="flex items-center justify-between">
-              <div class="text-sm text-slate-300">Links in this section</div>
+              <div class="text-sm">Links in this section</div>
               <button id="clearSectionLinks" class="btn-xs hidden">Clear</button>
             </div>
-            <div id="links" class="mt-2 flex flex-wrap gap-2 p-2 rounded-xl bg-slate-950 border border-slate-800 min-h-[44px]"></div>
+            <div id="links" class="mt-2 flex flex-wrap gap-2 p-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] min-h-[44px]"></div>
           </div>
 
           <!-- Optional description -->
           <div class="mt-4">
-            <label class="text-sm text-slate-300">Section notes (optional)</label>
-            <textarea id="sectionDesc" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm" placeholder="Add notes, mini-checklist, links…"></textarea>
+            <label class="text-sm">Section notes (optional)</label>
+            <textarea id="sectionDesc" class="w-full mt-1 input text-sm" placeholder="Add notes, mini-checklist, links…"></textarea>
           </div>
         </div>
       </section>
@@ -226,53 +247,121 @@
 
       <!-- RIGHT: OUTLINE -->
       <aside id="rightPane">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 h-full flex flex-col">
+        <div class="card p-4 h-full flex flex-col shadow-sm">
 
           <!-- Quick-load Saved Outlines (top of Home outline panel) -->
           <div id="homeSavedRow" class="mb-3">
             <div class="flex items-center justify-between">
-              <h4 class="text-xs uppercase tracking-wide text-slate-400">Saved Outlines</h4>
-              <button id="manageOutlinesLink" class="text-xs underline hover:text-white">Manage</button>
+              <h4 class="text-xs uppercase tracking-wide muted">Saved Outlines</h4>
+              <button id="manageOutlinesLink" class="text-xs underline">Manage</button>
             </div>
-            <div id="homeSavedScroller" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl bg-slate-950 border border-slate-800"></div>
+            <div id="homeSavedScroller" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
           </div>
 
           <div class="flex items-center justify-between">
-            <h3 class="text-sm uppercase tracking-wide text-slate-400">SESSION OUTLINE</h3>
-            <button id="collapseOutlineBtn" class="text-xs px-2 py-1 rounded-md bg-slate-800 border border-slate-700 hover:bg-slate-700">▾ Hide</button>
+            <h3 class="text-sm uppercase tracking-wide muted">SESSION OUTLINE</h3>
+            <button id="collapseOutlineBtn" class="text-xs px-2 py-1 rounded-md border border-[var(--border)]">▾ Hide</button>
           </div>
 
           <ul id="outline" class="mt-3 flex-1 overflow-auto"></ul>
 
+          <!-- Inline Add Section (no popups) -->
+          <div id="inlineAddRow" class="mt-2 hidden">
+            <div class="flex flex-wrap items-center gap-2">
+              <input id="addTitleInput" class="input flex-1" placeholder="Section title"/>
+              <input id="addMinsInput" class="input w-28" type="number" min="0.25" step="0.25" placeholder="Minutes"/>
+              <button id="addConfirmBtn" class="btn-xs">Add</button>
+              <button id="addCancelBtn" class="btn-xs">Cancel</button>
+            </div>
+          </div>
+
           <div class="mt-3 flex items-center gap-2">
-            <button id="addOutlineItem" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm">+ Add Section</button>
-            <div id="totalMins" class="ml-auto text-xs text-slate-400">Total: 0 minutes</div>
+            <button id="addOutlineItem" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Add Section</button>
+            <div id="totalMins" class="ml-auto text-xs muted">Total: 0 minutes</div>
           </div>
         </div>
       </aside>
     </div>
 
-    <footer class="mt-10 text-center text-xs text-slate-500 no-print">
+    <footer class="mt-10 text-center text-xs muted no-print">
       Minimal, keyboard-friendly session manager. ♟️
     </footer>
   </section>
 
   <!-- SAVED OUTLINES TAB -->
   <section id="savedTab" class="hidden">
-    <div class="mb-3 flex items-center gap-2">
-      <button id="createOutlineBtn" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm">+ Create new outline</button>
-
-    <div id="createOutlineForm" class="card p-4 mb-4 hidden">
-      <label class="text-sm text-slate-300">Outline title</label>
-      <div class="mt-2 flex items-center gap-2">
-        <input id="newOutlineTitle" class="bg-slate-950 border border-slate-800 rounded-xl p-2 flex-1" placeholder="e.g., 90-min Balanced Plan"/>
-        <button id="createOutlineConfirm" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm">Create</button>
-        <button id="createOutlineCancel" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm">Cancel</button>
+    <!-- Merge bar (appears when you drop one outline onto another) -->
+    <div id="mergeBar" class="card p-4 mb-4">
+      <div class="flex flex-col gap-2">
+        <div class="text-sm">
+          Merge <strong id="mergeSourceName"></strong> ➕ <strong id="mergeTargetName"></strong>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="text-sm muted">New outline name</label>
+          <input id="mergeTitleInput" class="input flex-1" placeholder="e.g., ‘Balanced A + Openings B’"/>
+          <button id="mergeConfirmBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Merge</button>
+          <button id="mergeCancelBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Cancel</button>
+        </div>
+        <div class="text-xs muted">Original outlines are kept. Sections from the dragged outline are appended after the target outline’s sections.</div>
       </div>
     </div>
+
+    <div class="mb-3 flex items-center gap-2">
+      <button id="createOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Create new outline</button>
+
+      <div id="createOutlineForm" class="card p-4 mb-0 hidden">
+        <label class="text-sm">Outline title</label>
+        <div class="mt-2 flex items-center gap-2">
+          <input id="newOutlineTitle" class="input flex-1" placeholder="e.g., 90-min Balanced Plan"/>
+          <button id="createOutlineConfirm" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Create</button>
+          <button id="createOutlineCancel" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Cancel</button>
+        </div>
+      </div>
     </div>
 
+    <!-- Hint -->
+    <div class="text-sm muted mb-3">Tip: drag one outline card onto another to propose a merge.</div>
+
     <div id="savedList" class="grid lg:grid-cols-2 gap-4"></div>
+  </section>
+
+  <!-- HOW TO USE TAB -->
+  <section id="helpTab" class="hidden">
+    <div class="grid lg:grid-cols-2 gap-6">
+      <div class="card p-5">
+        <h3 class="text-xl font-semibold mb-2">1) Build your session</h3>
+        <ol class="list-decimal pl-5 space-y-2 text-sm">
+          <li>Pick a <strong>Preset</strong> (A, B, or Both).</li>
+          <li>Use <strong>+ Add Section</strong> to create blocks. Inline edit titles and minutes.</li>
+          <li>Toggle <strong>Edit Section</strong> to drag link widgets (Lichess, Analysis, Chessable) into the current section.</li>
+          <li>Add <strong>Notes</strong> per section (checklists, ideas, links). Everything saves automatically to the cloud when signed in.</li>
+        </ol>
+      </div>
+      <div class="card p-5">
+        <h3 class="text-xl font-semibold mb-2">2) Run the timer</h3>
+        <ol class="list-decimal pl-5 space-y-2 text-sm">
+          <li>Press <strong>Start</strong>. The progress bar shows each block; click anywhere on it to jump.</li>
+          <li>Use <strong>Prev/Next</strong> to move, or <strong>Reset</strong> to restart.</li>
+          <li>The <strong>Live Analysis</strong> bubble opens a draggable Lichess board. Paste a FEN or open a game viewer.</li>
+        </ol>
+      </div>
+      <div class="card p-5">
+        <h3 class="text-xl font-semibold mb-2">3) Save & reuse outlines</h3>
+        <ol class="list-decimal pl-5 space-y-2 text-sm">
+          <li>Go to <strong>Saved Outlines</strong>. Create, rename, reorder sections, edit minutes/descriptions, and manage links.</li>
+          <li>Click <strong>Load</strong> to apply an outline to your current preset (A, B, or Both).</li>
+          <li><strong>Merge</strong> outlines by dragging one card onto another. Confirm the new title—originals are kept.</li>
+        </ol>
+      </div>
+      <div class="card p-5">
+        <h3 class="text-xl font-semibold mb-2">4) Cloud sync</h3>
+        <ul class="list-disc pl-5 space-y-2 text-sm">
+          <li>Sign in with Google or email to enable cloud sync.</li>
+          <li>The app saves sessions, notes, link widgets, presets, timer state, preferences (split sizes, window positions), and all saved outlines.</li>
+          <li>You can start on one device and continue on another.</li>
+        </ul>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -285,20 +374,20 @@
 <div id="boardWin" class="no-print" aria-live="polite">
   <div id="boardHeader" class="no-select">
     <div class="flex items-center gap-2">
-      <span class="text-sky-300 font-semibold">Live Analysis Board</span>
-      <span class="text-xs text-slate-400">(/embed/analysis)</span>
+      <span class="text-sky-600 font-semibold">Live Analysis Board</span>
+      <span class="text-xs muted">(/embed/analysis)</span>
     </div>
     <div class="flex items-center gap-2">
-      <button id="minimizeBoard" class="text-xs px-2 py-1 rounded-md bg-slate-800 border border-slate-700 hover:bg-slate-700" type="button" aria-expanded="true">Minimize</button>
-      <button id="closeBoard" class="text-xs px-2 py-1 rounded-md bg-rose-600 hover:bg-rose-500" type="button" aria-label="Close analysis window">Close</button>
+      <button id="minimizeBoard" class="text-xs px-2 py-1 rounded-md border border-[var(--border)]" type="button" aria-expanded="true">Minimize</button>
+      <button id="closeBoard" class="text-xs px-2 py-1 rounded-md bg-rose-600 hover:bg-rose-500 text-white" type="button" aria-label="Close analysis window">Close</button>
     </div>
   </div>
   <div id="boardContent">
     <div id="boardToolbar" class="text-sm">
-      <input id="fenBar" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" placeholder="FEN to load"/>
-      <button id="applyFen" class="px-2 py-1 rounded-lg bg-sky-600 hover:bg-sky-500" type="button">Load FEN</button>
-      <button id="openViewer" class="px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700" type="button">Open Game Viewer</button>
-      <a id="popOut" target="_blank" rel="noopener" class="px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700" href="#">Open in new tab</a>
+      <input id="fenBar" class="flex-1 input" placeholder="FEN to load"/>
+      <button id="applyFen" class="px-2 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white" type="button">Load FEN</button>
+      <button id="openViewer" class="px-2 py-1 rounded-lg border border-[var(--border)]" type="button">Open Game Viewer</button>
+      <a id="popOut" target="_blank" rel="noopener" class="px-2 py-1 rounded-lg border border-[var(--border)]" href="#">Open in new tab</a>
     </div>
     <div id="boardIframeWrap">
       <iframe id="boardIframe" title="Lichess analysis"></iframe>
@@ -310,37 +399,37 @@
 </div>
 
 <!-- ---------- Auth Modal (Google + Email/Password) ---------- -->
-<div id="authModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-[100]">
-  <div class="w-[92vw] max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-5">
+<div id="authModal" class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden items-center justify-center z-[100]">
+  <div class="w-[92vw] max-w-md card p-5 shadow-xl">
     <div class="flex items-start justify-between mb-4">
       <h3 id="authModalTitle" class="text-xl font-semibold">Sign in</h3>
-      <button id="closeAuthModal" class="text-slate-400 hover:text-slate-200" title="Close">✕</button>
+      <button id="closeAuthModal" class="muted hover:text-black" title="Close">✕</button>
     </div>
 
     <div class="space-y-3">
-      <button id="googleAuthBtn" class="w-full px-3 py-2 rounded-xl bg-white text-slate-900 hover:bg-slate-200 flex items-center justify-center gap-2">
+      <button id="googleAuthBtn" class="w-full px-3 py-2 rounded-xl bg-white border border-[var(--border)] hover:bg-[var(--panel-muted)] flex items-center justify-center gap-2">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.5 31.9 29.2 35 24 35c-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.4 1.1 7.4 2.9l5.7-5.7C33.2 7.1 28.8 5 24 5 12.9 5 4 13.9 4 25s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16.6 19 13 24 13c2.8 0 5.4 1.1 7.4 2.9l5.7-5.7C33.2 7.1 28.8 5 24 5 16.4 5 10 9.1 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.1 0 9.6-1.9 13-5.1l-6-4.9C29.1 36.8 26.7 38 24 38c-5.2 0-9.5-3.3-11.1-8l-6.6 5.1C10 41 16.5 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.1 3.2-3.5 5.7-6.3 7.1l6 4.9C36.4 41.8 44 36 44 25c0-1.3-.1-2.7-.4-4.5z"/></svg>
         Continue with Google
       </button>
 
       <div class="relative">
-        <div class="absolute inset-x-0 top-1/2 border-t border-slate-700"></div>
+        <div class="absolute inset-x-0 top-1/2 border-t border-[var(--border)]"></div>
         <div class="relative flex justify-center">
-          <span class="px-2 text-xs text-slate-400 bg-slate-900">or with email</span>
+          <span class="px-2 text-xs muted bg-white">or with email</span>
         </div>
       </div>
 
-      <input id="emailInput" type="email" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2" placeholder="Email"/>
-      <input id="passwordInput" type="password" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2" placeholder="Password (min 6 chars)"/>
+      <input id="emailInput" type="email" class="w-full input" placeholder="Email"/>
+      <input id="passwordInput" type="password" class="w-full input" placeholder="Password (min 6 chars)"/>
       <div class="flex items-center justify-between text-xs">
-        <label class="text-slate-400"><input id="showPw" type="checkbox" class="mr-1">Show password</label>
-        <button id="forgotBtn" class="text-slate-300 hover:text-white underline">Forgot password?</button>
+        <label class="muted"><input id="showPw" type="checkbox" class="mr-1">Show password</label>
+        <button id="forgotBtn" class="underline">Forgot password?</button>
       </div>
-      <button id="authSubmitBtn" class="w-full px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500">Sign in with email</button>
-      <div class="flex justify-center text-xs text-slate-400">
-        <button id="modeToggleBtn" class="underline hover:text-white">New here? Create an account</button>
+      <button id="authSubmitBtn" class="w-full px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white">Sign in with email</button>
+      <div class="flex justify-center text-xs muted">
+        <button id="modeToggleBtn" class="underline">New here? Create an account</button>
       </div>
-      <div id="authError" class="text-sm text-rose-400 min-h-[1rem]"></div>
+      <div id="authError" class="text-sm text-rose-600 min-h-[1rem]"></div>
     </div>
   </div>
 </div>
@@ -407,7 +496,7 @@
   let prefs = {
     floatBtnPos: null,
     boardWinRC: null,
-    splitRatio: Number(localStorage.getItem('split_ratio_v2')) || 56, // wider right by default
+    splitRatio: Number(localStorage.getItem('split_ratio_v2')) || 56,
     outlineCollapsed: false
   };
 
@@ -418,7 +507,7 @@
     activePreset
   };
 
-  // NEW: saved outlines
+  // saved outlines
   let savedOutlines = loadSavedOutlinesLocal();
 
   function loadSavedOutlinesLocal(){ try{ return JSON.parse(localStorage.getItem('saved_outlines_v1')) || []; }catch{ return []; } }
@@ -487,6 +576,7 @@
   const tabButtons=[...document.querySelectorAll('.tab-link')];
   const homeTab=document.getElementById('homeTab');
   const savedTab=document.getElementById('savedTab');
+  const helpTab=document.getElementById('helpTab');
   tabButtons.forEach(btn=>{
     btn.addEventListener('click', ()=>{
       tabButtons.forEach(b=>b.classList.remove('active'));
@@ -494,6 +584,7 @@
       const id=btn.dataset.tab;
       homeTab.classList.toggle('hidden', id!=='homeTab');
       savedTab.classList.toggle('hidden', id!=='savedTab');
+      helpTab.classList.toggle('hidden', id!=='helpTab');
       if(id==='savedTab') renderSavedOutlines();
       if(id==='homeTab') renderHomeSavedBar();
     });
@@ -537,10 +628,10 @@
   function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
 
   function updateClockColor(){
-    clockEl.classList.remove('text-emerald-400','text-rose-400');
+    clockEl.classList.remove('text-emerald-600','text-rose-600');
     if(sessionStarted){
-      if(running) clockEl.classList.add('text-emerald-400');
-      else clockEl.classList.add('text-rose-400');
+      if(running) clockEl.classList.add('text-emerald-600');
+      else clockEl.classList.add('text-rose-600');
     }
   }
 
@@ -623,7 +714,7 @@
     sched.forEach((sec)=>{
       const w=(minsToSecs(sec.minutes)/total)*100;
       const seg=document.createElement('div');
-      seg.className='h-full relative bg-slate-900/40';
+      seg.className='h-full relative bg-white/50';
       seg.style.width=`${w}%`;
       progressSegments.appendChild(seg);
     });
@@ -637,8 +728,7 @@
       tick.style.left=pct+'%';
       tick.style.top='0'; tick.style.bottom='0';
       tick.style.width='2px';
-      tick.style.background='white';
-      tick.style.boxShadow='0 0 10px rgba(255,255,255,.95)';
+      tick.style.background='rgba(0,0,0,.55)';
       progressTicks.appendChild(tick);
     }
 
@@ -719,7 +809,7 @@
     linksDiv.innerHTML = arr.map((w,i)=>`
       <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
         ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
-        <a class="text-slate-100 truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
+        <a class="truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
         ${isEditingSection ? `
         <div class="ml-auto flex items-center gap-1">
           <button class="btn-xs" data-act="edit">Edit</button>
@@ -744,9 +834,18 @@
     if(isEditingSection){
       linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
         btn.addEventListener('click', ()=>{
+          // (Keeping the simple prompt editor for now; all saves still go to Firestore.)
+          const sec=currentSectionRef();
           const i=Number(btn.closest('[data-idx]').dataset.idx);
           const target=sec.links[i];
-          editWidget(target, upd=>{ Object.assign(target, upd); saveSessions(); renderCurrentLinks(); });
+          const label = prompt('Title:', target?.label || '') ?? null; if(label===null) return;
+          const url   = prompt('URL:', target?.url || '') ?? null; if(url===null) return;
+          const type  = prompt('Icon type: emoji / img (leave empty to keep current)', target?.icon || '') || target?.icon || 'emoji';
+          let emoji   = target?.emoji || '🔗';
+          let img     = target?.img || '';
+          if(type==='emoji'){ emoji = prompt('Emoji (or short text):', emoji) || '🔗'; img=''; }
+          if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
+          Object.assign(target, {label,url,icon:type,emoji,img}); saveSessions(); renderCurrentLinks();
         });
       });
       linksDiv.querySelectorAll('[data-act="remove"]').forEach(btn=>{
@@ -773,8 +872,8 @@
     return `<div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${w.id}" style="cursor:${isEditingSection?'grab':'default'}">
       ${icon}
       <div class="min-w-0">
-        <div class="text-slate-100 truncate">${escapeHtml(w.label||'Untitled')}</div>
-        <div class="text-xs text-slate-400 truncate">${escapeHtml(w.url||'')}</div>
+        <div class="truncate">${escapeHtml(w.label||'Untitled')}</div>
+        <div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div>
       </div>
       <div class="ml-auto flex items-center gap-1">
         <button class="btn-xs" data-act="edit">Edit</button>
@@ -801,41 +900,35 @@
 
     linkShelfDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        if(!isEditingSection) return;
         const id=btn.closest('[data-wid]').dataset.wid;
         const w=widgetShelf.find(x=>x.id===id);
-        editWidget(w, upd=>{ Object.assign(w,upd); saveShelf(); renderShelf(); });
+        const label = prompt('Title:', w?.label || '') ?? null; if(label===null) return;
+        const url   = prompt('URL:', w?.url || '') ?? null; if(url===null) return;
+        const type  = prompt('Icon type: emoji / img (leave empty to keep current)', w?.icon || '') || w?.icon || 'emoji';
+        let emoji   = w?.emoji || '🔗';
+        let img     = w?.img || '';
+        if(type==='emoji'){ emoji = prompt('Emoji (or short text):', emoji) || '🔗'; img=''; }
+        if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
+        Object.assign(w,{label,url,icon:type,emoji,img}); saveShelf(); renderShelf();
       });
     });
     linkShelfDiv.querySelectorAll('[data-act="delete"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        if(!isEditingSection) return;
         const id=btn.closest('[data-wid]').dataset.wid;
         widgetShelf=widgetShelf.filter(w=>w.id!==id);
         saveShelf(); renderShelf();
       });
     });
   }
-  function editWidget(target, onSave){
-    const label = prompt('Title:', target?.label || '') ?? null; if(label===null) return;
-    const url   = prompt('URL:', target?.url || '') ?? null; if(url===null) return;
-    const type  = prompt('Icon type: emoji / img (leave empty to keep current)', target?.icon || '') || target?.icon || 'emoji';
-    let emoji   = target?.emoji || '🔗';
-    let img     = target?.img || '';
-    if(type==='emoji'){ emoji = prompt('Emoji (or short text):', emoji) || '🔗'; img=''; }
-    if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
-    onSave({label,url,icon:type,emoji,img});
-  }
   addWidgetBtn.addEventListener('click', ()=>{
-    if(!isEditingSection) return;
     const base={ id:'w_'+Date.now(), label:'New Link', url:'', icon:'emoji', emoji:'🔗', img:'' };
-    editWidget(base, upd=>{ widgetShelf.push({...base,...upd}); saveShelf(); renderShelf(); });
+    widgetShelf.push(base); saveShelf(); renderShelf();
   });
-  resetShelfBtn.addEventListener('click', ()=>{ if(!isEditingSection) return; if(confirm('Reset shelf to defaults?')){ widgetShelf=structuredClone(DEFAULT_SHELF); saveShelf(); renderShelf(); }});
+  resetShelfBtn.addEventListener('click', ()=>{ if(confirm('Reset shelf to defaults?')){ widgetShelf=structuredClone(DEFAULT_SHELF); saveShelf(); renderShelf(); }});
 
   let overCount = 0;
-  linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over'); });
-  linksDiv.addEventListener('dragleave', e=>{ if(!isEditingSection) return; overCount=Math.max(0, overCount-1); if(overCount===0) linksDiv.classList.remove('drag-over'); });
+  linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over-outline'); });
+  linksDiv.addEventListener('dragleave', e=>{ if(!isEditingSection) return; overCount=Math.max(0, overCount-1); if(overCount===0) linksDiv.classList.remove('drag-over-outline'); });
   linksDiv.addEventListener('dragover', e=>{
     if(!isEditingSection) return;
     e.preventDefault();
@@ -844,7 +937,7 @@
   linksDiv.addEventListener('drop', e=>{
     if(!isEditingSection) return;
     e.preventDefault();
-    overCount=0; linksDiv.classList.remove('drag-over');
+    overCount=0; linksDiv.classList.remove('drag-over-outline');
 
     let data = e.dataTransfer.getData('application/json');
     if(!data){ data = e.dataTransfer.getData('text/plain'); }
@@ -881,6 +974,14 @@
   const outline=document.getElementById('outline');
   const totalMins=document.getElementById('totalMins');
 
+  // Inline add row
+  const addOutlineItemBtn = document.getElementById('addOutlineItem');
+  const inlineAddRow = document.getElementById('inlineAddRow');
+  const addTitleInput = document.getElementById('addTitleInput');
+  const addMinsInput = document.getElementById('addMinsInput');
+  const addConfirmBtn = document.getElementById('addConfirmBtn');
+  const addCancelBtn  = document.getElementById('addCancelBtn');
+
   let editingOutlineId = null;
 
   const toMinutes = (value, unit)=>{
@@ -897,7 +998,7 @@
         <div class="flex items-center gap-3">
           <button class="text-left min-w-0 flex-1 truncate text-sm focus:outline-none">${escapeHtml(s.name)}</button>
           <div class="flex items-center gap-2 shrink-0">
-            <span class="text-xs text-slate-300 w-16 text-right">${Number(s.minutes)}m</span>
+            <span class="text-xs w-16 text-right">${Number(s.minutes)}m</span>
             <button class="btn-xs" data-act="edit">Edit</button>
           </div>
         </div>
@@ -983,6 +1084,23 @@
     totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(getSchedule())/60)} minutes`;
   }
 
+  // Inline Add Section handlers
+  addOutlineItemBtn.addEventListener('click', ()=>{
+    inlineAddRow.classList.remove('hidden');
+    addTitleInput.value = '';
+    addMinsInput.value = '';
+    addTitleInput.focus();
+  });
+  addCancelBtn.addEventListener('click', ()=> inlineAddRow.classList.add('hidden'));
+  addConfirmBtn.addEventListener('click', ()=>{
+    const title = (addTitleInput.value||'').trim() || 'New section';
+    const mins  = Math.max(0.25, Number(addMinsInput.value)||5);
+    const ref=getEditableRef();
+    ref.push({ id:'S'+Date.now(), name:title, minutes:mins, links:[] });
+    inlineAddRow.classList.add('hidden');
+    saveSessions(); renderAll();
+  });
+
   function makeOutlineDnD(listEl, backingArray){
     let draggingEl=null;
     let startedOnEdit=false;
@@ -1030,24 +1148,22 @@
     }, {offset: Number.NEGATIVE_INFINITY, element:null}).element;
   }
 
-  document.getElementById('addOutlineItem').addEventListener('click', ()=>{
-    const ref=getEditableRef();
-    const title = prompt('New section title:','New section');
-    if(title===null) return;
-    const minsRaw = prompt('Minutes:','5');
-    if(minsRaw===null) return;
-    const mins = Math.max(0.01, Number(minsRaw)||5);
-    ref.push({ id:'S'+Date.now(), name:title.trim()||'New section', minutes:mins, links:[] });
-    saveSessions(); renderAll();
-  });
-
-  /* ================= Saved Outlines UI ================= */
+  /* ================= Saved Outlines UI + Merge DnD ================= */
   const savedList = document.getElementById('savedList');
   const createOutlineBtn = document.getElementById('createOutlineBtn');
   const createOutlineForm = document.getElementById('createOutlineForm');
   const newOutlineTitleInput = document.getElementById('newOutlineTitle');
   const createOutlineConfirm = document.getElementById('createOutlineConfirm');
   const createOutlineCancel = document.getElementById('createOutlineCancel');
+
+  const mergeBar = document.getElementById('mergeBar');
+  const mergeSourceName = document.getElementById('mergeSourceName');
+  const mergeTargetName = document.getElementById('mergeTargetName');
+  const mergeTitleInput = document.getElementById('mergeTitleInput');
+  const mergeConfirmBtn = document.getElementById('mergeConfirmBtn');
+  const mergeCancelBtn  = document.getElementById('mergeCancelBtn');
+
+  let mergeProposal = null; // {sourceId, targetId}
 
   function defaultSection(){
     return { id:'S'+Date.now()+Math.random().toString(16).slice(2), name:'New section', minutes:5, desc:'', links:[] };
@@ -1068,7 +1184,7 @@
   ensureOutlineShapes();
 
   createOutlineBtn.addEventListener('click', ()=>{
-    createOutlineForm.classList.toggle('hidden', false);
+    createOutlineForm.classList.remove('hidden');
     newOutlineTitleInput.value = '';
     newOutlineTitleInput.focus();
   });
@@ -1110,9 +1226,9 @@
   function renderSavedOutlines(){
     ensureOutlineShapes();
     savedList.innerHTML = savedOutlines.map(o=>`
-      <div class="card p-4" data-oid="${o.id}">
+      <div class="card p-4" data-oid="${o.id}" draggable="true">
         <div class="flex items-center gap-2">
-          <input class="bg-transparent border border-slate-700 rounded-lg px-2 py-1 flex-1 outline-title" value="${escapeHtml(o.title)}" aria-label="Outline title"/>
+          <input class="input flex-1 outline-title" value="${escapeHtml(o.title)}" aria-label="Outline title"/>
           <div class="ml-auto flex items-center gap-2">
             <button class="btn-xs" data-act="edit">Edit</button>
             <button class="btn-xs" data-act="load">Load</button>
@@ -1123,6 +1239,36 @@
       </div>
     `).join('');
 
+    // Drag & drop for merge
+    savedList.querySelectorAll('[data-oid]').forEach(card=>{
+      const oid = card.dataset.oid;
+      card.addEventListener('dragstart', (e)=>{
+        e.dataTransfer.setData('text/plain', oid);
+        e.dataTransfer.effectAllowed = 'move';
+        card.classList.add('drag-ghost');
+      });
+      card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+      card.addEventListener('dragover', (e)=>{ e.preventDefault(); card.classList.add('drag-over-outline'); });
+      card.addEventListener('dragleave', ()=> card.classList.remove('drag-over-outline'));
+      card.addEventListener('drop', (e)=>{
+        e.preventDefault();
+        card.classList.remove('drag-over-outline');
+        const sourceId = e.dataTransfer.getData('text/plain');
+        const targetId = oid;
+        if(!sourceId || sourceId===targetId) return;
+        const src = savedOutlines.find(x=>x.id===sourceId);
+        const tgt = savedOutlines.find(x=>x.id===targetId);
+        if(!src || !tgt) return;
+        mergeProposal = {sourceId, targetId};
+        mergeSourceName.textContent = src.title;
+        mergeTargetName.textContent = tgt.title;
+        mergeTitleInput.value = `${tgt.title} + ${src.title}`;
+        mergeBar.classList.add('active');
+        mergeTitleInput.focus();
+      });
+    });
+
+    // Wire card controls
     savedList.querySelectorAll('[data-oid]').forEach(card=>{
       const oid = card.dataset.oid;
       const outline = savedOutlines.find(x=>x.id===oid);
@@ -1148,6 +1294,28 @@
         if(idx>=0){ savedOutlines.splice(idx,1); saveOutlines(); renderSavedOutlines(); renderHomeSavedBar(); }
       });
     });
+
+    // Merge bar controls
+    mergeCancelBtn.onclick = ()=>{ mergeProposal=null; mergeBar.classList.remove('active'); };
+    mergeConfirmBtn.onclick = ()=>{
+      if(!mergeProposal) return;
+      const {sourceId, targetId} = mergeProposal;
+      const src = savedOutlines.find(x=>x.id===sourceId);
+      const tgt = savedOutlines.find(x=>x.id===targetId);
+      if(!src || !tgt) return;
+
+      // build merged outline (target first, then source)
+      const newSections = [
+        ...tgt.sections.map(s=>({ ...structuredClone(s), id:'S'+Math.random().toString(16).slice(2) })),
+        ...src.sections.map(s=>({ ...structuredClone(s), id:'S'+Math.random().toString(16).slice(2) }))
+      ];
+      const title = (mergeTitleInput.value||'').trim() || `${tgt.title} + ${src.title}`;
+      const merged = { id:'O'+Date.now(), title, sections:newSections, createdAt: Date.now() };
+      savedOutlines.unshift(merged);
+      saveOutlines();
+      mergeProposal=null; mergeBar.classList.remove('active');
+      renderSavedOutlines(); renderHomeSavedBar();
+    };
   }
 
   function renderOutlineEditor(container, outline){
@@ -1158,7 +1326,7 @@
           <button class="btn-xs" data-act="add-section">+ Add Section</button>
         </div>
         <div class="space-y-3" data-role="sections">
-          ${secRows || '<div class="text-sm text-slate-400">No sections yet. Add one.</div>'}
+          ${secRows || '<div class="text-sm muted">No sections yet. Add one.</div>'}
         </div>
       </div>
     `;
@@ -1178,11 +1346,11 @@
   function sectionEditorRowHTML(s, index){
     const linksHTML = (s.links||[]).map((l, li)=> linkEditorRowHTML(l, index, li)).join('');
     return `
-      <div class="border border-slate-800 rounded-lg p-3" data-idx="${index}">
+      <div class="border border-[var(--border)] rounded-lg p-3" data-idx="${index}">
         <div class="flex flex-wrap items-center gap-2">
-          <input class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 flex-1 sec-title" value="${escapeHtml(s.name)}" placeholder="Section title"/>
-          <input class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 w-24 sec-mins" type="number" min="0.25" step="0.25" value="${(+s.minutes||5)}"/>
-          <span class="text-xs text-slate-400">min</span>
+          <input class="input flex-1 sec-title" value="${escapeHtml(s.name)}" placeholder="Section title"/>
+          <input class="input w-24 sec-mins" type="number" min="0.25" step="0.25" value="${(+s.minutes||5)}"/>
+          <span class="text-xs muted">min</span>
           <div class="ml-auto flex items-center gap-1">
             <button class="btn-xxs" data-act="up">↑</button>
             <button class="btn-xxs" data-act="down">↓</button>
@@ -1190,16 +1358,16 @@
           </div>
         </div>
         <div class="mt-2">
-          <label class="text-xs text-slate-400">Description</label>
-          <textarea class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 sec-desc" rows="2" placeholder="Notes or checklist…">${escapeHtml(s.desc||'')}</textarea>
+          <label class="text-xs muted">Description</label>
+          <textarea class="w-full input sec-desc" rows="2" placeholder="Notes or checklist…">${escapeHtml(s.desc||'')}</textarea>
         </div>
         <div class="mt-2">
           <div class="flex items-center justify-between">
-            <label class="text-xs text-slate-400">Link widgets</label>
+            <label class="text-xs muted">Link widgets</label>
             <button class="btn-xxs" data-act="add-link">+ Add Link</button>
           </div>
           <div class="mt-2 space-y-2 links-host">
-            ${linksHTML || '<div class="text-xs text-slate-500">No links yet.</div>'}
+            ${linksHTML || '<div class="text-xs muted">No links yet.</div>'}
           </div>
         </div>
       </div>
@@ -1212,23 +1380,23 @@
       <div class="link-card items-start" data-link-idx="${linkIdx}">
         <div class="grid grid-cols-12 gap-2 w-full">
           <div class="col-span-3">
-            <label class="text-xs text-slate-400">Label</label>
-            <input class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 link-label" value="${escapeHtml(l.label||'')}" placeholder="e.g., Lichess Analysis"/>
+            <label class="text-xs muted">Label</label>
+            <input class="w-full input link-label" value="${escapeHtml(l.label||'')}" placeholder="e.g., Lichess Analysis"/>
           </div>
           <div class="col-span-5">
-            <label class="text-xs text-slate-400">URL</label>
-            <input class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 link-url" value="${escapeHtml(l.url||'')}" placeholder="https://..."/>
+            <label class="text-xs muted">URL</label>
+            <input class="w-full input link-url" value="${escapeHtml(l.url||'')}" placeholder="https://..."/>
           </div>
           <div class="col-span-2">
-            <label class="text-xs text-slate-400">Icon</label>
-            <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 link-icon">
+            <label class="text-xs muted">Icon</label>
+            <select class="w-full input link-icon">
               <option value="emoji"${isEmoji?' selected':''}>emoji</option>
               <option value="img"${!isEmoji?' selected':''}>img</option>
             </select>
           </div>
           <div class="col-span-2">
-            <label class="text-xs text-slate-400 link-extra-label">${isEmoji?'Emoji/Text':'Image URL'}</label>
-            <input class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 link-extra" value="${escapeHtml(isEmoji?(l.emoji||'🔗'):(l.img||''))}" placeholder="${isEmoji?'🔗 or ♟️':'https://...png'}"/>
+            <label class="text-xs muted link-extra-label">${isEmoji?'Emoji/Text':'Image URL'}</label>
+            <input class="w-full input link-extra" value="${escapeHtml(isEmoji?(l.emoji||'🔗'):(l.img||''))}" placeholder="${isEmoji?'🔗 or ♟️':'https://...png'}"/>
           </div>
         </div>
         <div class="mt-2 flex items-center gap-2">
@@ -1337,9 +1505,7 @@
     `).join('');
     scroller.querySelectorAll('[data-load-oid]').forEach(btn=>{
       const o = savedOutlines.find(x=>x.id===btn.dataset.loadOid);
-      btn.addEventListener('click', ()=>{
-        applyOutlineToPreset(o);
-      });
+      btn.addEventListener('click', ()=>{ applyOutlineToPreset(o); });
     });
   }
 
@@ -1472,7 +1638,7 @@
 
   function renderCurrent(){
     const sched=getSchedule(); const cur=sched[currentIndex];
-    currentTitleEl.textContent=cur?cur.name:'—';
+    document.getElementById('currentTitle').textContent=cur?cur.name:'—';
     if(secondsLeft!==lastDisplayedSec){ clockEl.textContent=secsToClock(secondsLeft); lastDisplayedSec=secondsLeft; }
 
     const key = cur ? ('section_desc_'+cur.id) : null;
@@ -1482,17 +1648,17 @@
   }
   function renderAll(){ buildProgress(); updateProgress(); updateLegendActive(); renderCurrent(); renderShelf(); renderOutline(); }
 
-  /* --- Fixed: don't redeclare existing variables here --- */
+  // initial timer seconds
   let secondsInit = minsToSecs((getSchedule()[0]||{}).minutes||0);
-  secondsLeft = secondsInit;   /* ← assignment only, no 'let' */
-  currentIndex = 0;            /* ← assignment only, no 'let' */
+  secondsLeft = secondsInit;  // assignment only (no redeclare)
+  currentIndex = 0;           // assignment only (no redeclare)
 
   renderAll(); renderHomeSavedBar();
   if(!loadSessionsLocal()) saveSessionsLocal();
   updateStartBtnLabel();
   updateEditUI();
 
-  /* ------------------------------ Auth (abbrev) ------------------------------ */
+  /* ------------------------------ Auth ------------------------------ */
   const signOutBtn = document.getElementById('signOutBtn');
   signOutBtn.addEventListener('click', ()=> signOut(auth));
 
@@ -1542,7 +1708,7 @@
   function closeModal(){ authModal.classList.add('hidden'); authModal.classList.remove('flex'); }
 
   authOpenBtn.addEventListener('click', ()=> openAuthModal('signin'));
-  closeAuthModal.addEventListener('click', closeModal);
+  document.getElementById('closeAuthModal').addEventListener('click', closeModal);
   authModal.addEventListener('click', (e)=>{ if(e.target === authModal) closeModal(); });
 
   showPw.addEventListener('change', ()=>{ passwordInput.type = showPw.checked ? 'text' : 'password'; });
@@ -1601,7 +1767,7 @@
         if(data.widgetShelf){ widgetShelf = data.widgetShelf; }
         if(data.activePreset){ activePreset = data.activePreset; presetSelect.value = activePreset; }
         if(data.notes){ sectionNotes = data.notes || {}; }
-        if(data.prefs){ prefs = {...prefs, ...data.prefs}; }
+        if(data.prefs){ prefs = {...prefs, ...data.prefs}; applySplit(prefs.splitRatio ?? 56); }
         if(data.timer){ timerState = {...timerState, ...data.timer}; }
         if(data.savedOutlines){ savedOutlines = data.savedOutlines || []; }
         saveSessionsLocal(); saveShelfLocal(); saveSavedOutlinesLocal();
