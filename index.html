@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Chess Study Planner — Cloud Sync</title>
+<title>Skillflow — Plan • Practice • Improve</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <meta name="color-scheme" content="light dark"/>
 
@@ -12,8 +12,8 @@
     --bg: #ffffff;
     --fg: #0f172a;
     --muted: #475569;
-    --border: #e5e7eb;
-    --borderW: 1px;
+    --border: #94a3b8;          /* clearer borders */
+    --borderW: 2px;              /* thicker borders */
     --panel: #ffffff;
     --panel-muted:#f8fafc;
     --accent:#0ea5e9;
@@ -32,7 +32,7 @@
   .chip{padding:.35rem .65rem; border-radius:9999px; border:var(--borderW) solid var(--border); display:inline-flex; gap:.35rem; align-items:center; background:#fff}
   .chip:hover{background:var(--panel-muted)}
   .chip-active{border-color:var(--accent); box-shadow:0 0 0 2px rgba(14,165,233,.2); background:var(--accent-100); color:#0b4661}
-  .card{background:var(--panel); border:var(--borderW) solid var(--border); border-radius:14px}
+  .card{background:var(--panel); border:var(--borderW) solid var(--border); border-radius:14px; box-shadow:0 3px 10px rgba(15,23,42,.04)}
   .muted{color:var(--muted)}
   .tabs-bar{display:flex; align-items:center; gap:0; border-bottom:var(--borderW) solid var(--border); background:var(--panel); border-radius:14px; padding:.35rem;}
   .tab-link{position:relative; padding:.6rem 1rem; font-weight:800; color:var(--muted); border-radius:.6rem;}
@@ -75,7 +75,6 @@
   .section-collapsed{margin-left:16px; background:var(--panel-muted); border:var(--borderW) dashed var(--border); border-radius:10px; padding:.45rem .6rem; font-size:.92rem; display:flex; align-items:center; justify-content:space-between;}
   .input{ background:#fff; border:var(--borderW) solid var(--border); border-radius:.75rem; padding:.55rem .7rem; }
   .input:focus{ outline: 2px solid var(--accent-100); box-shadow: 0 0 0 2px rgba(14,165,233,.25); }
-  /* Clear title hierarchy */
   .block-title{font-size:1.125rem;line-height:1.75rem;font-weight:800}
   .block-sub{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 </style>
@@ -84,8 +83,11 @@
 <div class="max-w-7xl mx-auto px-5 py-6">
 
   <!-- Header -->
-  <header class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print">
-    <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Chess Study Planner</h1>
+  <header class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between no-print">
+    <div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Skillflow</h1>
+      <p class="text-sm muted -mt-1">Plan • Practice • Improve</p>
+    </div>
     <div class="flex flex-wrap items-center gap-2">
       <button id="settingsBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]" title="Customize UI">⚙️ Settings</button>
       <div id="authArea" class="flex items-center gap-2">
@@ -224,7 +226,7 @@
     </div>
 
     <footer class="mt-10 text-center text-xs muted no-print">
-      Minimal, keyboard-friendly session manager. ♟️
+      Skillflow — minimal, keyboard-friendly session manager. ♟️
     </footer>
   </section>
 
@@ -329,6 +331,17 @@
   <div class="resizer se" aria-hidden="true"></div>
 </div>
 
+<!-- Session complete modal -->
+<div id="endModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-[120]">
+  <div class="w-[92vw] max-w-sm card p-6 text-center">
+    <h3 class="text-2xl font-extrabold mb-1">Session Complete! 🎉</h3>
+    <p id="endStats" class="text-sm muted mb-4"></p>
+    <div class="flex items-center justify-center gap-2">
+      <button id="endCloseBtn" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white">Nice!</button>
+    </div>
+  </div>
+</div>
+
 <!-- Settings Modal -->
 <div id="settingsModal" class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden items-center justify-center z-[100]">
   <div class="w-[92vw] max-w-lg card p-5 shadow-xl">
@@ -347,11 +360,11 @@
         <input id="themeAccent" type="color" class="ml-auto h-9 w-16 input" value="#0ea5e9">
       </label>
       <label class="flex items-center gap-2">Border color
-        <input id="themeBorder" type="color" class="ml-auto h-9 w-16 input" value="#e5e7eb">
+        <input id="themeBorder" type="color" class="ml-auto h-9 w-16 input" value="#94a3b8">
       </label>
       <label class="flex items-center gap-2 col-span-2">Border thickness
-        <input id="themeBorderW" type="range" min="0" max="4" step="1" class="flex-1" value="1">
-        <span id="themeBorderWVal" class="w-8 text-right">1px</span>
+        <input id="themeBorderW" type="range" min="0" max="4" step="1" class="flex-1" value="2">
+        <span id="themeBorderWVal" class="w-8 text-right">2px</span>
       </label>
     </div>
     <div class="mt-4 flex items-center justify-between">
@@ -388,7 +401,6 @@
   const app = initializeApp(firebaseConfig);
   getAnalytics(app);
 
-  /* ——— run after DOM is ready (prevents null-element crashes) ——— */
   window.addEventListener('DOMContentLoaded', () => {
     const auth = getAuth(app);
     const db   = getFirestore(app);
@@ -403,7 +415,7 @@
       { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
       { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
     ];
-    let prefs = load('prefs_v1') || { splitRatio:56, outlineCollapsed:false, theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#e5e7eb', borderW:1 } };
+    let prefs = load('prefs_v1') || { splitRatio:56, outlineCollapsed:false, theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 } };
     let savedOutlines = load('saved_outlines_v1') || [];
     let timerState = load('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0 };
 
@@ -456,6 +468,7 @@
     /* -------- Timer / Progress -------- */
     const clockEl = document.getElementById('clock');
     let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, lastDisplayedSec=null, sessionStarted=false;
+    let totalSessionSecs = 0;
 
     function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
     function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
@@ -476,6 +489,7 @@
         currentIndex = Math.min(idx, Math.max(0,currentSession.length-1));
         secondsLeft  = Math.max(0, remain||0);
       }
+      totalSessionSecs = scheduleTotalSecs(currentSession);
       updateStartBtnLabel(); renderAll();
     }
 
@@ -499,6 +513,18 @@
       saveTimerLocal(); touchCloud();
     }
 
+    function showEndModal(){
+      const endModal = document.getElementById('endModal');
+      const endStats = document.getElementById('endStats');
+      const elapsed = totalSessionSecs;
+      endStats.textContent = `You completed ${currentSession.length} section${currentSession.length!==1?'s':''} — ${Math.round(elapsed/60)} minutes total.`;
+      endModal.classList.remove('hidden'); endModal.classList.add('flex');
+    }
+    document.getElementById('endCloseBtn')?.addEventListener('click', ()=>{
+      const endModal = document.getElementById('endModal'); endModal.classList.add('hidden'); endModal.classList.remove('flex');
+    });
+    document.getElementById('endModal')?.addEventListener('click', (e)=>{ if(e.target.id==='endModal'){ e.currentTarget.classList.add('hidden'); e.currentTarget.classList.remove('flex'); } });
+
     function loop(){
       if(!running) return;
       const sched=currentSession; if(!sched.length){ stopTimer(); return; }
@@ -510,6 +536,7 @@
         } else {
           stopTimer(); beep(); renderAll();
           sessionStarted=false; updateStartBtnLabel(); markTimer('end');
+          showEndModal();
           return;
         }
       }
@@ -525,7 +552,7 @@
     }
     startBtn?.addEventListener('click', ()=>{
       const s=currentSession; if(!s.length) return;
-      if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(s[0].minutes||0); sessionStarted=true; markTimer('init'); startTimer(); }
+      if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(s[0].minutes||0); totalSessionSecs = scheduleTotalSecs(s); sessionStarted=true; markTimer('init'); startTimer(); }
       else { if(running) stopTimer(); else startTimer(); }
     });
     document.getElementById('prevBtn')?.addEventListener('click', ()=>{ const s=currentSession; if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(s[currentIndex].minutes||0); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); markTimer('prev'); } updateStartBtnLabel(); });
@@ -580,6 +607,9 @@
     const sectionDescEl=document.getElementById('sectionDesc');
     const shelfWrap=document.getElementById('shelfWrap');
     const clearSectionLinksBtn=document.getElementById('clearSectionLinks');
+    const addWidgetBtn=document.getElementById('addWidgetBtn');
+    const resetShelfBtn=document.getElementById('resetShelfBtn');
+    const linkShelfDiv=document.getElementById('linkShelf');
     let isEditingSection=false;
 
     document.getElementById('editSectionBtn')?.addEventListener('click', ()=>{ isEditingSection = !isEditingSection; updateEditUI(); });
@@ -594,50 +624,27 @@
     function loadNoteFor(id){ return sectionNotes[id] ?? ''; }
     function saveNoteFor(id, text){ sectionNotes[id] = text; saveNotes(); }
 
-    function renderCurrentLinks(){
-      const sec=currentSectionRef(); const arr=sec?.links||[];
-      if(!linksDiv) return;
-      linksDiv.innerHTML = arr.map((w,i)=>`
-        <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
-          ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
-          <a class="truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
-          ${isEditingSection ? `<div class="ml-auto flex items-center gap-1"><button class="btn-xs" data-act="edit">Edit</button><button class="btn-xs" data-act="remove">Del</button></div>` : ''}
-        </div>`).join('');
-      linksDiv.querySelectorAll('.section-link').forEach(card=>{
-        card.addEventListener('dragstart', e=>{
-          if(!isEditingSection){ e.preventDefault(); return; }
-          const index=Number(card.dataset.idx); e.stopPropagation();
-          e.dataTransfer.effectAllowed='move';
-          const p={type:'reorder', index};
-          e.dataTransfer.setData('application/json', JSON.stringify(p));
-          e.dataTransfer.setData('text/plain', JSON.stringify(p));
-          card.classList.add('drag-ghost');
-        });
-        card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-      });
-      if(isEditingSection){
-        linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
-          btn.addEventListener('click', ()=>{
-            const i=Number(btn.closest('[data-idx]').dataset.idx);
-            const target=sec.links[i];
-            const label = prompt('Title:', target?.label || '') ?? null; if(label===null) return;
-            const url   = prompt('URL:', target?.url || '') ?? null; if(url===null) return;
-            const type  = prompt('Icon type: emoji / img (leave empty to keep current)', target?.icon || '') || target?.icon || 'emoji';
-            let emoji   = target?.emoji || '🔗';
-            let img     = target?.img || '';
-            if(type==='emoji'){ emoji = prompt('Emoji/Text:', emoji) || '🔗'; img=''; }
-            if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
-            Object.assign(target,{label,url,icon:type,emoji,img}); saveCurrentSession(); renderCurrentLinks();
-          });
-        });
-        linksDiv.querySelectorAll('[data-act="remove"]').forEach(btn=>{
-          btn.addEventListener('click', ()=>{ const i=Number(btn.closest('[data-idx]').dataset.idx); sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); });
-        });
-      }
-    }
-    clearSectionLinksBtn?.addEventListener('click', ()=>{ if(!isEditingSection) return; const sec=currentSectionRef(); if(!sec) return; if(confirm('Remove all links from this section?')){ sec.links=[]; saveCurrentSession(); renderCurrentLinks(); } });
+    /* Shelf add/reset */
+    addWidgetBtn?.addEventListener('click', ()=>{
+      const label = prompt('Widget title (shown on the chip):','Lichess')?.trim(); if(!label) return;
+      const url   = prompt('URL (https://…):','https://lichess.org')?.trim(); if(!url) return;
+      let icon    = (prompt('Icon type: emoji / img','emoji')||'emoji').toLowerCase();
+      let emoji='🔗', img='';
+      if(icon==='img'){ img = prompt('Image URL (.png/.ico):','https://lichess1.org/assets/logo/lichess-favicon-256.png')?.trim()||''; icon='img'; }
+      else { emoji = prompt('Emoji/Text for the chip:','♟️')?.trim()||'🔗'; icon='emoji'; }
+      const w = { id:'w_'+Date.now().toString(36), label, url, icon, emoji, img };
+      widgetShelf.push(w); saveShelf(); renderShelf();
+    });
+    resetShelfBtn?.addEventListener('click', ()=>{
+      if(!confirm('Reset link shelf to defaults?')) return;
+      widgetShelf = [
+        { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',          icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+        { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+        { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
+      ];
+      saveShelf(); renderShelf();
+    });
 
-    const linkShelfDiv=document.getElementById('linkShelf');
     function widgetCardHTML(w){
       const icon = (w.icon==='img' && w.img) ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
       return `<div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${w.id}" style="cursor:${isEditingSection?'grab':'default'}">
@@ -662,6 +669,49 @@
       });
     }
 
+    function renderCurrentLinks(){
+      const sec=currentSectionRef(); const arr=sec?.links||[];
+      if(!linksDiv) return;
+      linksDiv.innerHTML = arr.map((w,i)=>`
+        <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
+          ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
+          <a class="truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
+          ${isEditingSection ? `<div class="ml-auto flex items-center gap-1"><button class="btn-xs" data-act="edit">Edit</button><button class="btn-xs" data-act="remove">Del</button></div>` : ''}
+        </div>`).join('');
+      linksDiv.querySelectorAll('.section-link').forEach(card=>{
+        card.addEventListener('dragstart', e=>{
+          if(!isEditingSection){ e.preventDefault(); return; }
+          const index=Number(card.dataset.idx); e.stopPropagation();
+          e.dataTransfer.effectAllowed='move';
+          const p={type:'reorder', index};
+          e.dataTransfer.setData('application/json', JSON.stringify(p));
+          e.dataTransfer.setData('text/plain', JSON.stringify(p));
+          card.classList.add('drag-ghost');
+        });
+        card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+      });
+      if(isEditingSection){
+        const sec=currentSectionRef();
+        linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            const i=Number(btn.closest('[data-idx]').dataset.idx);
+            const target=sec.links[i];
+            const label = prompt('Title:', target?.label || '') ?? null; if(label===null) return;
+            const url   = prompt('URL:', target?.url || '') ?? null; if(url===null) return;
+            const type  = prompt('Icon type: emoji / img (leave empty to keep current)', target?.icon || '') || target?.icon || 'emoji';
+            let emoji   = target?.emoji || '🔗';
+            let img     = target?.img || '';
+            if(type==='emoji'){ emoji = prompt('Emoji/Text:', emoji) || '🔗'; img=''; }
+            if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
+            Object.assign(target,{label,url,icon:type,emoji,img}); saveCurrentSession(); renderCurrentLinks();
+          });
+        });
+        linksDiv.querySelectorAll('[data-act="remove"]').forEach(btn=>{
+          btn.addEventListener('click', ()=>{ const i=Number(btn.closest('[data-idx]').dataset.idx); sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); });
+        });
+      }
+    }
+
     /* drop from shelf / reorder */
     let overCount = 0;
     linksDiv?.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over-outline'); });
@@ -680,11 +730,13 @@
       } else if(payload.type==='reorder'){
         const from=payload.index; const cards=[...linksDiv.querySelectorAll('.section-link')];
         let to=cards.length; for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
-        if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks();
+        if(from===to || from==null || to==null) return; const sec=currentSectionRef(); const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks();
       }
     });
 
-    /* Outline list (Home) */
+    clearSectionLinksBtn?.addEventListener('click', ()=>{ if(!isEditingSection) return; const sec=currentSectionRef(); if(!sec) return; if(confirm('Remove all links from this section?')){ sec.links=[]; saveCurrentSession(); renderCurrentLinks(); } });
+
+    /* Outline list (Home) — with Delete button beside Edit */
     const outline=document.getElementById('outline'); const totalMins=document.getElementById('totalMins');
     const addOutlineItemBtn = document.getElementById('addOutlineItem');
     const inlineAddRow = document.getElementById('inlineAddRow');
@@ -819,7 +871,6 @@
     }
     ensureOutlineShapes();
 
-    /* NEW: Create new outline flow */
     createOutlineBtn?.addEventListener('click', ()=>{
       createOutlineForm?.classList.remove('hidden');
       if(newOutlineTitleInput){ newOutlineTitleInput.value = ''; newOutlineTitleInput.focus(); }
@@ -871,7 +922,6 @@
           <div class="mt-3 hidden editor"></div>
         </div>`).join('');
 
-      /* Merge DnD */
       savedList.querySelectorAll('[data-oid]').forEach(card=>{
         const oid = card.dataset.oid;
         card.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', oid); e.dataTransfer.effectAllowed = 'move'; card.classList.add('drag-ghost'); });
@@ -886,7 +936,6 @@
         });
       });
 
-      /* Card controls */
       savedList.querySelectorAll('[data-oid]').forEach(card=>{
         const oid = card.dataset.oid; const outline = savedOutlines.find(x=>x.id===oid);
         card.querySelector('.outline-title')?.addEventListener('input', e=>{ outline.title = e.target.value; saveOutlines(); renderHomeSavedBar(); });
@@ -898,7 +947,6 @@
         card.querySelector('[data-act="delete"]')?.addEventListener('click', ()=>{ if(!confirm('Delete this outline?')) return; const idx = savedOutlines.findIndex(x=>x.id===oid); if(idx>=0){ savedOutlines.splice(idx,1); saveOutlines(); renderSavedOutlines(); renderHomeSavedBar(); } });
       });
 
-      /* Merge bar */
       mergeCancelBtn && (mergeCancelBtn.onclick = ()=>{ mergeProposal=null; if(mergeBar) mergeBar.style.display='none'; });
       mergeConfirmBtn && (mergeConfirmBtn.onclick = ()=>{
         if(!mergeProposal) return;
@@ -913,7 +961,6 @@
       });
     }
 
-    /* Section editor for outlines */
     function sectionEditorRowHTML(s, index, collapsed){
       if(collapsed){
         return `
@@ -1030,18 +1077,10 @@
       minsEl?.addEventListener('input', ()=>{ sec.minutes = Math.max(0.25, Number(minsEl.value)||5); save(); });
       descEl?.addEventListener('input', ()=>{ sec.desc = descEl.value; save(); });
 
-      row.querySelector('[data-act="up"]')?.addEventListener('click', ()=>{
-        if(idx<=0) return; const [m]=outline.sections.splice(idx,1); outline.sections.splice(idx-1,0,m); save(); renderOutlineEditor(row.parentElement.parentElement, outline);
-      });
-      row.querySelector('[data-act="down"]')?.addEventListener('click', ()=>{
-        if(idx>=outline.sections.length-1) return; const [m]=outline.sections.splice(idx,1); outline.sections.splice(idx+1,0,m); save(); renderOutlineEditor(row.parentElement.parentElement, outline);
-      });
-      row.querySelector('[data-act="remove"]')?.addEventListener('click', ()=>{
-        outline.sections.splice(idx,1); save(); renderOutlineEditor(row.parentElement.parentElement, outline);
-      });
-      row.querySelector('[data-act="save-section"]')?.addEventListener('click', ()=>{
-        save(); collapsedSet.add(sec.id); renderOutlineEditor(row.parentElement.parentElement, outline);
-      });
+      row.querySelector('[data-act="up"]')?.addEventListener('click', ()=>{ if(idx<=0) return; const [m]=outline.sections.splice(idx,1); outline.sections.splice(idx-1,0,m); save(); renderOutlineEditor(row.parentElement.parentElement, outline); });
+      row.querySelector('[data-act="down"]')?.addEventListener('click', ()=>{ if(idx>=outline.sections.length-1) return; const [m]=outline.sections.splice(idx,1); outline.sections.splice(idx+1,0,m); save(); renderOutlineEditor(row.parentElement.parentElement, outline); });
+      row.querySelector('[data-act="remove"]')?.addEventListener('click', ()=>{ outline.sections.splice(idx,1); save(); renderOutlineEditor(row.parentElement.parentElement, outline); });
+      row.querySelector('[data-act="save-section"]')?.addEventListener('click', ()=>{ save(); collapsedSet.add(sec.id); renderOutlineEditor(row.parentElement.parentElement, outline); });
 
       row.querySelector('[data-act="add-link"]')?.addEventListener('click', ()=>{
         const newLink = { id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:'New link', url:'', icon:'emoji', emoji:'🔗', img:'' };
@@ -1145,6 +1184,7 @@
 
     function renderCurrent(){
       const sched=currentSession; const cur=sched[currentIndex];
+      const currentTitleEl=document.getElementById('currentTitle');
       if(currentTitleEl) currentTitleEl.textContent=cur?cur.name:'—';
       if(clockEl && secondsLeft!==lastDisplayedSec){ clockEl.textContent=secsToClock(secondsLeft); lastDisplayedSec=secondsLeft; }
       const key = cur ? cur.id : null;
@@ -1268,14 +1308,14 @@
       root.style.setProperty('--accent', t.accent || '#0ea5e9');
       root.style.setProperty('--accent-600', t.accent || '#0284c7');
       root.style.setProperty('--accent-100', '#e0f2fe');
-      root.style.setProperty('--border', t.border || '#e5e7eb');
-      root.style.setProperty('--borderW', (t.borderW ?? 1) + 'px');
+      root.style.setProperty('--border', t.border || '#94a3b8');
+      root.style.setProperty('--borderW', (t.borderW ?? 2) + 'px');
       root.style.setProperty('--panel', t.bg || '#ffffff');
       root.style.setProperty('--panel-muted', '#f8fafc');
     }
     function openSettings(){
-      const t = prefs.theme || {bg:'#ffffff',fg:'#0f172a',accent:'#0ea5e9',border:'#e5e7eb',borderW:1};
-      if(themeBg) themeBg.value = toHex(t.bg); if(themeFg) themeFg.value = toHex(t.fg); if(themeAccent) themeAccent.value = toHex(t.accent); if(themeBorder) themeBorder.value = toHex(t.border); if(themeBorderW) themeBorderW.value = t.borderW ?? 1; if(themeBorderWVal) themeBorderWVal.textContent = (t.borderW ?? 1) + 'px';
+      const t = prefs.theme || {bg:'#ffffff',fg:'#0f172a',accent:'#0ea5e9',border:'#94a3b8',borderW:2};
+      if(themeBg) themeBg.value = toHex(t.bg); if(themeFg) themeFg.value = toHex(t.fg); if(themeAccent) themeAccent.value = toHex(t.accent); if(themeBorder) themeBorder.value = toHex(t.border); if(themeBorderW) themeBorderW.value = t.borderW ?? 2; if(themeBorderWVal) themeBorderWVal.textContent = (t.borderW ?? 2) + 'px';
       settingsModal?.classList.remove('hidden'); settingsModal?.classList.add('flex');
     }
     function closeSettingsModal(){ settingsModal?.classList.add('hidden'); settingsModal?.classList.remove('flex'); }
@@ -1284,15 +1324,15 @@
     closeSettings?.addEventListener('click', closeSettingsModal);
     settingsModal?.addEventListener('click', (e)=>{ if(e.target===settingsModal) closeSettingsModal(); });
     themeBorderW?.addEventListener('input', ()=>{ if(themeBorderWVal) themeBorderWVal.textContent = themeBorderW.value + 'px'; });
-    saveThemeBtn?.addEventListener('click', ()=>{ prefs.theme = { bg:themeBg?.value, fg:themeFg?.value, accent:themeAccent?.value, border:themeBorder?.value, borderW:Number(themeBorderW?.value)||1 }; applyTheme(prefs.theme); savePrefs(); closeSettingsModal(); });
-    resetThemeBtn?.addEventListener('click', ()=>{ prefs.theme = { bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#e5e7eb', borderW:1 }; applyTheme(prefs.theme); savePrefs(); closeSettingsModal(); });
+    saveThemeBtn?.addEventListener('click', ()=>{ prefs.theme = { bg:themeBg?.value, fg:themeFg?.value, accent:themeAccent?.value, border:themeBorder?.value, borderW:Number(themeBorderW?.value)||2 }; applyTheme(prefs.theme); savePrefs(); closeSettingsModal(); });
+    resetThemeBtn?.addEventListener('click', ()=>{ prefs.theme = { bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 }; applyTheme(prefs.theme); savePrefs(); closeSettingsModal(); });
     applyTheme(prefs.theme);
 
     /* -------- Initial render -------- */
     renderAll(); renderHomeSavedBar(); setTimerFromState(timerState);
     window.addEventListener('beforeunload', ()=>{ timerState.lastSyncTs = Date.now(); saveTimerLocal(); });
     document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ timerState.lastSyncTs = Date.now(); saveTimerLocal(); touchCloud(); } });
-  }); // DOMContentLoaded
+  });
 </script>
 
 <!-- Auth Modal -->
