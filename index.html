@@ -15,6 +15,7 @@
   .row-handle{cursor:grab}
   .row-handle:active{cursor:grabbing}
   .btn-xs{font-size:.72rem; padding:.25rem .45rem; border-radius:.45rem; border:1px solid rgb(51,65,85); background:#0b1220}
+  .btn-xxs{font-size:.68rem; padding:.2rem .4rem; border-radius:.35rem; border:1px solid rgb(51,65,85); background:#0b1220}
   .link-card{display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;border-radius:.75rem;border:1px solid rgb(51,65,85);background:rgba(15,23,42,.6)}
   .link-card:hover{background:rgba(30,41,59,.7)}
   .link-icon{width:18px;height:18px;display:inline-block}
@@ -81,15 +82,19 @@
   .resizer.se{cursor:nwse-resize; right:-3px; bottom:-3px; width:10px; height:10px; border-bottom-right-radius:10px}
 
   /* Minimal outline */
-  .outline-row{padding:.7rem .4rem; border-bottom:1px solid rgba(51,65,85,.6)}
+  .outline-row{padding:.6rem .4rem; border-bottom:1px solid rgba(51,65,85,.6)}
   .outline-row:hover{background:rgba(30,41,59,.35)}
   .outline-active{background:rgba(2,132,199,.15) !important; box-shadow:inset 0 0 0 1px rgba(56,189,248,.6)}
   .chip{padding:.35rem .65rem; border-radius:9999px; border:1px solid rgba(51,65,85,.8); display:inline-flex; gap:.35rem; align-items:center; background:rgba(15,23,42,.5)}
   .chip:hover{background:rgba(30,41,59,.6)}
   .chip-active{border-color:rgba(56,189,248,.85); box-shadow:0 0 0 2px rgba(56,189,248,.35); background:rgba(2,132,199,.18); color:#e2f3ff}
 
-  /* Outline inline editing */
-  .outline-editing{background:rgba(2,132,199,.08); border:1px solid rgba(56,189,248,.6)!important; border-radius:12px}
+  /* Inline outline editing */
+  .outline-edit{display:flex; align-items:center; gap:.5rem; width:100%}
+  .outline-edit input[type="text"]{min-width:0}
+  .inline-field{background:transparent; border:1px solid rgba(56,189,248,.55); border-radius:.5rem; padding:.25rem .5rem}
+  .inline-number{width:4.5rem}
+  .inline-select{height:30px}
 </style>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
@@ -312,7 +317,7 @@
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
 
-  /* ============== Local + Cloud persistence ============== */
+  /* ============== Local + Cloud state (expanded) ============== */
   const DEFAULTS = {
     A: [
       { id:'aim',   name:'Aimchess warmup', minutes:8, links:[] },
@@ -334,10 +339,30 @@
     { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
   ];
 
+  // sessions + shelf
   let sessions = loadSessionsLocal() || structuredClone(DEFAULTS);
   sanitizeSessions(sessions);
   let widgetShelf = loadShelfLocal() || structuredClone(DEFAULT_SHELF);
   let activePreset = localStorage.getItem('preset_v11') || 'BOTH';
+
+  // new: per-section notes (cloud-synced)
+  let sectionNotes = {}; // { [sectionId]: string }
+
+  // new: UI prefs (cloud-synced)
+  let prefs = {
+    floatBtnPos: null,      // {x,y}
+    boardWinRC: null,       // {w,h,l,t}
+    splitRatio: Number(localStorage.getItem('split_ratio_v2')) || 66,
+    outlineCollapsed: false
+  };
+
+  // new: timer state (cloud-synced)
+  let timerState = {
+    sessionStarted:false,
+    currentIndex:0,
+    secondsLeft:0,
+    activePreset
+  };
 
   function loadSessionsLocal(){ try{ return JSON.parse(localStorage.getItem('studySessions_v11')); }catch{ return null; } }
   function saveSessionsLocal(){ localStorage.setItem('studySessions_v11', JSON.stringify(sessions)); }
@@ -356,22 +381,32 @@
     });
   }
 
+  // cloud helpers
   const cloudStatus = document.getElementById('cloudStatus');
   let currentUser = null;
   const userDocRef = (uid)=> doc(db, 'users', uid, 'apps', 'chess_planner_v1');
 
-  const debounce = (fn,ms=600)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
+  const debounce = (fn,ms=800)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
   const saveCloudDebounced = debounce(async ()=>{
     if(!currentUser) return;
     try{
-      const payload = { sessions, widgetShelf, activePreset, updatedAt: serverTimestamp() };
+      const payload = {
+        sessions,
+        widgetShelf,
+        activePreset,
+        notes: sectionNotes,
+        prefs,
+        timer: timerState,
+        updatedAt: serverTimestamp()
+      };
       await setDoc(userDocRef(currentUser.uid), payload, { merge:true });
       cloudStatus.textContent = 'Saved to cloud ✓';
     }catch(e){ console.error(e); cloudStatus.textContent='Cloud save failed'; }
-  }, 700);
+  }, 1200);
 
   function saveSessions(){ saveSessionsLocal(); if(currentUser) saveCloudDebounced(); }
   function saveShelf(){ saveShelfLocal(); if(currentUser) saveCloudDebounced(); }
+  function touchCloud(){ if(currentUser) saveCloudDebounced(); }
 
   /* ================= Presets/Timer/UI ================= */
   const presetSelect = document.getElementById('presetSelect');
@@ -379,6 +414,7 @@
   presetSelect.addEventListener('change', ()=>{
     activePreset = presetSelect.value;
     localStorage.setItem('preset_v11', activePreset);
+    timerState.activePreset = activePreset;
     if(activePreset==='BOTH' && !sessions.BOTH){
       sessions.BOTH = [...(sessions.A||[]), ...(sessions.B||[])].map(s=>({...s}));
       saveSessions();
@@ -387,12 +423,12 @@
     sessionStarted=false;
     currentIndex=0;
     secondsLeft = minsToSecs((getSchedule()[0]||{}).minutes||0);
+    timerTouch();
     lastDisplayedSec=null;
     isEditingSection=false;
     updateEditUI();
     renderAll();
     updateStartBtnLabel();
-    if(currentUser) saveCloudDebounced();
   });
 
   function getSchedule(){
@@ -404,26 +440,38 @@
   function getEditableRef(){ return getSchedule(); }
 
   let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, lastDisplayedSec=null;
+  let sessionStarted=false;
   const clockEl = document.getElementById('clock');
   function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
   function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
+
   function startTimer(){ if(running) return; running=true; syncEnd(); loop(); renderAll(); updateStartBtnLabel(); }
-  function stopTimer(){ running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateStartBtnLabel(); }
+  function stopTimer(){ running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateStartBtnLabel(); timerTouch(); }
   function syncEnd(){ endTimeMs = performance.now() + secondsLeft*1000; }
+
+  function timerTouch(){
+    timerState.sessionStarted = sessionStarted;
+    timerState.currentIndex = currentIndex;
+    timerState.secondsLeft = secondsLeft;
+    timerState.activePreset = activePreset;
+    touchCloud();
+  }
+
   function loop(){
     if(!running) return;
     const sched=getSchedule(); if(!sched.length){ stopTimer(); return; }
     const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
-    if(remaining !== secondsLeft){ secondsLeft = remaining; lastDisplayedSec=null; renderAll(); }
+    if(remaining !== secondsLeft){
+      secondsLeft = remaining; lastDisplayedSec=null; renderAll(); timerTouch();
+    }
     if(secondsLeft<=0){
       if(currentIndex < sched.length-1){
         currentIndex++;
         secondsLeft=minsToSecs(sched[currentIndex].minutes);
-        syncEnd(); beep(); renderAll();
+        syncEnd(); beep(); renderAll(); timerTouch();
       } else {
         stopTimer(); beep(); renderAll();
-        sessionStarted=false;
-        updateStartBtnLabel();
+        sessionStarted=false; updateStartBtnLabel(); timerTouch();
         return;
       }
     }
@@ -431,7 +479,6 @@
   }
 
   const startBtn = document.getElementById('startBtn');
-  let sessionStarted=false;
   function updateStartBtnLabel(){
     if(!sessionStarted) startBtn.textContent='Start Study Session';
     else if(running) startBtn.textContent='Pause Session';
@@ -439,12 +486,12 @@
   }
   startBtn.onclick=()=>{
     const s=getSchedule(); if(!s.length) return;
-    if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(s[0].minutes); sessionStarted=true; startTimer(); }
+    if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(s[0].minutes); sessionStarted=true; timerTouch(); startTimer(); }
     else { if(running) stopTimer(); else startTimer(); }
   };
-  document.getElementById('prevBtn').onclick=()=>{ const s=getSchedule(); if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(s[currentIndex].minutes); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); } updateStartBtnLabel(); };
-  document.getElementById('nextBtn').onclick=()=>{ const s=getSchedule(); if(currentIndex<s.length-1){ currentIndex++; secondsLeft=minsToSecs(s[currentIndex].minutes); if(running) syncEnd(); } else stopTimer(); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); };
-  document.getElementById('resetBtn').onclick=()=>{ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((getSchedule()[0]||{}).minutes||0); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); };
+  document.getElementById('prevBtn').onclick=()=>{ const s=getSchedule(); if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(s[currentIndex].minutes); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); timerTouch(); } updateStartBtnLabel(); };
+  document.getElementById('nextBtn').onclick=()=>{ const s=getSchedule(); if(currentIndex<s.length-1){ currentIndex++; secondsLeft=minsToSecs(s[currentIndex].minutes); if(running) syncEnd(); timerTouch(); } else stopTimer(); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); };
+  document.getElementById('resetBtn').onclick=()=>{ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((getSchedule()[0]||{}).minutes||0); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); timerTouch(); };
 
   function jumpToSection(i){
     const sched=getSchedule(); if(!sched[i]) return;
@@ -453,6 +500,7 @@
     if(running) syncEnd();
     lastDisplayedSec=null;
     renderAll();
+    timerTouch();
   }
 
   const progressHost=document.getElementById('progressHost'),
@@ -523,10 +571,10 @@
     const sched=getSchedule(); const total=scheduleTotalSecs(sched); let target=p*total; let cum=0;
     for(let i=0;i<sched.length;i++){
       const dur=minsToSecs(sched[i].minutes);
-      if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); return; }
+      if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); timerTouch(); return; }
       cum+=dur;
     }
-    currentIndex=sched.length-1; secondsLeft=0; stopTimer(); lastDisplayedSec=null; renderAll();
+    currentIndex=sched.length-1; secondsLeft=0; stopTimer(); lastDisplayedSec=null; renderAll(); timerTouch();
   }
   scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true; scrubOverlay.setPointerCapture(e.pointerId); jumpFromPct(pctFromEvent(e));});
   scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing) jumpFromPct(pctFromEvent(e));});
@@ -554,6 +602,16 @@
   }
 
   function currentSectionRef(){ return getSchedule()[currentIndex]; }
+
+  // --- notes persistence (local + cloud) ---
+  function loadNoteFor(id){
+    return sectionNotes[id] ?? localStorage.getItem('section_desc_'+id) ?? '';
+  }
+  function saveNoteFor(id, text){
+    sectionNotes[id] = text;
+    localStorage.setItem('section_desc_'+id, text);
+    touchCloud();
+  }
 
   function renderCurrentLinks(){
     const sec=currentSectionRef();
@@ -693,9 +751,12 @@
     }
   });
 
-  /* ============== Outline (with inline edit) ============== */
+  /* ============== Outline (inline edit, bug-fixed) ============== */
   const outline=document.getElementById('outline');
   const totalMins=document.getElementById('totalMins');
+
+  // Track whether any row is in edit mode to suppress jump clicks
+  let editingOutlineId = null;
 
   const toMinutes = (value, unit)=>{
     const v = Number(value)||0;
@@ -703,16 +764,12 @@
     if(unit==='hours')   return v*60;
     return v; // minutes
   };
-  const fromMinutes = (mins)=>{
-    // Default to minutes display
-    return { value: String((+mins).toFixed(2)).replace(/\.00$/,''), unit:'minutes' };
-  };
 
   function renderOutline(){
     const sched=getSchedule();
     outline.innerHTML = sched.map((s,i)=>`
-      <li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}" draggable="true">
-        <div class="flex items-center justify-between gap-3">
+      <li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}" draggable="${editingOutlineId? 'false' : 'true'}">
+        <div class="flex items-center gap-3">
           <button class="text-left min-w-0 flex-1 truncate text-sm focus:outline-none">${escapeHtml(s.name)}</button>
           <div class="flex items-center gap-2 shrink-0">
             <span class="text-xs text-slate-300 w-16 text-right">${Number(s.minutes)}m</span>
@@ -722,9 +779,10 @@
       </li>
     `).join('');
 
-    // click to jump
+    // click to jump (disabled while editing)
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
       li.addEventListener('click', (e)=>{
+        if(editingOutlineId) return;
         if(e.target.closest('[data-act]')) return;
         jumpToSection(idx);
       });
@@ -739,34 +797,25 @@
         const idx=ref.findIndex(x=>x.id===id);
         if(idx<0) return;
         const cur=ref[idx];
+        editingOutlineId = id;
 
-        const {value, unit} = fromMinutes(cur.minutes);
-        li.classList.add('outline-editing');
-        li.setAttribute('draggable','false');
+        // build compact inline editor in-place
         li.innerHTML = `
-          <div class="flex flex-col gap-2 p-2">
-            <label class="text-xs text-slate-400">Title</label>
-            <input class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-sm" id="edtTitle" value="${escapeHtml(cur.name)}"/>
-            <div class="grid grid-cols-3 gap-2">
-              <div class="col-span-2">
-                <label class="text-xs text-slate-400">Time value</label>
-                <input id="edtValue" type="number" step="0.1" min="0.01" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-sm" value="${value}">
-              </div>
-              <div>
-                <label class="text-xs text-slate-400">Unit</label>
-                <select id="edtUnit" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-sm">
-                  <option value="seconds" ${unit==='seconds'?'selected':''}>seconds</option>
-                  <option value="minutes" ${unit==='minutes'?'selected':''}>minutes</option>
-                  <option value="hours"   ${unit==='hours'  ?'selected':''}>hours</option>
-                </select>
-              </div>
-            </div>
-            <div class="flex gap-2">
-              <button class="px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm" id="edtSave">Save</button>
-              <button class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm" id="edtCancel">Cancel</button>
-            </div>
+          <div class="outline-edit">
+            <input id="edtTitle" class="inline-field text-sm flex-1 min-w-0" type="text" value="${escapeHtml(cur.name)}" />
+            <input id="edtValue" class="inline-field inline-number text-sm" type="number" step="0.1" min="0.01" value="${(+cur.minutes).toFixed(2).replace(/\.00$/,'')}" />
+            <select id="edtUnit" class="inline-field inline-select text-sm">
+              <option value="minutes" selected>min</option>
+              <option value="seconds">sec</option>
+              <option value="hours">hr</option>
+            </select>
+            <button class="btn-xxs" id="edtSave">Save</button>
+            <button class="btn-xxs" id="edtCancel">Cancel</button>
           </div>
         `;
+
+        // prevent clicks inside editor from bubbling to li (fixes minimize bug)
+        li.querySelector('.outline-edit').addEventListener('click', ev=>ev.stopPropagation());
 
         const edtTitle = li.querySelector('#edtTitle');
         const edtValue = li.querySelector('#edtValue');
@@ -774,7 +823,7 @@
         const saveBtn  = li.querySelector('#edtSave');
         const cancelBtn= li.querySelector('#edtCancel');
 
-        const cancel = ()=> renderOutline();
+        const cancel = ()=>{ editingOutlineId=null; renderOutline(); };
         cancelBtn.addEventListener('click', cancel);
         li.addEventListener('keydown', (e)=>{ if(e.key==='Escape') cancel(); });
 
@@ -787,7 +836,9 @@
           if(getSchedule()[currentIndex]?.id===cur.id){
             secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes));
             if(running) syncEnd();
+            timerTouch();
           }
+          editingOutlineId=null;
           renderOutline();
           buildProgress(); updateProgress(); renderCurrent();
         };
@@ -808,7 +859,7 @@
     listEl.querySelectorAll('li[draggable="true"]').forEach(li=>{
       li.addEventListener('pointerdown', (e)=>{ startedOnEdit = !!e.target.closest('[data-act]'); });
       li.addEventListener('dragstart', (e)=>{
-        if(startedOnEdit){ e.preventDefault(); startedOnEdit=false; return; }
+        if(startedOnEdit || editingOutlineId){ e.preventDefault(); startedOnEdit=false; return; }
         draggingEl = li;
         li.classList.add('drag-ghost');
         e.dataTransfer.effectAllowed = 'move';
@@ -859,20 +910,35 @@
     saveSessions(); renderAll();
   });
 
-  /* ================= Splitter & board (unchanged) ================= */
+  /* ================= Splitter & board with cloud prefs ================= */
   const split = document.getElementById('split');
   const splitHandle = document.getElementById('splitHandle');
   const showOutlineBtn = document.getElementById('showOutlineBtn');
   const collapseOutlineBtn = document.getElementById('collapseOutlineBtn');
-  let splitRatio = Number(localStorage.getItem('split_ratio_v2')) || 66;
-  applySplit(splitRatio);
-  function applySplit(pct){ pct=Math.max(40,Math.min(85,pct)); split.style.setProperty('--leftRatio', pct + '%'); localStorage.setItem('split_ratio_v2', String(pct)); }
+
+  function applySplit(pct){
+    pct=Math.max(40,Math.min(85,pct));
+    split.style.setProperty('--leftRatio', pct + '%');
+    localStorage.setItem('split_ratio_v2', String(pct));
+    prefs.splitRatio = pct;
+    touchCloud();
+  }
+  applySplit(prefs.splitRatio);
+
   let resizing=false;
   splitHandle.addEventListener('pointerdown', (e)=>{ if(split.classList.contains('collapsed')) return; resizing=true; splitHandle.setPointerCapture(e.pointerId); });
   splitHandle.addEventListener('pointermove', (e)=>{ if(!resizing) return; const rect=split.getBoundingClientRect(); const x=Math.max(rect.left+120, Math.min(e.clientX, rect.right-260)); const pct=((x-rect.left)/rect.width)*100; applySplit(pct); });
   splitHandle.addEventListener('pointerup', ()=>{ resizing=false; });
-  collapseOutlineBtn.addEventListener('click', ()=>{ split.classList.add('collapsed'); showOutlineBtn.classList.remove('hidden'); });
-  showOutlineBtn.addEventListener('click', ()=>{ split.classList.remove('collapsed'); showOutlineBtn.classList.add('hidden'); });
+
+  function setOutlineCollapsed(collapsed){
+    split.classList.toggle('collapsed', collapsed);
+    showOutlineBtn.classList.toggle('hidden', !collapsed);
+    prefs.outlineCollapsed = collapsed;
+    touchCloud();
+  }
+
+  collapseOutlineBtn.addEventListener('click', ()=> setOutlineCollapsed(true));
+  showOutlineBtn.addEventListener('click', ()=> setOutlineCollapsed(false));
 
   const floatBtn = document.getElementById('floatBtn');
   const boardWin = document.getElementById('boardWin');
@@ -909,18 +975,28 @@
     boardWin.classList.remove('minimized'); minimizeBoard.textContent='Minimize'; minimizeBoard.setAttribute('aria-expanded','true'); hideBoard();
   });
 
+  // Floating button (position persisted to cloud)
   (function(){
+    // apply from local storage first
     let pos=JSON.parse(localStorage.getItem('float_btn_pos_v1')||'null')||{x:null,y:null};
     if(pos.x!=null&&pos.y!=null){ floatBtn.style.left=pos.x+'px'; floatBtn.style.top=pos.y+'px'; floatBtn.style.right='auto'; floatBtn.style.bottom='auto'; }
+    if(prefs.floatBtnPos){ floatBtn.style.left=prefs.floatBtnPos.x; floatBtn.style.top=prefs.floatBtnPos.y; floatBtn.style.right='auto'; floatBtn.style.bottom='auto'; }
     let dragging=false, offX=0, offY=0;
     floatBtn.addEventListener('pointerdown', e=>{ dragging=true; floatBtn.setPointerCapture(e.pointerId); const r=floatBtn.getBoundingClientRect(); offX=e.clientX-r.left; offY=e.clientY-r.top; });
     floatBtn.addEventListener('pointermove', e=>{ if(!dragging) return; floatBtn.style.left=(e.clientX-offX)+'px'; floatBtn.style.top=(e.clientY-offY)+'px'; floatBtn.style.right='auto'; floatBtn.style.bottom='auto'; });
-    function end(){ if(!dragging) return; dragging=false; const r=floatBtn.getBoundingClientRect(); localStorage.setItem('float_btn_pos_v1', JSON.stringify({x:r.left,y:r.top})); }
+    function end(){
+      if(!dragging) return; dragging=false; const r=floatBtn.getBoundingClientRect();
+      const p={x:r.left+'px',y:r.top+'px'};
+      localStorage.setItem('float_btn_pos_v1', JSON.stringify({x:r.left,y:r.top}));
+      prefs.floatBtnPos=p; touchCloud();
+    }
     floatBtn.addEventListener('pointerup', end); floatBtn.addEventListener('pointercancel', end);
   })();
 
+  // Board window RC (persist to cloud)
   (function(){
-    const saved=JSON.parse(localStorage.getItem('board_win_rc_v1')||'null');
+    const ls=JSON.parse(localStorage.getItem('board_win_rc_v1')||'null');
+    const saved= prefs.boardWinRC || ls;
     if(saved){ boardWin.style.width=saved.w; boardWin.style.height=saved.h; boardWin.style.left=saved.l; boardWin.style.top=saved.t; boardWin.style.right='auto'; boardWin.style.bottom='auto'; }
     let dragging=false, dx=0, dy=0;
     boardHeader.addEventListener('pointerdown', e=>{
@@ -929,7 +1005,7 @@
       const r=boardWin.getBoundingClientRect(); dx=e.clientX-r.left; dy=e.clientY-r.top;
     });
     boardHeader.addEventListener('pointermove', e=>{ if(!dragging) return; const ww=innerWidth, wh=innerHeight; const nx=Math.min(ww-40,Math.max(10,e.clientX-dx)); const ny=Math.min(wh-40,Math.max(10,e.clientY-dy)); boardWin.style.left=nx+'px'; boardWin.style.top=ny+'px'; boardWin.style.right='auto'; boardWin.style.bottom='auto'; });
-    function endDrag(){ if(!dragging) return; dragging=false; const r=boardWin.getBoundingClientRect(); localStorage.setItem('board_win_rc_v1', JSON.stringify({w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'})); }
+    function endDrag(){ if(!dragging) return; dragging=false; const r=boardWin.getBoundingClientRect(); const rc={w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'}; localStorage.setItem('board_win_rc_v1', JSON.stringify(rc)); prefs.boardWinRC=rc; touchCloud(); }
     boardHeader.addEventListener('pointerup', endDrag); boardHeader.addEventListener('pointercancel', endDrag);
 
     function startResize(handle, mode){
@@ -949,7 +1025,9 @@
           document.removeEventListener('pointermove',mm);
           document.removeEventListener('pointerup',end);
           const r=boardWin.getBoundingClientRect();
-          localStorage.setItem('board_win_rc_v1', JSON.stringify({w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'}));
+          const rc={w:r.width+'px',h:r.height+'px',l:r.left+'px',t:r.top+'px'};
+          localStorage.setItem('board_win_rc_v1', JSON.stringify(rc));
+          prefs.boardWinRC=rc; touchCloud();
         }
         document.addEventListener('pointermove',mm);
         document.addEventListener('pointerup',end);
@@ -968,15 +1046,24 @@
     currentTitleEl.textContent=cur?cur.name:'—';
     if(secondsLeft!==lastDisplayedSec){ clockEl.textContent=secsToClock(secondsLeft); lastDisplayedSec=secondsLeft; }
 
-    const key = cur ? ('section_desc_'+cur.id) : null;
-    if(key){ sectionDescEl.value = localStorage.getItem(key) || ''; sectionDescEl.oninput = ()=> localStorage.setItem(key, sectionDescEl.value); }
+    if(cur){
+      const key = cur.id;
+      sectionDescEl.value = loadNoteFor(key);
+      sectionDescEl.oninput = ()=> saveNoteFor(key, sectionDescEl.value);
+    }else{
+      sectionDescEl.value = '';
+      sectionDescEl.oninput = null;
+    }
 
     renderCurrentLinks();
   }
   function renderAll(){ buildProgress(); updateProgress(); updateLegendActive(); renderCurrent(); renderShelf(); renderOutline(); }
 
+  // Initial render & default timer state
   let secondsInit = minsToSecs((getSchedule()[0]||{}).minutes||0);
   secondsLeft = secondsInit;
+  timerState.secondsLeft = secondsLeft;
+  timerState.currentIndex = currentIndex;
   renderAll();
   if(!loadSessionsLocal()) saveSessionsLocal();
   updateStartBtnLabel();
@@ -1043,9 +1130,8 @@
       await signInWithPopup(auth, provider);
       closeModal();
     }catch(e){
-      // Helpful message for common deploy issue
       if(e && e.code === 'auth/unauthorized-domain'){
-        authError.textContent = 'This domain is not authorized. In Firebase Console → Authentication → Settings → Authorized domains, add: loxtyrell03.github.io , then refresh.';
+        authError.textContent = 'This domain is not authorized. In Firebase Console → Authentication → Settings → Authorized domains, add your deployed domain (e.g., loxtyrell03.github.io), then refresh.';
       }else{
         authError.textContent = e.message || 'Google sign-in failed';
       }
@@ -1096,12 +1182,37 @@
         const data = snap.data() || {};
         if(data.sessions){ sessions = data.sessions; sanitizeSessions(sessions); }
         if(data.widgetShelf){ widgetShelf = data.widgetShelf; }
-        if(data.activePreset){ activePreset = data.activePreset; presetSelect.value = activePreset; }
+        if(typeof data.activePreset==='string'){ activePreset = data.activePreset; presetSelect.value = activePreset; }
+        if(data.notes){ sectionNotes = data.notes || {}; }
+        if(data.prefs){
+          prefs = Object.assign(prefs, data.prefs);
+          if(prefs.splitRatio) applySplit(prefs.splitRatio);
+          if(prefs.outlineCollapsed) setOutlineCollapsed(true);
+          if(prefs.floatBtnPos){
+            floatBtn.style.left=prefs.floatBtnPos.x; floatBtn.style.top=prefs.floatBtnPos.y; floatBtn.style.right='auto'; floatBtn.style.bottom='auto';
+          }
+          if(prefs.boardWinRC){
+            const rc=prefs.boardWinRC;
+            boardWin.style.width=rc.w; boardWin.style.height=rc.h; boardWin.style.left=rc.l; boardWin.style.top=rc.t; boardWin.style.right='auto'; boardWin.style.bottom='auto';
+          }
+        }
+        if(data.timer){
+          timerState = Object.assign(timerState, data.timer);
+          activePreset = timerState.activePreset || activePreset; presetSelect.value = activePreset;
+          // restore timer vars (do not auto-run)
+          sessionStarted = !!timerState.sessionStarted;
+          currentIndex = Math.min(Math.max(0, timerState.currentIndex|0), Math.max(0, getSchedule().length-1));
+          const cur = getSchedule()[currentIndex];
+          const maxSecs = cur ? minsToSecs(cur.minutes) : 0;
+          secondsLeft = Math.min(Math.max(0, timerState.secondsLeft|0), maxSecs);
+          updateStartBtnLabel();
+        }
         saveSessionsLocal(); saveShelfLocal();
         renderAll();
       }else{
         await setDoc(ref, {
           sessions, widgetShelf, activePreset,
+          notes: sectionNotes, prefs, timer: timerState,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
       }
