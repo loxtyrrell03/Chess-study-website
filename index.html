@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Chess Study Planner — Cloud Sync</title>
+<title>Skillflow — Plan • Practice • Improve</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <meta name="color-scheme" content="light dark"/>
 
@@ -12,8 +12,8 @@
     --bg: #ffffff;
     --fg: #0f172a;
     --muted: #475569;
-    --border: #e5e7eb;
-    --borderW: 1px;
+    --border: #94a3b8;          /* clearer borders */
+    --borderW: 2px;              /* thicker borders */
     --panel: #ffffff;
     --panel-muted:#f8fafc;
     --accent:#0ea5e9;
@@ -22,6 +22,7 @@
   }
   html,body{background:var(--bg); color:var(--fg)}
   .no-select{user-select:none;-webkit-user-select:none}
+  .no-drag{-webkit-user-drag:none; user-drag:none}
   .drag-ghost{opacity:.4}
   .drag-over-outline{outline:2px dashed rgba(14,165,233,.9); outline-offset:4px}
   .btn-xs{font-size:.72rem; padding:.25rem .5rem; border-radius:.5rem; border:var(--borderW) solid var(--border); background:#fff}
@@ -32,10 +33,10 @@
   .chip{padding:.35rem .65rem; border-radius:9999px; border:var(--borderW) solid var(--border); display:inline-flex; gap:.35rem; align-items:center; background:#fff}
   .chip:hover{background:var(--panel-muted)}
   .chip-active{border-color:var(--accent); box-shadow:0 0 0 2px rgba(14,165,233,.2); background:var(--accent-100); color:#0b4661}
-  .card{background:var(--panel); border:var(--borderW) solid var(--border); border-radius:14px}
+  .card{background:var(--panel); border:var(--borderW) solid var(--border); border-radius:14px; box-shadow:0 3px 10px rgba(15,23,42,.04)}
   .muted{color:var(--muted)}
   .tabs-bar{display:flex; align-items:center; gap:0; border-bottom:var(--borderW) solid var(--border); background:var(--panel); border-radius:14px; padding:.35rem;}
-  .tab-link{position:relative; padding:.6rem 1rem; font-weight:600; color:var(--muted); border-radius:.6rem;}
+  .tab-link{position:relative; padding:.6rem 1rem; font-weight:800; color:var(--muted); border-radius:.6rem;}
   .tab-link:hover{ color:#111827; background:var(--panel-muted); }
   .tab-link.active{ color:#0b4661; background:var(--accent-100); box-shadow:inset 0 0 0 1px rgba(14,165,233,.5); }
   .tab-sep{ width:1px; height:22px; background:linear-gradient(180deg,transparent,#cbd5e1,transparent); margin:0 .25rem; }
@@ -75,17 +76,19 @@
   .section-collapsed{margin-left:16px; background:var(--panel-muted); border:var(--borderW) dashed var(--border); border-radius:10px; padding:.45rem .6rem; font-size:.92rem; display:flex; align-items:center; justify-content:space-between;}
   .input{ background:#fff; border:var(--borderW) solid var(--border); border-radius:.75rem; padding:.55rem .7rem; }
   .input:focus{ outline: 2px solid var(--accent-100); box-shadow: 0 0 0 2px rgba(14,165,233,.25); }
-  /* Session complete modal */
-  #doneModal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.35); z-index:90;}
-  #doneCard{background:#fff; border:1px solid var(--border); border-radius:14px; padding:18px; width:min(92vw,420px); box-shadow:0 12px 30px rgba(2,132,199,.2)}
+  .block-title{font-size:1.125rem;line-height:1.75rem;font-weight:800}
+  .block-sub{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 </style>
 </head>
 <body class="min-h-screen">
 <div class="max-w-7xl mx-auto px-5 py-6">
 
   <!-- Header -->
-  <header class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print">
-    <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Chess Study Planner</h1>
+  <header class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between no-print">
+    <div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Skillflow</h1>
+      <p class="text-sm muted -mt-1">Plan • Practice • Improve</p>
+    </div>
     <div class="flex flex-wrap items-center gap-2">
       <button id="settingsBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]" title="Customize UI">⚙️ Settings</button>
       <div id="authArea" class="flex items-center gap-2">
@@ -115,7 +118,7 @@
     <!-- Progress -->
     <section class="mb-4 no-print">
       <div class="flex items-center justify-between mb-1">
-        <div class="text-xs uppercase tracking-wide muted">PROGRESS — DRAG ANYWHERE TO JUMP</div>
+        <div class="block-sub">PROGRESS — DRAG ANYWHERE TO JUMP</div>
         <div id="progressPct" class="text-xs muted">0%</div>
       </div>
       <div id="progressHost" class="relative w-full h-6 rounded-2xl overflow-hidden glow no-select">
@@ -142,8 +145,8 @@
         <div class="card p-5 shadow-sm">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <div class="text-xs uppercase tracking-wide muted">Current Section</div>
-              <h2 id="currentTitle" class="text-2xl font-semibold mt-1">—</h2>
+              <div class="block-sub">Current Section</div>
+              <h2 id="currentTitle" class="text-2xl font-extrabold mt-1">—</h2>
             </div>
             <div class="flex items-center gap-2">
               <button id="editSectionBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Edit Section</button>
@@ -154,7 +157,7 @@
           <!-- Shelf -->
           <div id="shelfWrap" class="mt-4 hidden">
             <div class="flex items-center justify-between">
-              <h3 class="text-sm uppercase tracking-wide muted">LINK WIDGETS</h3>
+              <h3 class="block-title">Link widgets</h3>
               <div class="flex items-center gap-2">
                 <button id="addWidgetBtn" class="btn-xs">+ New Widget</button>
                 <button id="resetShelfBtn" class="btn-xs">Reset Shelf</button>
@@ -167,7 +170,7 @@
           <!-- Links in current -->
           <div id="linksWrap" class="mt-4">
             <div class="flex items-center justify-between">
-              <div class="text-sm">Links in this section</div>
+              <h3 class="block-title">Links in this section</h3>
               <button id="clearSectionLinks" class="btn-xs hidden">Clear</button>
             </div>
             <div id="links" class="mt-2 flex flex-wrap gap-2 p-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] min-h-[44px]"></div>
@@ -175,7 +178,8 @@
 
           <!-- Notes -->
           <div class="mt-4">
-            <label class="text-sm">Section notes (optional)</label>
+            <label class="block-title">Section notes</label>
+            <p class="text-xs muted -mt-1 mb-1">Optional mini-checklist or reminders.</p>
             <textarea id="sectionDesc" class="w-full mt-1 input text-sm" placeholder="Add notes, mini-checklist, links…"></textarea>
           </div>
         </div>
@@ -191,14 +195,14 @@
           <!-- Quick load -->
           <div id="homeSavedRow" class="mb-3">
             <div class="flex items-center justify-between">
-              <h4 class="text-xs uppercase tracking-wide muted">Saved Outlines</h4>
+              <h4 class="block-title">Saved Outlines</h4>
               <button id="manageOutlinesLink" class="text-xs underline">Manage</button>
             </div>
             <div id="homeSavedScroller" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
           </div>
 
           <div class="flex items-center justify-between">
-            <h3 class="text-sm uppercase tracking-wide muted">SESSION OUTLINE</h3>
+            <h3 class="block-title">Session outline</h3>
             <button id="collapseOutlineBtn" class="text-xs px-2 py-1 rounded-md border border-[var(--border)]">▾ Hide</button>
           </div>
 
@@ -223,7 +227,7 @@
     </div>
 
     <footer class="mt-10 text-center text-xs muted no-print">
-      Minimal, keyboard-friendly session manager. ♟️
+      Skillflow — minimal, keyboard-friendly session manager. ♟️
     </footer>
   </section>
 
@@ -256,6 +260,44 @@
 
     <div class="text-sm muted mb-3">Tip: drag one outline card onto another to propose a merge.</div>
     <div id="savedList" class="grid lg:grid-cols-2 gap-4"></div>
+  </section>
+
+  <!-- HOW TO USE -->
+  <section id="helpTab" class="hidden">
+    <div class="grid lg:grid-cols-2 gap-6">
+      <div class="card p-5">
+        <h3 class="text-xl font-extrabold mb-2">1) Build your session</h3>
+        <ol class="list-decimal pl-5 space-y-2 text-sm">
+          <li>Use <strong>+ Add Section</strong> to create blocks (title + minutes).</li>
+          <li>Toggle <strong>Edit Section</strong> to drag link widgets into the current section.</li>
+          <li>Add <strong>Notes</strong> per section. Everything syncs to the cloud when you’re signed in.</li>
+        </ol>
+      </div>
+      <div class="card p-5">
+        <h3 class="text-xl font-extrabold mb-2">2) Run the timer</h3>
+        <ol class="list-decimal pl-5 space-y-2 text-sm">
+          <li>Press <strong>Start</strong>. The progress bar shows each block; click anywhere on it to jump.</li>
+          <li>Use <strong>Prev/Next</strong> to move, or <strong>Reset</strong> to restart.</li>
+          <li><strong>Live Analysis</strong> bubble opens a draggable Lichess board.</li>
+        </ol>
+      </div>
+      <div class="card p-5">
+        <h3 class="text-xl font-extrabold mb-2">3) Save & reuse outlines</h3>
+        <ol class="list-decimal pl-5 space-y-2 text-sm">
+          <li>Create/rename/reorder sections and links in <strong>Saved Outlines</strong>.</li>
+          <li>Click <strong>Load</strong> to apply an outline to the current session.</li>
+          <li>Drag one outline onto another to <strong>merge</strong> (keeps originals).</li>
+        </ol>
+      </div>
+      <div class="card p-5">
+        <h3 class="text-xl font-extrabold mb-2">4) Cloud sync</h3>
+        <ul class="list-disc pl-5 space-y-2 text-sm">
+          <li>Sign in with Google or email to enable sync.</li>
+          <li>We save: current session, progress/timer state, notes, link widgets, UI prefs, and saved outlines.</li>
+          <li>On reload, your progress is restored (even if the page was closed).</li>
+        </ul>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -291,13 +333,12 @@
 </div>
 
 <!-- Session complete modal -->
-<div id="doneModal">
-  <div id="doneCard">
-    <div class="text-lg font-semibold mb-1">Session Complete! 🎉</div>
-    <div class="text-sm muted mb-3">Nice work. You can reset to run it again or tweak the outline.</div>
-    <div class="flex items-center justify-end gap-2">
-      <button id="doneClose" class="px-3 py-2 rounded-xl border border-[var(--border)]">Close</button>
-      <button id="doneReset" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white">Reset session</button>
+<div id="endModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-[120]">
+  <div class="w-[92vw] max-w-sm card p-6 text-center">
+    <h3 class="text-2xl font-extrabold mb-1">Session Complete! 🎉</h3>
+    <p id="endStats" class="text-sm muted mb-4"></p>
+    <div class="flex items-center justify-center gap-2">
+      <button id="endCloseBtn" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white">Nice!</button>
     </div>
   </div>
 </div>
@@ -306,7 +347,7 @@
 <div id="settingsModal" class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden items-center justify-center z-[100]">
   <div class="w-[92vw] max-w-lg card p-5 shadow-xl">
     <div class="flex items-start justify-between mb-4">
-      <h3 class="text-xl font-semibold">UI Settings</h3>
+      <h3 class="text-xl font-extrabold">UI Settings</h3>
       <button id="closeSettings" class="muted hover:text-black" title="Close">✕</button>
     </div>
     <div class="grid grid-cols-2 gap-4 text-sm">
@@ -320,11 +361,11 @@
         <input id="themeAccent" type="color" class="ml-auto h-9 w-16 input" value="#0ea5e9">
       </label>
       <label class="flex items-center gap-2">Border color
-        <input id="themeBorder" type="color" class="ml-auto h-9 w-16 input" value="#e5e7eb">
+        <input id="themeBorder" type="color" class="ml-auto h-9 w-16 input" value="#94a3b8">
       </label>
       <label class="flex items-center gap-2 col-span-2">Border thickness
-        <input id="themeBorderW" type="range" min="0" max="4" step="1" class="flex-1" value="1">
-        <span id="themeBorderWVal" class="w-8 text-right">1px</span>
+        <input id="themeBorderW" type="range" min="0" max="4" step="1" class="flex-1" value="2">
+        <span id="themeBorderWVal" class="w-8 text-right">2px</span>
       </label>
     </div>
     <div class="mt-4 flex items-center justify-between">
@@ -360,872 +401,964 @@
 
   const app = initializeApp(firebaseConfig);
   getAnalytics(app);
-  const auth = getAuth(app);
-  const db   = getFirestore(app);
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: "select_account" });
 
-  /* ---------- State (no presets anymore) ---------- */
-  // currentSession: [{id, name, minutes, links:[]}]
-  let currentSession = load('current_session_v1') || [];
-  let sectionNotes   = load('section_notes_v1') || {};  // {sectionId: text}
-  const defaultShelf = () => ([
-    { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',          icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-    { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-    { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
-  ]);
-  let widgetShelf    = load('linkShelf_v1') || defaultShelf();
-  let prefs = load('prefs_v1') || { splitRatio:56, outlineCollapsed:false, theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#e5e7eb', borderW:1 } };
-  let savedOutlines = load('saved_outlines_v1') || [];
-  // timerState persists to cloud & local frequently
-  let timerState = load('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0 };
+  window.addEventListener('DOMContentLoaded', () => {
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
 
-  function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
-  function load(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch{ return null; } }
+    /* ---------- State ---------- */
+    let currentSession = load('current_session_v1') || [];
+    let sectionNotes   = load('section_notes_v1') || {};
+    let widgetShelf    = load('linkShelf_v1') || [
+      { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',          icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+      { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+      { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
+    ];
+    let prefs = load('prefs_v1') || { splitRatio:56, outlineCollapsed:false, theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 } };
+    let savedOutlines = load('saved_outlines_v1') || [];
+    let timerState = load('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0 };
 
-  function saveCurrentSession(){ save('current_session_v1', currentSession); touchCloud(); }
-  function saveNotes(){ save('section_notes_v1', sectionNotes); touchCloud(); }
-  function saveShelf(){ save('linkShelf_v1', widgetShelf); touchCloud(); }
-  function savePrefs(){ save('prefs_v1', prefs); touchCloud(); }
-  function saveOutlines(){ save('saved_outlines_v1', savedOutlines); touchCloud(); }
-  function saveTimerLocal(){ save('timer_state_v2', timerState); }
+    function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+    function load(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch{ return null; } }
 
-  // Cloud
-  const cloudStatus = document.getElementById('cloudStatus');
-  let currentUser = null;
-  const userDocRef = (uid)=> doc(db, 'users', uid, 'apps', 'chess_planner_v2'); // new doc id
+    function saveCurrentSession(){ save('current_session_v1', currentSession); touchCloud(); }
+    function saveNotes(){ save('section_notes_v1', sectionNotes); touchCloud(); }
+    function saveShelf(){ save('linkShelf_v1', widgetShelf); touchCloud(); }
+    function savePrefs(){ save('prefs_v1', prefs); touchCloud(); }
+    function saveOutlines(){ save('saved_outlines_v1', savedOutlines); touchCloud(); }
+    function saveTimerLocal(){ save('timer_state_v2', timerState); }
 
-  const debounce = (fn,ms=1000)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
-  const saveCloudDebounced = debounce(async ()=>{
-    if(!currentUser) return;
-    try{
-      await setDoc(userDocRef(currentUser.uid), {
-        currentSession, notes: sectionNotes, prefs, widgetShelf, savedOutlines,
-        timer: timerState, updatedAt: serverTimestamp(),
-        sessions: deleteField(), activePreset: deleteField()
-      }, { merge:true });
-      cloudStatus.textContent = 'Saved to cloud ✓';
-    }catch(e){ console.error(e); cloudStatus.textContent='Cloud save failed'; }
-  }, 1200);
-  const touchCloud = ()=> currentUser && saveCloudDebounced();
+    const cloudStatus = document.getElementById('cloudStatus');
+    let currentUser = null;
+    const userDocRef = (uid)=> doc(db, 'users', uid, 'apps', 'chess_planner_v2');
 
-  // -------- Tabs --------
-  const tabButtons=[...document.querySelectorAll('.tab-link')];
-  const homeTab=document.getElementById('homeTab');
-  const savedTab=document.getElementById('savedTab');
-  const helpTab=document.getElementById('helpTab');
-  tabButtons.forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      tabButtons.forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      const id=btn.dataset.tab;
-      homeTab.classList.toggle('hidden', id!=='homeTab');
-      savedTab.classList.toggle('hidden', id!=='savedTab');
-      helpTab.classList.toggle('hidden', id!=='helpTab');
-      if(id==='savedTab') renderSavedOutlines();
-      if(id==='homeTab') renderHomeSavedBar();
-    });
-  });
+    const debounce = (fn,ms=1000)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
+    const saveCloudDebounced = debounce(async ()=>{
+      if(!currentUser) return;
+      try{
+        await setDoc(userDocRef(currentUser.uid), {
+          currentSession, notes: sectionNotes, prefs, widgetShelf, savedOutlines,
+          timer: timerState, updatedAt: serverTimestamp(),
+          sessions: deleteField(), activePreset: deleteField()
+        }, { merge:true });
+        if(cloudStatus) cloudStatus.textContent = 'Saved to cloud ✓';
+      }catch(e){ console.error(e); if(cloudStatus) cloudStatus.textContent='Cloud save failed'; }
+    }, 1200);
+    const touchCloud = ()=> currentUser && saveCloudDebounced();
 
-  // -------- Timer / Progress --------
-  const clockEl = document.getElementById('clock');
-  let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, lastDisplayedSec=null, sessionStarted=false;
-
-  function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
-  function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
-  function scheduleTotalSecs(s){ return s.reduce((a,b)=>a+minsToSecs(b.minutes||0),0); }
-
-  function setTimerFromState(state){
-    sessionStarted = !!state.sessionStarted;
-    running        = false; // resume paused; user can press Resume
-    currentIndex   = state.currentIndex||0;
-    secondsLeft    = Math.max(0, Math.round(state.secondsLeft||0));
-    if(state.running && state.lastSyncTs){
-      // Catch up elapsed time since last sync
-      let delta = Math.floor((Date.now() - state.lastSyncTs)/1000);
-      let idx = currentIndex, remain = secondsLeft;
-      while(delta>0 && currentSession[idx]){
-        if(delta >= remain){ delta -= remain; idx++; remain = currentSession[idx] ? minsToSecs(currentSession[idx].minutes||0) : 0; }
-        else { remain -= delta; delta = 0; }
-      }
-      currentIndex = Math.min(idx, Math.max(0,currentSession.length-1));
-      secondsLeft  = Math.max(0, remain||0);
-    }
-    updateStartBtnLabel(); renderAll();
-  }
-
-  function updateClockColor(){
-    clockEl.classList.remove('text-emerald-600','text-rose-600');
-    if(sessionStarted){ if(running) clockEl.classList.add('text-emerald-600'); else clockEl.classList.add('text-rose-600'); }
-  }
-
-  function startTimer(){ if(running) return; running=true; syncEnd(); loop(); updateStartBtnLabel(); updateClockColor(); markTimer('start'); }
-  function stopTimer(){ running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateStartBtnLabel(); updateClockColor(); markTimer('pause'); }
-  function syncEnd(){ endTimeMs = performance.now() + secondsLeft*1000; }
-
-  const saveTimerDebounced = debounce(()=> markTimer('tick'), 2000);
-
-  function markTimer(reason){
-    timerState.sessionStarted = sessionStarted;
-    timerState.running = running;
-    timerState.currentIndex = currentIndex;
-    timerState.secondsLeft = secondsLeft;
-    timerState.lastSyncTs = Date.now();
-    saveTimerLocal(); touchCloud();
-  }
-
-  function loop(){
-    if(!running) return;
-    const sched=currentSession; if(!sched.length){ stopTimer(); return; }
-    const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
-    if(remaining !== secondsLeft){ secondsLeft = remaining; lastDisplayedSec=null; renderAll(); saveTimerDebounced(); }
-    if(secondsLeft<=0){
-      if(currentIndex < sched.length-1){
-        currentIndex++; secondsLeft=minsToSecs(sched[currentIndex].minutes||0); syncEnd(); beep(); renderAll(); saveTimerDebounced();
-      } else {
-        stopTimer(); beep(); renderAll();
-        sessionStarted=false; updateStartBtnLabel(); markTimer('end');
-        // Show end screen
-        showDoneModal();
-        return;
-      }
-    }
-    rafId=requestAnimationFrame(loop);
-  }
-
-  const startBtn = document.getElementById('startBtn');
-  function updateStartBtnLabel(){
-    if(!sessionStarted) startBtn.textContent='Start Study Session';
-    else if(running) startBtn.textContent='Pause Session';
-    else startBtn.textContent='Resume Session';
-  }
-  startBtn.onclick=()=>{
-    const s=currentSession; if(!s.length) return;
-    if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(s[0].minutes||0); sessionStarted=true; markTimer('init'); startTimer(); }
-    else { if(running) stopTimer(); else startTimer(); }
-  };
-  document.getElementById('prevBtn').onclick=()=>{ const s=currentSession; if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(s[currentIndex].minutes||0); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); markTimer('prev'); } updateStartBtnLabel(); };
-  document.getElementById('nextBtn').onclick=()=>{ const s=currentSession; if(currentIndex<s.length-1){ currentIndex++; secondsLeft=minsToSecs(s[currentIndex].minutes||0); if(running) syncEnd(); markTimer('next'); } else stopTimer(); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); };
-  document.getElementById('resetBtn').onclick=()=>{ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((currentSession[0]||{}).minutes||0); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); markTimer('reset'); };
-
-  function jumpToSection(i){
-    const sched=currentSession; if(!sched[i]) return;
-    currentIndex=i; secondsLeft=minsToSecs(sched[i].minutes||0); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); markTimer('jump');
-  }
-
-  // Progress bar
-  const progressHost=document.getElementById('progressHost'),
-        progressFill=document.getElementById('progressFill'),
-        progressSegments=document.getElementById('progressSegments'),
-        progressTicks=document.getElementById('progressTicks'),
-        progressPctEl=document.getElementById('progressPct'),
-        legend=document.getElementById('legend'),
-        scrubOverlay=document.getElementById('scrubOverlay');
-
-  function elapsedSeconds(sched, idx, secsLeft){
-    const past=sched.slice(0,idx).reduce((a,b)=>a+minsToSecs(b.minutes||0),0);
-    const cur=sched[idx]?minsToSecs(sched[idx].minutes||0)-secsLeft:0;
-    return past+cur;
-  }
-  function buildProgress(){
-    const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
-    progressSegments.innerHTML=''; legend.innerHTML=''; progressTicks.innerHTML='';
-    sched.forEach((sec)=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; progressSegments.appendChild(seg); });
-    let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); tick.style.position='absolute'; tick.style.left=pct+'%'; tick.style.top='0'; tick.style.bottom='0'; tick.style.width='2px'; tick.style.background='rgba(0,0,0,.55)'; progressTicks.appendChild(tick); }
-    sched.forEach((sec,i)=>{ const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); chip.innerHTML = `${escapeHtml(sec.name||'') } <span class="opacity-80">(${sec.minutes||0}m)</span>`; chip.addEventListener('click', ()=>jumpToSection(i)); legend.appendChild(chip); });
-  }
-  function updateLegendActive(){ legend.querySelectorAll('.chip').forEach((el, i)=> el.classList.toggle('chip-active', i===currentIndex)); }
-  function updateProgress(){ const sched=currentSession; const total=scheduleTotalSecs(sched)||1; const elapsed=elapsedSeconds(sched,currentIndex,secondsLeft); const pct=Math.min(100,Math.max(0,(elapsed/total)*100)); progressFill.style.width=pct+'%'; progressPctEl.textContent=Math.floor(pct)+'%'; updateLegendActive(); }
-  let scrubbing=false;
-  function pctFromEvent(e){ const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0)) - rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
-  function jumpFromPct(p){ const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0;
-    for(let i=0;i<sched.length;i++){ const dur=minsToSecs(sched[i].minutes||0);
-      if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); markTimer('scrub'); return; }
-      cum+=dur;
-    } currentIndex=sched.length-1; secondsLeft=0; stopTimer(); lastDisplayedSec=null; renderAll(); markTimer('scrub-end');
-  }
-  scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true; scrubOverlay.setPointerCapture(e.pointerId); jumpFromPct(pctFromEvent(e));});
-  scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing) jumpFromPct(pctFromEvent(e));});
-  scrubOverlay.addEventListener('pointerup',()=>{scrubbing=false;});
-  scrubOverlay.addEventListener('pointercancel',()=>{scrubbing=false;});
-
-  // Current panel (links + notes)
-  const currentTitleEl=document.getElementById('currentTitle');
-  const linksDiv=document.getElementById('links');
-  const sectionDescEl=document.getElementById('sectionDesc');
-  const shelfWrap=document.getElementById('shelfWrap');
-  const clearSectionLinksBtn=document.getElementById('clearSectionLinks');
-  let isEditingSection=false;
-
-  document.getElementById('editSectionBtn').addEventListener('click', ()=>{ isEditingSection = !isEditingSection; updateEditUI(); });
-
-  function updateEditUI(){
-    shelfWrap.classList.toggle('hidden', !isEditingSection);
-    clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
-    document.getElementById('editSectionBtn').textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
-    renderCurrentLinks(); renderShelf();
-  }
-  function currentSectionRef(){ return currentSession[currentIndex]; }
-  function loadNoteFor(id){ return sectionNotes[id] ?? ''; }
-  function saveNoteFor(id, text){ sectionNotes[id] = text; saveNotes(); }
-
-  // -------- DnD hardening: memory fallback --------
-  let dragMemo = null;
-  function rememberDrag(payload){ dragMemo = payload; setTimeout(()=>{ if(dragMemo===payload) dragMemo=null; }, 8000); }
-  function readPayloadFromEvent(e){
-    let raw = '';
-    try{
-      if(e.dataTransfer){
-        raw = e.dataTransfer.getData('application/json') ||
-              e.dataTransfer.getData('text/plain') || '';
-      }
-    }catch{}
-    let p = null;
-    if(raw){
-      try{ p = JSON.parse(raw); }catch{ p = null; }
-    }
-    if(!p && dragMemo) p = dragMemo;
-    return p;
-  }
-
-  function renderCurrentLinks(){
-    const sec=currentSectionRef(); const arr=sec?.links||[];
-    linksDiv.innerHTML = arr.map((w,i)=>`
-      <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
-        ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
-        <a class="truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
-        ${isEditingSection ? `<div class="ml-auto flex items-center gap-1"><button class="btn-xs" data-act="edit">Edit</button><button class="btn-xs" data-act="remove">Del</button></div>` : ''}
-      </div>`).join('');
-    linksDiv.querySelectorAll('.section-link').forEach(card=>{
-      card.addEventListener('dragstart', e=>{
-        if(!isEditingSection){ e.preventDefault(); return; }
-        const index=Number(card.dataset.idx); e.stopPropagation();
-        e.dataTransfer.effectAllowed='copyMove';
-        const p={type:'reorder', index};
-        try{
-          e.dataTransfer.setData('text/plain', JSON.stringify(p));
-          e.dataTransfer.setData('application/json', JSON.stringify(p));
-        }catch{}
-        rememberDrag(p);
-        card.classList.add('drag-ghost');
+    /* -------- Tabs -------- */
+    const tabButtons=[...document.querySelectorAll('.tab-link')];
+    const homeTab=document.getElementById('homeTab');
+    const savedTab=document.getElementById('savedTab');
+    const helpTab=document.getElementById('helpTab');
+    tabButtons.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        tabButtons.forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        const id=btn.dataset.tab;
+        homeTab?.classList.toggle('hidden', id!=='homeTab');
+        savedTab?.classList.toggle('hidden', id!=='savedTab');
+        helpTab?.classList.toggle('hidden', id!=='helpTab');
+        if(id==='savedTab') renderSavedOutlines();
+        if(id==='homeTab') renderHomeSavedBar();
       });
-      card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
     });
-    if(isEditingSection){
-      linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
+
+    /* -------- Timer / Progress -------- */
+    const clockEl = document.getElementById('clock');
+    let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, lastDisplayedSec=null, sessionStarted=false;
+    let totalSessionSecs = 0;
+
+    function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
+    function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
+    function scheduleTotalSecs(s){ return s.reduce((a,b)=>a+minsToSecs(b.minutes||0),0); }
+
+    function setTimerFromState(state){
+      sessionStarted = !!state.sessionStarted;
+      running        = false;
+      currentIndex   = state.currentIndex||0;
+      secondsLeft    = Math.max(0, Math.round(state.secondsLeft||0));
+      if(state.running && state.lastSyncTs){
+        let delta = Math.floor((Date.now() - state.lastSyncTs)/1000);
+        let idx = currentIndex, remain = secondsLeft;
+        while(delta>0 && currentSession[idx]){
+          if(delta >= remain){ delta -= remain; idx++; remain = currentSession[idx] ? minsToSecs(currentSession[idx].minutes||0) : 0; }
+          else { remain -= delta; delta = 0; }
+        }
+        currentIndex = Math.min(idx, Math.max(0,currentSession.length-1));
+        secondsLeft  = Math.max(0, remain||0);
+      }
+      totalSessionSecs = scheduleTotalSecs(currentSession);
+      updateStartBtnLabel(); renderAll();
+    }
+
+    function updateClockColor(){
+      clockEl?.classList.remove('text-emerald-600','text-rose-600');
+      if(sessionStarted){ if(running) clockEl?.classList.add('text-emerald-600'); else clockEl?.classList.add('text-rose-600'); }
+    }
+
+    function startTimer(){ if(running) return; running=true; syncEnd(); loop(); updateStartBtnLabel(); updateClockColor(); markTimer('start'); }
+    function stopTimer(){ running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateStartBtnLabel(); updateClockColor(); markTimer('pause'); }
+    function syncEnd(){ endTimeMs = performance.now() + secondsLeft*1000; }
+
+    const saveTimerDebounced = debounce(()=> markTimer('tick'), 2000);
+
+    function markTimer(){
+      timerState.sessionStarted = sessionStarted;
+      timerState.running = running;
+      timerState.currentIndex = currentIndex;
+      timerState.secondsLeft = secondsLeft;
+      timerState.lastSyncTs = Date.now();
+      saveTimerLocal(); touchCloud();
+    }
+
+    function showEndModal(){
+      const endModal = document.getElementById('endModal');
+      const endStats = document.getElementById('endStats');
+      const elapsed = totalSessionSecs;
+      endStats.textContent = `You completed ${currentSession.length} section${currentSession.length!==1?'s':''} — ${Math.round(elapsed/60)} minutes total.`;
+      endModal.classList.remove('hidden'); endModal.classList.add('flex');
+    }
+    document.getElementById('endCloseBtn')?.addEventListener('click', ()=>{
+      const endModal = document.getElementById('endModal'); endModal.classList.add('hidden'); endModal.classList.remove('flex');
+    });
+    document.getElementById('endModal')?.addEventListener('click', (e)=>{ if(e.target.id==='endModal'){ e.currentTarget.classList.add('hidden'); e.currentTarget.classList.remove('flex'); } });
+
+    function loop(){
+      if(!running) return;
+      const sched=currentSession; if(!sched.length){ stopTimer(); return; }
+      const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
+      if(remaining !== secondsLeft){ secondsLeft = remaining; lastDisplayedSec=null; renderAll(); saveTimerDebounced(); }
+      if(secondsLeft<=0){
+        if(currentIndex < sched.length-1){
+          currentIndex++; secondsLeft=minsToSecs(sched[currentIndex].minutes||0); syncEnd(); beep(); renderAll(); saveTimerDebounced();
+        } else {
+          stopTimer(); beep(); renderAll();
+          sessionStarted=false; updateStartBtnLabel(); markTimer('end');
+          showEndModal();
+          return;
+        }
+      }
+      rafId=requestAnimationFrame(loop);
+    }
+
+    const startBtn = document.getElementById('startBtn');
+    function updateStartBtnLabel(){
+      if(!startBtn) return;
+      if(!sessionStarted) startBtn.textContent='Start Study Session';
+      else if(running) startBtn.textContent='Pause Session';
+      else startBtn.textContent='Resume Session';
+    }
+    startBtn?.addEventListener('click', ()=>{
+      const s=currentSession; if(!s.length) return;
+      if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(s[0].minutes||0); totalSessionSecs = scheduleTotalSecs(s); sessionStarted=true; markTimer('init'); startTimer(); }
+      else { if(running) stopTimer(); else startTimer(); }
+    });
+    document.getElementById('prevBtn')?.addEventListener('click', ()=>{ const s=currentSession; if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(s[currentIndex].minutes||0); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); markTimer('prev'); } updateStartBtnLabel(); });
+    document.getElementById('nextBtn')?.addEventListener('click', ()=>{ const s=currentSession; if(currentIndex<s.length-1){ currentIndex++; secondsLeft=minsToSecs(s[currentIndex].minutes||0); if(running) syncEnd(); markTimer('next'); } else stopTimer(); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); });
+    document.getElementById('resetBtn')?.addEventListener('click', ()=>{ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((currentSession[0]||{}).minutes||0); lastDisplayedSec=null; renderAll(); updateStartBtnLabel(); markTimer('reset'); });
+
+    function jumpToSection(i){
+      const sched=currentSession; if(!sched[i]) return;
+      currentIndex=i; secondsLeft=minsToSecs(sched[i].minutes||0); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); markTimer('jump');
+    }
+
+    /* Progress bar */
+    const progressHost=document.getElementById('progressHost'),
+          progressFill=document.getElementById('progressFill'),
+          progressSegments=document.getElementById('progressSegments'),
+          progressTicks=document.getElementById('progressTicks'),
+          progressPctEl=document.getElementById('progressPct'),
+          legend=document.getElementById('legend'),
+          scrubOverlay=document.getElementById('scrubOverlay');
+
+    function elapsedSeconds(sched, idx, secsLeft){
+      const past=sched.slice(0,idx).reduce((a,b)=>a+minsToSecs(b.minutes||0),0);
+      const cur=sched[idx]?minsToSecs(sched[idx].minutes||0)-secsLeft:0;
+      return past+cur;
+    }
+    function buildProgress(){
+      const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
+      if(!progressSegments || !legend || !progressTicks) return;
+      progressSegments.innerHTML=''; legend.innerHTML=''; progressTicks.innerHTML='';
+      sched.forEach((sec)=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; progressSegments.appendChild(seg); });
+      let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); tick.style.position='absolute'; tick.style.left=pct+'%'; tick.style.top='0'; tick.style.bottom='0'; tick.style.width='2px'; tick.style.background='rgba(0,0,0,.55)'; progressTicks.appendChild(tick); }
+      sched.forEach((sec,i)=>{ const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); chip.innerHTML = `${escapeHtml(sec.name||'') } <span class="opacity-80">(${sec.minutes||0}m)</span>`; chip.addEventListener('click', ()=>jumpToSection(i)); legend.appendChild(chip); });
+    }
+    function updateLegendActive(){ legend?.querySelectorAll('.chip').forEach((el, i)=> el.classList.toggle('chip-active', i===currentIndex)); }
+    function updateProgress(){ const sched=currentSession; const total=scheduleTotalSecs(sched)||1; const elapsed=elapsedSeconds(sched,currentIndex,secondsLeft); const pct=Math.min(100,Math.max(0,(elapsed/total)*100)); if(progressFill) progressFill.style.width=pct+'%'; if(progressPctEl) progressPctEl.textContent=Math.floor(pct)+'%'; updateLegendActive(); }
+    let scrubbing=false;
+    function pctFromEvent(e){ const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0)) - rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
+    function jumpFromPct(p){ const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0;
+      for(let i=0;i<sched.length;i++){ const dur=minsToSecs(sched[i].minutes||0);
+        if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); lastDisplayedSec=null; renderAll(); markTimer('scrub'); return; }
+        cum+=dur;
+      } currentIndex=sched.length-1; secondsLeft=0; stopTimer(); lastDisplayedSec=null; renderAll(); markTimer('scrub-end');
+    }
+    scrubOverlay?.addEventListener('pointerdown',(e)=>{scrubbing=true; scrubOverlay.setPointerCapture(e.pointerId); jumpFromPct(pctFromEvent(e));});
+    scrubOverlay?.addEventListener('pointermove',(e)=>{if(scrubbing) jumpFromPct(pctFromEvent(e));});
+    scrubOverlay?.addEventListener('pointerup',()=>{scrubbing=false;});
+    scrubOverlay?.addEventListener('pointercancel',()=>{scrubbing=false;});
+
+    /* Current panel (links + notes) */
+    const currentTitleEl=document.getElementById('currentTitle');
+    const linksDiv=document.getElementById('links');
+    const sectionDescEl=document.getElementById('sectionDesc');
+    const shelfWrap=document.getElementById('shelfWrap');
+    const clearSectionLinksBtn=document.getElementById('clearSectionLinks');
+    const addWidgetBtn=document.getElementById('addWidgetBtn');
+    const resetShelfBtn=document.getElementById('resetShelfBtn');
+    const linkShelfDiv=document.getElementById('linkShelf');
+    let isEditingSection=false;
+
+    document.getElementById('editSectionBtn')?.addEventListener('click', ()=>{ isEditingSection = !isEditingSection; updateEditUI(); });
+
+    function updateEditUI(){
+      shelfWrap?.classList.toggle('hidden', !isEditingSection);
+      clearSectionLinksBtn?.classList.toggle('hidden', !isEditingSection);
+      const b=document.getElementById('editSectionBtn'); if(b) b.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
+      renderCurrentLinks(); renderShelf();
+    }
+    function currentSectionRef(){ return currentSession[currentIndex]; }
+    function loadNoteFor(id){ return sectionNotes[id] ?? ''; }
+    function saveNoteFor(id, text){ sectionNotes[id] = text; saveNotes(); }
+
+    /* Shelf add/reset */
+    addWidgetBtn?.addEventListener('click', ()=>{
+      const label = prompt('Widget title (shown on the chip):','Lichess')?.trim(); if(!label) return;
+      const url   = prompt('URL (https://…):','https://lichess.org')?.trim(); if(!url) return;
+      let icon    = (prompt('Icon type: emoji / img','emoji')||'emoji').toLowerCase();
+      let emoji='🔗', img='';
+      if(icon==='img'){ img = prompt('Image URL (.png/.ico):','https://lichess1.org/assets/logo/lichess-favicon-256.png')?.trim()||''; icon='img'; }
+      else { emoji = prompt('Emoji/Text for the chip:','♟️')?.trim()||'🔗'; icon='emoji'; }
+      const w = { id:'w_'+Date.now().toString(36), label, url, icon, emoji, img };
+      widgetShelf.push(w); saveShelf(); renderShelf();
+    });
+    resetShelfBtn?.addEventListener('click', ()=>{
+      if(!confirm('Reset link shelf to defaults?')) return;
+      widgetShelf = [
+        { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',          icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+        { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+        { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
+      ];
+      saveShelf(); renderShelf();
+    });
+
+    function widgetCardHTML(w){
+      const icon = (w.icon==='img' && w.img)
+        ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover no-drag" draggable="false"/>`
+        : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
+      return `<div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${w.id}" style="cursor:${isEditingSection?'grab':'default'}">
+        ${icon}
+        <div class="min-w-0"><div class="truncate">${escapeHtml(w.label||'Untitled')}</div><div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div></div>
+      </div>`;
+    }
+    function renderShelf(){
+      if(!linkShelfDiv) return;
+      linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
+      linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
+        card.addEventListener('dragstart', e=>{
+          if(!isEditingSection){ e.preventDefault(); return; }
+          // Always use safe data types; some hosts strip custom MIME types.
+          const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid});
+          try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
+          try{ e.dataTransfer.setData('text', payloadStr); }catch{}
+          try{ e.dataTransfer.setData('application/json', payloadStr); }catch{}
+          e.dataTransfer.effectAllowed='copy';
+          card.classList.add('drag-ghost');
+        });
+        card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+      });
+    }
+
+    function renderCurrentLinks(){
+      const sec=currentSectionRef(); const arr=sec?.links||[];
+      if(!linksDiv) return;
+      linksDiv.innerHTML = arr.map((w,i)=>`
+        <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
+          ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover no-drag" draggable="false"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
+          <a class="truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
+          ${isEditingSection ? `<div class="ml-auto flex items-center gap-1"><button class="btn-xs" data-act="edit">Edit</button><button class="btn-xs" data-act="remove">Del</button></div>` : ''}
+        </div>`).join('');
+      linksDiv.querySelectorAll('.section-link').forEach(card=>{
+        card.addEventListener('dragstart', e=>{
+          if(!isEditingSection){ e.preventDefault(); return; }
+          const index=Number(card.dataset.idx); e.stopPropagation();
+          const payloadStr = JSON.stringify({type:'reorder', index});
+          try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
+          try{ e.dataTransfer.setData('text', payloadStr); }catch{}
+          try{ e.dataTransfer.setData('application/json', payloadStr); }catch{}
+          e.dataTransfer.effectAllowed='move';
+          card.classList.add('drag-ghost');
+        });
+        card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+      });
+      if(isEditingSection){
+        const sec=currentSectionRef();
+        linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            const i=Number(btn.closest('[data-idx]').dataset.idx);
+            const target=sec.links[i];
+            const label = prompt('Title:', target?.label || '') ?? null; if(label===null) return;
+            const url   = prompt('URL:', target?.url || '') ?? null; if(url===null) return;
+            const type  = prompt('Icon type: emoji / img (leave empty to keep current)', target?.icon || '') || target?.icon || 'emoji';
+            let emoji   = target?.emoji || '🔗';
+            let img     = target?.img || '';
+            if(type==='emoji'){ emoji = prompt('Emoji/Text:', emoji) || '🔗'; img=''; }
+            if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
+            Object.assign(target,{label,url,icon:type,emoji,img}); saveCurrentSession(); renderCurrentLinks();
+          });
+        });
+        linksDiv.querySelectorAll('[data-act="remove"]').forEach(btn=>{
+          btn.addEventListener('click', ()=>{ const i=Number(btn.closest('[data-idx]').dataset.idx); sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); });
+        });
+      }
+    }
+
+    /* drop from shelf / reorder */
+    let overCount = 0;
+    linksDiv?.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over-outline'); });
+    linksDiv?.addEventListener('dragleave', e=>{ if(!isEditingSection) return; overCount=Math.max(0, overCount-1); if(overCount===0) linksDiv.classList.remove('drag-over-outline'); });
+    linksDiv?.addEventListener('dragover', e=>{ if(!isEditingSection) return; e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy'; });
+    linksDiv?.addEventListener('drop', e=>{
+      if(!isEditingSection) return; e.preventDefault(); overCount=0; linksDiv.classList.remove('drag-over-outline');
+
+      // Read robustly across hosts/iframes
+      let data = '';
+      const types = e.dataTransfer.types ? Array.from(e.dataTransfer.types) : [];
+      if(types.includes('text/plain')) data = e.dataTransfer.getData('text/plain');
+      if(!data && types.includes('text')) data = e.dataTransfer.getData('text');
+      if(!data) data = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('Text') || '';
+
+      let payload=null;
+      try{ payload = JSON.parse(data); }
+      catch{
+        if(typeof data === 'string' && data.startsWith('shelf:')) payload = {type:'shelf', id:data.slice(6)};
+        else if(typeof data === 'string' && data.startsWith('reorder:')) payload = {type:'reorder', index:Number(data.slice(8))};
+      }
+      if(!payload){ console.warn('Drop payload missing/invalid', {data, types}); return; }
+
+      const sec=currentSectionRef(); if(!sec) return;
+
+      if(payload.type==='shelf'){
+        const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
+        sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
+        saveCurrentSession(); renderCurrentLinks();
+      } else if(payload.type==='reorder'){
+        const from=payload.index; const cards=[...linksDiv.querySelectorAll('.section-link')];
+        let to=cards.length; for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
+        if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks();
+      }
+    });
+
+    clearSectionLinksBtn?.addEventListener('click', ()=>{ if(!isEditingSection) return; const sec=currentSectionRef(); if(!sec) return; if(confirm('Remove all links from this section?')){ sec.links=[]; saveCurrentSession(); renderCurrentLinks(); } });
+
+    /* Outline list (Home) — with Delete button beside Edit */
+    const outline=document.getElementById('outline'); const totalMins=document.getElementById('totalMins');
+    const addOutlineItemBtn = document.getElementById('addOutlineItem');
+    const inlineAddRow = document.getElementById('inlineAddRow');
+    const addTitleInput = document.getElementById('addTitleInput');
+    const addMinsInput = document.getElementById('addMinsInput');
+    const addConfirmBtn = document.getElementById('addConfirmBtn');
+    const addCancelBtn  = document.getElementById('addCancelBtn');
+    let editingOutlineId = null;
+    const toMinutes = (value, unit)=>{ const v = Number(value)||0; if(unit==='seconds') return v/60; if(unit==='hours') return v*60; return v; };
+
+    function renderOutline(){
+      const sched=currentSession;
+      if(!outline) return;
+      outline.innerHTML = sched.map((s,i)=>`
+        <li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}" draggable="${editingOutlineId? 'false' : 'true'}">
+          <div class="flex items-center gap-3">
+            <button class="text-left min-w-0 flex-1 truncate text-sm font-semibold focus:outline-none">${escapeHtml(s.name||'')}</button>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-xs w-16 text-right">${Number(s.minutes||0)}m</span>
+              <button class="btn-xs" data-act="edit">Edit</button>
+              <button class="btn-xs" data-act="delete">Delete</button>
+            </div>
+          </div>
+        </li>`).join('');
+      outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
+        li.addEventListener('click', (e)=>{ if(editingOutlineId) return; if(e.target.closest('[data-act]')) return; jumpToSection(idx); });
+      });
+      outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
         btn.addEventListener('click', ()=>{
-          const i=Number(btn.closest('[data-idx]').dataset.idx);
-          const target=sec.links[i];
-          const label = prompt('Title:', target?.label || '') ?? null; if(label===null) return;
-          const url   = prompt('URL:', target?.url || '') ?? null; if(url===null) return;
-          const type  = prompt('Icon type: emoji / img (leave empty to keep current)', target?.icon || '') || target?.icon || 'emoji';
-          let emoji   = target?.emoji || '🔗';
-          let img     = target?.img || '';
-          if(type==='emoji'){ emoji = prompt('Emoji/Text:', emoji) || '🔗'; img=''; }
-          if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
-          Object.assign(target,{label,url,icon:type,emoji,img}); saveCurrentSession(); renderCurrentLinks();
+          const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
+          const cur=currentSession[idx]; editingOutlineId = id;
+          li.innerHTML = `
+            <div class="outline-edit">
+              <input id="edtTitle" class="inline-field inline-title text-sm" type="text" value="${escapeHtml(cur.name||'')}" />
+              <input id="edtValue" class="inline-field inline-number text-sm" type="number" step="0.1" min="0.01" value="${(+cur.minutes||0).toFixed(2).replace(/\.00$/,'')}" />
+              <select id="edtUnit" class="inline-field inline-select text-sm">
+                <option value="minutes" selected>min</option>
+                <option value="seconds">sec</option>
+                <option value="hours">hr</option>
+              </select>
+              <button class="btn-xxs" id="edtSave">Save</button>
+              <button class="btn-xxs" id="edtCancel">Cancel</button>
+            </div>`;
+          li.querySelector('.outline-edit').addEventListener('click', ev=>ev.stopPropagation());
+          const edtTitle=li.querySelector('#edtTitle'), edtValue=li.querySelector('#edtValue'), edtUnit=li.querySelector('#edtUnit');
+          const saveBtn=li.querySelector('#edtSave'), cancelBtn=li.querySelector('#edtCancel');
+          const adjust=()=>{ const numLen = String(edtValue.value).length || 1; edtValue.style.width = Math.max(8, numLen + 2) + 'ch'; const text = edtUnit.options[edtUnit.selectedIndex].text || 'min'; edtUnit.style.width = Math.max(6, text.length + 2) + 'ch'; };
+          adjust(); edtValue.addEventListener('input', adjust); edtUnit.addEventListener('change', adjust);
+          const cancel = ()=>{ editingOutlineId=null; renderOutline(); }; cancelBtn.addEventListener('click', cancel); li.addEventListener('keydown', (e)=>{ if(e.key==='Escape') cancel(); });
+          const saveInline = ()=>{ cur.name = edtTitle.value.trim() || cur.name; cur.minutes = Math.max(0.01, toMinutes(edtValue.value, edtUnit.value)); saveCurrentSession(); if(currentSession[currentIndex]?.id===cur.id){ secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes)); if(running) syncEnd(); markTimer('edit'); } editingOutlineId=null; renderOutline(); buildProgress(); updateProgress(); renderCurrent(); };
+          saveBtn.addEventListener('click', saveInline); li.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)) saveInline(); });
+          edtTitle.focus();
         });
       });
-      linksDiv.querySelectorAll('[data-act="remove"]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{ const i=Number(btn.closest('[data-idx]').dataset.idx); sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); });
+      outline.querySelectorAll('[data-act="delete"]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const id = btn.closest('li[data-id]').dataset.id;
+          const delIdx = currentSession.findIndex(s=>s.id===id);
+          if(delIdx<0) return;
+          if(!confirm('Delete this section?')) return;
+          const deletingCurrent = delIdx === currentIndex;
+          currentSession.splice(delIdx,1);
+          if(currentSession.length===0){
+            stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=0;
+          }else{
+            if(delIdx < currentIndex) currentIndex--;
+            if(deletingCurrent){
+              currentIndex = Math.min(currentIndex, currentSession.length-1);
+              secondsLeft = minsToSecs(currentSession[currentIndex].minutes||0);
+              if(running) syncEnd();
+            }
+          }
+          saveCurrentSession(); renderAll(); markTimer('delete-section');
+        });
+      });
+      makeOutlineDnD(outline, currentSession);
+      if(totalMins) totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(currentSession)/60)} minutes`;
+    }
+
+    document.getElementById('addOutlineItem')?.addEventListener('click', ()=>{ inlineAddRow?.classList.remove('hidden'); if(addTitleInput) addTitleInput.value=''; if(addMinsInput) addMinsInput.value=''; addTitleInput?.focus(); });
+    addCancelBtn?.addEventListener('click', ()=> inlineAddRow?.classList.add('hidden'));
+    addConfirmBtn?.addEventListener('click', ()=>{
+      const title=(addTitleInput?.value||'').trim() || 'New section'; const mins=Math.max(0.25, Number(addMinsInput?.value)||5);
+      currentSession.push({ id:'S'+Date.now(), name:title, minutes:mins, links:[] });
+      inlineAddRow?.classList.add('hidden'); saveCurrentSession(); renderAll(); markTimer('add');
+    });
+
+    function makeOutlineDnD(listEl, backingArray){
+      let draggingEl=null, startedOnEdit=false;
+      listEl.querySelectorAll('li[draggable="true"]').forEach(li=>{
+        li.addEventListener('pointerdown', (e)=>{ startedOnEdit = !!e.target.closest('[data-act]'); });
+        li.addEventListener('dragstart', (e)=>{ if(startedOnEdit || editingOutlineId){ e.preventDefault(); startedOnEdit=false; return; } draggingEl = li; li.classList.add('drag-ghost'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', li.dataset.id); } catch {} });
+        li.addEventListener('dragend', ()=>{ if(!draggingEl) return; draggingEl.classList.remove('drag-ghost'); const currentId = currentSession[currentIndex]?.id; const ids = [...listEl.querySelectorAll('li[data-id]')].map(n=>n.dataset.id); const map = Object.fromEntries(backingArray.map(x=>[x.id,x])); backingArray.splice(0, backingArray.length, ...ids.map(id=>map[id]).filter(Boolean)); saveCurrentSession(); const newIndex = currentSession.findIndex(s=>s.id===currentId); if(newIndex>=0) currentIndex=newIndex; renderAll(); draggingEl=null; markTimer('reorder'); });
+      });
+      listEl.addEventListener('dragover', (e)=>{ if(!draggingEl) return; e.preventDefault(); const after = getDragAfterElement(listEl, e.clientY); if(after==null) listEl.appendChild(draggingEl); else if(after !== draggingEl) listEl.insertBefore(draggingEl, after); });
+      listEl.addEventListener('drop', (e)=> e.preventDefault());
+    }
+    function getDragAfterElement(container, y){
+      const els=[...container.querySelectorAll('li[data-id]:not(.drag-ghost)')];
+      return els.reduce((closest,child)=>{ const box=child.getBoundingClientRect(); const offset=y - (box.top + box.height/2); if(offset<0 && offset>closest.offset) return {offset, element:child}; else return closest; }, {offset: Number.NEGATIVE_INFINITY, element:null}).element;
+    }
+
+    /* -------- Saved Outlines (tab) -------- */
+    const savedList = document.getElementById('savedList');
+    const createOutlineBtn = document.getElementById('createOutlineBtn');
+    const createOutlineForm = document.getElementById('createOutlineForm');
+    const newOutlineTitleInput = document.getElementById('newOutlineTitle');
+    const createOutlineConfirm = document.getElementById('createOutlineConfirm');
+    const createOutlineCancel = document.getElementById('createOutlineCancel');
+
+    const mergeBar = document.getElementById('mergeBar');
+    const mergeSourceName = document.getElementById('mergeSourceName');
+    const mergeTargetName = document.getElementById('mergeTargetName');
+    const mergeTitleInput = document.getElementById('mergeTitleInput');
+    const mergeConfirmBtn = document.getElementById('mergeConfirmBtn');
+    const mergeCancelBtn  = document.getElementById('mergeCancelBtn');
+    let mergeProposal = null;
+    const collapsedByOutline = {};
+
+    function defaultSection(){ return { id:'S'+Date.now()+Math.random().toString(16).slice(2), name:'New section', minutes:5, desc:'', links:[] }; }
+    function ensureOutlineShapes(){
+      savedOutlines.forEach(o=>{
+        o.sections = o.sections || [];
+        o.sections.forEach(s=>{
+          if(typeof s.minutes!=='number') s.minutes = Number(s.minutes)||5;
+          if(!('desc' in s)) s.desc='';
+          if(!('links' in s)) s.links=[];
+          if(!('name' in s)) s.name='Untitled';
+          if(!('id' in s)) s.id='S'+Math.random().toString(16).slice(2);
+        });
       });
     }
-  }
-  clearSectionLinksBtn.addEventListener('click', ()=>{ if(!isEditingSection) return; const sec=currentSectionRef(); if(!sec) return; if(confirm('Remove all links from this section?')){ sec.links=[]; saveCurrentSession(); renderCurrentLinks(); } });
-
-  const linkShelfDiv=document.getElementById('linkShelf');
-  const addWidgetBtn=document.getElementById('addWidgetBtn');
-  const resetShelfBtn=document.getElementById('resetShelfBtn');
-
-  function widgetCardHTML(w){
-    const icon = (w.icon==='img' && w.img) ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
-    return `<div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${w.id}" style="cursor:${isEditingSection?'grab':'default'}">
-      ${icon}
-      <div class="min-w-0"><div class="truncate">${escapeHtml(w.label||'Untitled')}</div><div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div></div>
-      <div class="ml-auto flex items-center gap-1"><button class="btn-xs" data-act="edit">Edit</button><button class="btn-xs" data-act="delete">Del</button></div>
-    </div>`;
-  }
-  function renderShelf(){
-    linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
-    linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
-      card.addEventListener('dragstart', e=>{
-        if(!isEditingSection){ e.preventDefault(); return; }
-        if(e.target.closest('[data-act]')) { e.preventDefault(); return; }
-        e.stopPropagation();
-        const payload={type:'shelf', id:card.dataset.wid};
-        e.dataTransfer.effectAllowed='copyMove';
-        try{
-          e.dataTransfer.setData('text/plain', JSON.stringify(payload));
-          e.dataTransfer.setData('application/json', JSON.stringify(payload));
-        }catch{}
-        rememberDrag(payload);
-        card.classList.add('drag-ghost');
-      });
-      card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-    });
-    linkShelfDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const id=btn.closest('[data-wid]').dataset.wid;
-        const w=widgetShelf.find(x=>x.id===id);
-        const label = prompt('Title:', w?.label || '') ?? null; if(label===null) return;
-        const url   = prompt('URL:', w?.url || '') ?? null; if(url===null) return;
-        const type  = prompt('Icon type: emoji / img (leave empty to keep current)', w?.icon || '') || w?.icon || 'emoji';
-        let emoji   = w?.emoji || '🔗';
-        let img     = w?.img || '';
-        if(type==='emoji'){ emoji = prompt('Emoji/Text:', emoji) || '🔗'; img=''; }
-        if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
-        Object.assign(w,{label,url,icon:type,emoji,img}); saveShelf(); renderShelf();
-      });
-    });
-    linkShelfDiv.querySelectorAll('[data-act="delete"]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{ const id=btn.closest('[data-wid]').dataset.wid; widgetShelf=widgetShelf.filter(w=>w.id!==id); saveShelf(); renderShelf(); });
-    });
-  }
-
-  // Drop from shelf / reorder (with hardened payload reading)
-  let overCount = 0;
-  linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over-outline'); });
-  linksDiv.addEventListener('dragleave', e=>{ if(!isEditingSection) return; overCount=Math.max(0, overCount-1); if(overCount===0) linksDiv.classList.remove('drag-over-outline'); });
-  linksDiv.addEventListener('dragover', e=>{ if(!isEditingSection) return; e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy'; });
-  linksDiv.addEventListener('drop', e=>{
-    if(!isEditingSection) return; e.preventDefault(); overCount=0; linksDiv.classList.remove('drag-over-outline');
-    const payload = readPayloadFromEvent(e);
-    if(!payload) return;
-    const sec=currentSectionRef(); if(!sec) return;
-
-    if(payload.type==='shelf'){
-      const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
-      sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
-      saveCurrentSession(); renderCurrentLinks();
-    } else if(payload.type==='reorder'){
-      const from=payload.index; const cards=[...linksDiv.querySelectorAll('.section-link')];
-      let to=cards.length; for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
-      if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks();
-    }
-  });
-
-  // Outline list (Home)
-  const outline=document.getElementById('outline'); const totalMins=document.getElementById('totalMins');
-  const addOutlineItemBtn = document.getElementById('addOutlineItem');
-  const inlineAddRow = document.getElementById('inlineAddRow');
-  const addTitleInput = document.getElementById('addTitleInput');
-  const addMinsInput = document.getElementById('addMinsInput');
-  const addConfirmBtn = document.getElementById('addConfirmBtn');
-  const addCancelBtn  = document.getElementById('addCancelBtn');
-  let editingOutlineId = null;
-  const toMinutes = (value, unit)=>{ const v = Number(value)||0; if(unit==='seconds') return v/60; if(unit==='hours') return v*60; return v; };
-
-  function renderOutline(){
-    const sched=currentSession;
-    outline.innerHTML = sched.map((s,i)=>`
-      <li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}" draggable="${editingOutlineId? 'false' : 'true'}">
-        <div class="flex items-center gap-3">
-          <button class="text-left min-w-0 flex-1 truncate text-sm focus:outline-none">${escapeHtml(s.name||'')}</button>
-          <div class="flex items-center gap-2 shrink-0">
-            <span class="text-xs w-16 text-right">${Number(s.minutes||0)}m</span>
-            <button class="btn-xs" data-act="edit">Edit</button>
-          </div>
-        </div>
-      </li>`).join('');
-    outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
-      li.addEventListener('click', (e)=>{ if(editingOutlineId) return; if(e.target.closest('[data-act]')) return; jumpToSection(idx); });
-    });
-    outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
-        const cur=currentSession[idx]; editingOutlineId = id;
-        li.innerHTML = `
-          <div class="outline-edit">
-            <input id="edtTitle" class="inline-field inline-title text-sm" type="text" value="${escapeHtml(cur.name||'')}" />
-            <input id="edtValue" class="inline-field inline-number text-sm" type="number" step="0.1" min="0.01" value="${(+cur.minutes||0).toFixed(2).replace(/\.00$/,'')}" />
-            <select id="edtUnit" class="inline-field inline-select text-sm">
-              <option value="minutes" selected>min</option>
-              <option value="seconds">sec</option>
-              <option value="hours">hr</option>
-            </select>
-            <button class="btn-xxs" id="edtSave">Save</button>
-            <button class="btn-xxs" id="edtCancel">Cancel</button>
-          </div>`;
-        li.querySelector('.outline-edit').addEventListener('click', ev=>ev.stopPropagation());
-        const edtTitle=li.querySelector('#edtTitle'), edtValue=li.querySelector('#edtValue'), edtUnit=li.querySelector('#edtUnit');
-        const saveBtn=li.querySelector('#edtSave'), cancelBtn=li.querySelector('#edtCancel');
-        const adjust=()=>{ const numLen = String(edtValue.value).length || 1; edtValue.style.width = Math.max(8, numLen + 2) + 'ch'; const text = edtUnit.options[edtUnit.selectedIndex].text || 'min'; edtUnit.style.width = Math.max(6, text.length + 2) + 'ch'; };
-        adjust(); edtValue.addEventListener('input', adjust); edtUnit.addEventListener('change', adjust);
-        const cancel = ()=>{ editingOutlineId=null; renderOutline(); }; cancelBtn.addEventListener('click', cancel); li.addEventListener('keydown', (e)=>{ if(e.key==='Escape') cancel(); });
-        const saveInline = ()=>{ cur.name = edtTitle.value.trim() || cur.name; cur.minutes = Math.max(0.01, toMinutes(edtValue.value, edtUnit.value)); saveCurrentSession(); if(currentSession[currentIndex]?.id===cur.id){ secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes)); if(running) syncEnd(); markTimer('edit'); } editingOutlineId=null; renderOutline(); buildProgress(); updateProgress(); renderCurrent(); };
-        saveBtn.addEventListener('click', saveInline); li.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)) saveInline(); });
-        edtTitle.focus();
-      });
-    });
-    makeOutlineDnD(outline, currentSession);
-    totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(currentSession)/60)} minutes`;
-  }
-
-  addOutlineItemBtn.addEventListener('click', ()=>{ inlineAddRow.classList.remove('hidden'); addTitleInput.value=''; addMinsInput.value=''; addTitleInput.focus(); });
-  addCancelBtn.addEventListener('click', ()=> inlineAddRow.classList.add('hidden'));
-  addConfirmBtn.addEventListener('click', ()=>{
-    const title=(addTitleInput.value||'').trim() || 'New section'; const mins=Math.max(0.25, Number(addMinsInput.value)||5);
-    currentSession.push({ id:'S'+Date.now(), name:title, minutes:mins, links:[] });
-    inlineAddRow.classList.add('hidden'); saveCurrentSession(); renderAll(); markTimer('add');
-  });
-
-  function makeOutlineDnD(listEl, backingArray){
-    let draggingEl=null, startedOnEdit=false;
-    listEl.querySelectorAll('li[draggable="true"]').forEach(li=>{
-      li.addEventListener('pointerdown', (e)=>{ startedOnEdit = !!e.target.closest('[data-act]'); });
-      li.addEventListener('dragstart', (e)=>{ if(startedOnEdit || editingOutlineId){ e.preventDefault(); startedOnEdit=false; return; } draggingEl = li; li.classList.add('drag-ghost'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', li.dataset.id); } catch {} });
-      li.addEventListener('dragend', ()=>{ if(!draggingEl) return; draggingEl.classList.remove('drag-ghost'); const currentId = currentSession[currentIndex]?.id; const ids = [...listEl.querySelectorAll('li[data-id]')].map(n=>n.dataset.id); const map = Object.fromEntries(backingArray.map(x=>[x.id,x])); backingArray.splice(0, backingArray.length, ...ids.map(id=>map[id]).filter(Boolean)); saveCurrentSession(); const newIndex = currentSession.findIndex(s=>s.id===currentId); if(newIndex>=0) currentIndex=newIndex; renderAll(); draggingEl=null; markTimer('reorder'); });
-    });
-    listEl.addEventListener('dragover', (e)=>{ if(!draggingEl) return; e.preventDefault(); const after = getDragAfterElement(listEl, e.clientY); if(after==null) listEl.appendChild(draggingEl); else if(after !== draggingEl) listEl.insertBefore(draggingEl, after); });
-    listEl.addEventListener('drop', (e)=> e.preventDefault());
-  }
-  function getDragAfterElement(container, y){
-    const els=[...container.querySelectorAll('li[data-id]:not(.drag-ghost)')];
-    return els.reduce((closest,child)=>{ const box=child.getBoundingClientRect(); const offset=y - (box.top + box.height/2); if(offset<0 && offset>closest.offset) return {offset, element:child}; else return closest; }, {offset: Number.NEGATIVE_INFINITY, element:null}).element;
-  }
-
-  // Saved Outlines (with per-section Save → collapse)
-  const savedList = document.getElementById('savedList');
-  const createOutlineBtn = document.getElementById('createOutlineBtn');
-  const createOutlineForm = document.getElementById('createOutlineForm');
-  const newOutlineTitleInput = document.getElementById('newOutlineTitle');
-  const createOutlineConfirm = document.getElementById('createOutlineConfirm');
-  const createOutlineCancel = document.getElementById('createOutlineCancel');
-
-  const mergeBar = document.getElementById('mergeBar');
-  const mergeSourceName = document.getElementById('mergeSourceName');
-  const mergeTargetName = document.getElementById('mergeTargetName');
-  const mergeTitleInput = document.getElementById('mergeTitleInput');
-  const mergeConfirmBtn = document.getElementById('mergeConfirmBtn');
-  const mergeCancelBtn  = document.getElementById('mergeCancelBtn');
-  let mergeProposal = null;
-  const collapsedByOutline = {}; // { outlineId: Set<sectionId> }
-
-  function defaultSection(){ return { id:'S'+Date.now()+Math.random().toString(16).slice(2), name:'New section', minutes:5, desc:'', links:[] }; }
-  function ensureOutlineShapes(){
-    savedOutlines.forEach(o=>{
-      o.sections = o.sections || [];
-      o.sections.forEach(s=>{
-        if(typeof s.minutes!=='number') s.minutes = Number(s.minutes)||5;
-        if(!('desc' in s)) s.desc='';
-        if(!('links' in s)) s.links=[];
-        if(!('name' in s)) s.name='Untitled';
-        if(!('id' in s)) s.id='S'+Math.random().toString(16).slice(2);
-      });
-    });
-  }
-  ensureOutlineShapes();
-
-  function applyOutlineToCurrent(outline){
-    const clone = outline.sections.map(s=>({ id:s.id||('S'+Math.random().toString(16).slice(2)), name:s.name, minutes:s.minutes, links:structuredClone(s.links||[]) }));
-    currentSession = clone;
-    sectionNotes = {}; clone.forEach(sec=>{ const src = outline.sections.find(ss=>ss.id===sec.id); if(src && src.desc!=null) sectionNotes[sec.id] = src.desc; });
-    timerState = { sessionStarted:false, running:false, currentIndex:0, secondsLeft:minsToSecs((clone[0]||{}).minutes||0), outlineId: outline.id, lastSyncTs: Date.now() };
-    saveCurrentSession(); saveNotes(); saveTimerLocal(); renderAll(); updateStartBtnLabel();
-  }
-
-  function renderSavedOutlines(){
     ensureOutlineShapes();
-    savedList.innerHTML = savedOutlines.map(o=>`
-      <div class="card p-4" data-oid="${o.id}" draggable="true">
-        <div class="flex items-center gap-2">
-          <input class="input flex-1 outline-title" value="${escapeHtml(o.title)}" aria-label="Outline title"/>
-          <div class="ml-auto flex items-center gap-2">
-            <button class="btn-xs" data-act="edit">Edit</button>
-            <button class="btn-xs" data-act="load">Load</button>
-            <button class="btn-xs" data-act="delete">Delete</button>
-          </div>
-        </div>
-        <div class="mt-3 hidden editor"></div>
-      </div>`).join('');
 
-    // Drag & drop for merge
-    savedList.querySelectorAll('[data-oid]').forEach(card=>{
-      const oid = card.dataset.oid;
-      card.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', oid); e.dataTransfer.effectAllowed = 'move'; card.classList.add('drag-ghost'); });
-      card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-      card.addEventListener('dragover', (e)=>{ e.preventDefault(); card.classList.add('drag-over-outline'); });
-      card.addEventListener('dragleave', ()=> card.classList.remove('drag-over-outline'));
-      card.addEventListener('drop', (e)=>{
-        e.preventDefault(); card.classList.remove('drag-over-outline');
-        const sourceId = e.dataTransfer.getData('text/plain'); const targetId = oid; if(!sourceId || sourceId===targetId) return;
-        const src = savedOutlines.find(x=>x.id===sourceId); const tgt = savedOutlines.find(x=>x.id===targetId); if(!src || !tgt) return;
-        mergeProposal = {sourceId, targetId}; mergeSourceName.textContent = src.title; mergeTargetName.textContent = tgt.title; mergeTitleInput.value = `${tgt.title} + ${src.title}`; mergeBar.style.display='block'; mergeTitleInput.focus();
-      });
+    createOutlineBtn?.addEventListener('click', ()=>{
+      createOutlineForm?.classList.remove('hidden');
+      if(newOutlineTitleInput){ newOutlineTitleInput.value = ''; newOutlineTitleInput.focus(); }
+    });
+    createOutlineCancel?.addEventListener('click', ()=>{
+      createOutlineForm?.classList.add('hidden');
+    });
+    createOutlineConfirm?.addEventListener('click', ()=>{
+      const title = (newOutlineTitleInput?.value||'').trim() || 'New outline';
+      const outline = { id:'O'+Date.now()+Math.random().toString(16).slice(2), title, sections:[], createdAt: Date.now() };
+      savedOutlines.unshift(outline);
+      saveOutlines();
+      createOutlineForm?.classList.add('hidden');
+      renderSavedOutlines();
+      renderHomeSavedBar();
+      setTimeout(()=>{
+        const card = document.querySelector(`[data-oid="${outline.id}"]`);
+        if(card){
+          const editor = card.querySelector('.editor');
+          if(editor && editor.classList.contains('hidden')){
+            editor.classList.remove('hidden');
+            renderOutlineEditor(editor, outline);
+          }
+        }
+      }, 0);
     });
 
-    // Card controls
-    savedList.querySelectorAll('[data-oid]').forEach(card=>{
-      const oid = card.dataset.oid; const outline = savedOutlines.find(x=>x.id===oid);
-      card.querySelector('.outline-title').addEventListener('input', e=>{ outline.title = e.target.value; saveOutlines(); renderHomeSavedBar(); });
-      card.querySelector('[data-act="edit"]').addEventListener('click', ()=>{
-        const editor = card.querySelector('.editor'); const isHidden = editor.classList.contains('hidden'); editor.classList.toggle('hidden', !isHidden);
-        if(isHidden) renderOutlineEditor(editor, outline);
-      });
-      card.querySelector('[data-act="load"]').addEventListener('click', ()=>{ applyOutlineToCurrent(outline); gotoHome(); });
-      card.querySelector('[data-act="delete"]').addEventListener('click', ()=>{ if(!confirm('Delete this outline?')) return; const idx = savedOutlines.findIndex(x=>x.id===oid); if(idx>=0){ savedOutlines.splice(idx,1); saveOutlines(); renderSavedOutlines(); renderHomeSavedBar(); } });
-    });
+    function applyOutlineToCurrent(outline){
+      const clone = outline.sections.map(s=>({ id:s.id||('S'+Math.random().toString(16).slice(2)), name:s.name, minutes:s.minutes, links:structuredClone(s.links||[]) }));
+      currentSession = clone;
+      sectionNotes = {}; clone.forEach(sec=>{ const src = outline.sections.find(ss=>ss.id===sec.id); if(src && src.desc!=null) sectionNotes[sec.id] = src.desc; });
+      timerState = { sessionStarted:false, running:false, currentIndex:0, secondsLeft:minsToSecs((clone[0]||{}).minutes||0), outlineId: outline.id, lastSyncTs: Date.now() };
+      saveCurrentSession(); saveNotes(); saveTimerLocal(); renderAll(); updateStartBtnLabel();
+    }
 
-    // Merge bar handlers
-    mergeCancelBtn.onclick = ()=>{ mergeProposal=null; mergeBar.style.display='none'; };
-    mergeConfirmBtn.onclick = ()=>{
-      if(!mergeProposal) return;
-      const {sourceId, targetId} = mergeProposal; const src = savedOutlines.find(x=>x.id===sourceId); const tgt = savedOutlines.find(x=>x.id===targetId); if(!src || !tgt) return;
-      const newSections = [
-        ...tgt.sections.map(s=>({ ...structuredClone(s), id:'S'+Math.random().toString(16).slice(2) })),
-        ...src.sections.map(s=>({ ...structuredClone(s), id:'S'+Math.random().toString(16).slice(2) }))
-      ];
-      const title = (mergeTitleInput.value||'').trim() || `${tgt.title} + ${src.title}`;
-      const merged = { id:'O'+Date.now(), title, sections:newSections, createdAt: Date.now() };
-      savedOutlines.unshift(merged); saveOutlines(); mergeProposal=null; mergeBar.style.display='none'; renderSavedOutlines(); renderHomeSavedBar();
-    };
-  }
-
-  // section editor (Saved Outlines)
-  function sectionEditorRowHTML(s, index, collapsed){
-    if(collapsed){
-      return `
-        <div class="section-collapsed" data-idx="${index}">
+    function renderSavedOutlines(){
+      ensureOutlineShapes();
+      if(!savedList) return;
+      savedList.innerHTML = savedOutlines.map(o=>`
+        <div class="card p-4" data-oid="${o.id}" draggable="true">
           <div class="flex items-center gap-2">
-            <span class="font-medium">${escapeHtml(s.name)}</span>
-            <span class="text-xs muted">${(+s.minutes)||0}m</span>
+            <input class="input flex-1 outline-title" value="${escapeHtml(o.title)}" aria-label="Outline title"/>
+            <div class="ml-auto flex items-center gap-2">
+              <button class="btn-xs" data-act="edit">Edit</button>
+              <button class="btn-xs" data-act="load">Load</button>
+              <button class="btn-xs" data-act="delete">Delete</button>
+            </div>
           </div>
-          <button class="btn-xxs" data-act="expand">Edit</button>
+          <div class="mt-3 hidden editor"></div>
+        </div>`).join('');
+
+      savedList.querySelectorAll('[data-oid]').forEach(card=>{
+        const oid = card.dataset.oid;
+        card.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', oid); e.dataTransfer.effectAllowed = 'move'; card.classList.add('drag-ghost'); });
+        card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+        card.addEventListener('dragover', (e)=>{ e.preventDefault(); card.classList.add('drag-over-outline'); });
+        card.addEventListener('dragleave', ()=> card.classList.remove('drag-over-outline'));
+        card.addEventListener('drop', (e)=>{
+          e.preventDefault(); card.classList.remove('drag-over-outline');
+          const sourceId = e.dataTransfer.getData('text/plain'); const targetId = oid; if(!sourceId || sourceId===targetId) return;
+          const src = savedOutlines.find(x=>x.id===sourceId); const tgt = savedOutlines.find(x=>x.id===targetId); if(!src || !tgt) return;
+          mergeProposal = {sourceId, targetId}; if(mergeSourceName) mergeSourceName.textContent = src.title; if(mergeTargetName) mergeTargetName.textContent = tgt.title; if(mergeTitleInput) mergeTitleInput.value = `${tgt.title} + ${src.title}`; if(mergeBar) mergeBar.style.display='block'; mergeTitleInput?.focus();
+        });
+      });
+
+      savedList.querySelectorAll('[data-oid]').forEach(card=>{
+        const oid = card.dataset.oid; const outline = savedOutlines.find(x=>x.id===oid);
+        card.querySelector('.outline-title')?.addEventListener('input', e=>{ outline.title = e.target.value; saveOutlines(); renderHomeSavedBar(); });
+        card.querySelector('[data-act="edit"]')?.addEventListener('click', ()=>{
+          const editor = card.querySelector('.editor'); const isHidden = editor.classList.contains('hidden'); editor.classList.toggle('hidden', !isHidden);
+          if(isHidden) renderOutlineEditor(editor, outline);
+        });
+        card.querySelector('[data-act="load"]')?.addEventListener('click', ()=>{ applyOutlineToCurrent(outline); gotoHome(); });
+        card.querySelector('[data-act="delete"]')?.addEventListener('click', ()=>{ if(!confirm('Delete this outline?')) return; const idx = savedOutlines.findIndex(x=>x.id===oid); if(idx>=0){ savedOutlines.splice(idx,1); saveOutlines(); renderSavedOutlines(); renderHomeSavedBar(); } });
+      });
+
+      mergeCancelBtn && (mergeCancelBtn.onclick = ()=>{ mergeProposal=null; if(mergeBar) mergeBar.style.display='none'; });
+      mergeConfirmBtn && (mergeConfirmBtn.onclick = ()=>{
+        if(!mergeProposal) return;
+        const {sourceId, targetId} = mergeProposal; const src = savedOutlines.find(x=>x.id===sourceId); const tgt = savedOutlines.find(x=>x.id===targetId); if(!src || !tgt) return;
+        const newSections = [
+          ...tgt.sections.map(s=>({ ...structuredClone(s), id:'S'+Math.random().toString(16).slice(2) })),
+          ...src.sections.map(s=>({ ...structuredClone(s), id:'S'+Math.random().toString(16).slice(2) }))
+        ];
+        const title = (mergeTitleInput?.value||'').trim() || `${tgt.title} + ${src.title}`;
+        const merged = { id:'O'+Date.now(), title, sections:newSections, createdAt: Date.now() };
+        savedOutlines.unshift(merged); saveOutlines(); mergeProposal=null; if(mergeBar) mergeBar.style.display='none'; renderSavedOutlines(); renderHomeSavedBar();
+      });
+    }
+
+    function sectionEditorRowHTML(s, index, collapsed){
+      if(collapsed){
+        return `
+          <div class="section-collapsed" data-idx="${index}">
+            <div class="flex items-center gap-2">
+              <span class="font-semibold">${escapeHtml(s.name)}</span>
+              <span class="text-xs muted">${(+s.minutes)||0}m</span>
+            </div>
+            <button class="btn-xxs" data-act="expand">Edit</button>
+          </div>`;
+      }
+      const linksHTML = (s.links||[]).map((l, li)=> linkEditorRowHTML(l, index, li)).join('');
+      return `
+        <div class="border border-[var(--border)] rounded-lg p-3" data-idx="${index}">
+          <div class="flex flex-wrap items-center gap-2">
+            <input class="input flex-1 sec-title" value="${escapeHtml(s.name)}" placeholder="Section title"/>
+            <input class="input w-24 sec-mins" type="number" min="0.25" step="0.25" value="${(+s.minutes||5)}"/>
+            <span class="text-xs muted">min</span>
+            <div class="ml-auto flex items-center gap-1">
+              <button class="btn-xxs" data-act="up">↑</button>
+              <button class="btn-xxs" data-act="down">↓</button>
+              <button class="btn-xxs" data-act="remove">Del</button>
+            </div>
+          </div>
+          <div class="mt-2">
+            <label class="text-xs muted">Description</label>
+            <textarea class="w-full input sec-desc" rows="2" placeholder="Notes or checklist…">${escapeHtml(s.desc||'')}</textarea>
+          </div>
+          <div class="mt-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs muted">Link widgets</label>
+              <button class="btn-xxs" data-act="add-link">+ Add Link</button>
+            </div>
+            <div class="mt-2 space-y-2 links-host">
+              ${linksHTML || '<div class="text-xs muted">No links yet.</div>'}
+            </div>
+          </div>
+          <div class="mt-3 flex justify-end">
+            <button class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm" data-act="save-section">Save</button>
+          </div>
         </div>`;
     }
-    const linksHTML = (s.links||[]).map((l, li)=> linkEditorRowHTML(l, index, li)).join('');
-    return `
-      <div class="border border-[var(--border)] rounded-lg p-3" data-idx="${index}">
-        <div class="flex flex-wrap items-center gap-2">
-          <input class="input flex-1 sec-title" value="${escapeHtml(s.name)}" placeholder="Section title"/>
-          <input class="input w-24 sec-mins" type="number" min="0.25" step="0.25" value="${(+s.minutes||5)}"/>
-          <span class="text-xs muted">min</span>
-          <div class="ml-auto flex items-center gap-1">
-            <button class="btn-xxs" data-act="up">↑</button>
-            <button class="btn-xxs" data-act="down">↓</button>
-            <button class="btn-xxs" data-act="remove">Del</button>
+    function linkEditorRowHTML(l, secIdx, linkIdx){
+      const isEmoji = (l.icon||'emoji') === 'emoji';
+      return `
+        <div class="link-card items-start" data-link-idx="${linkIdx}">
+          <div class="grid grid-cols-12 gap-2 w-full">
+            <div class="col-span-3">
+              <label class="text-xs muted">Label</label>
+              <input class="w-full input link-label" value="${escapeHtml(l.label||'')}" placeholder="e.g., Lichess Analysis"/>
+            </div>
+            <div class="col-span-5">
+              <label class="text-xs muted">URL</label>
+              <input class="w-full input link-url" value="${escapeHtml(l.url||'')}" placeholder="https://..."/>
+            </div>
+            <div class="col-span-2">
+              <label class="text-xs muted">Icon</label>
+              <select class="w-full input link-icon">
+                <option value="emoji"${isEmoji?' selected':''}>emoji</option>
+                <option value="img"${!isEmoji?' selected':''}>img</option>
+              </select>
+            </div>
+            <div class="col-span-2">
+              <label class="text-xs muted link-extra-label">${isEmoji?'Emoji/Text':'Image URL'}</label>
+              <input class="w-full input link-extra" value="${escapeHtml(isEmoji?(l.emoji||'🔗'):(l.img||''))}" placeholder="${isEmoji?'🔗 or ♟️':'https://...png'}"/>
+            </div>
           </div>
-        </div>
-        <div class="mt-2">
-          <label class="text-xs muted">Description</label>
-          <textarea class="w-full input sec-desc" rows="2" placeholder="Notes or checklist…">${escapeHtml(s.desc||'')}</textarea>
-        </div>
-        <div class="mt-2">
-          <div class="flex items-center justify-between">
-            <label class="text-xs muted">Link widgets</label>
-            <button class="btn-xxs" data-act="add-link">+ Add Link</button>
+          <div class="mt-2 flex items-center gap-2">
+            <button class="btn-xxs" data-act="remove-link">Remove</button>
           </div>
-          <div class="mt-2 space-y-2 links-host">
-            ${linksHTML || '<div class="text-xs muted">No links yet.</div>'}
-          </div>
-        </div>
-        <div class="mt-3 flex justify-end">
-          <button class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm" data-act="save-section">Save</button>
-        </div>
-      </div>`;
-  }
-  function linkEditorRowHTML(l, secIdx, linkIdx){
-    const isEmoji = (l.icon||'emoji') === 'emoji';
-    return `
-      <div class="link-card items-start" data-link-idx="${linkIdx}">
-        <div class="grid grid-cols-12 gap-2 w-full">
-          <div class="col-span-3">
-            <label class="text-xs muted">Label</label>
-            <input class="w-full input link-label" value="${escapeHtml(l.label||'')}" placeholder="e.g., Lichess Analysis"/>
-          </div>
-          <div class="col-span-5">
-            <label class="text-xs muted">URL</label>
-            <input class="w-full input link-url" value="${escapeHtml(l.url||'')}" placeholder="https://..."/>
-          </div>
-          <div class="col-span-2">
-            <label class="text-xs muted">Icon</label>
-            <select class="w-full input link-icon">
-              <option value="emoji"${isEmoji?' selected':''}>emoji</option>
-              <option value="img"${!isEmoji?' selected':''}>img</option>
-            </select>
-          </div>
-          <div class="col-span-2">
-            <label class="text-xs muted link-extra-label">${isEmoji?'Emoji/Text':'Image URL'}</label>
-            <input class="w-full input link-extra" value="${escapeHtml(isEmoji?(l.emoji||'🔗'):(l.img||''))}" placeholder="${isEmoji?'🔗 or ♟️':'https://...png'}"/>
-          </div>
-        </div>
-        <div class="mt-2 flex items-center gap-2">
-          <button class="btn-xxs" data-act="remove-link">Remove</button>
-        </div>
-      </div>`;
-  }
-  function renderOutlineEditor(container, outline){
-    if(!collapsedByOutline[outline.id]) collapsedByOutline[outline.id] = new Set();
-    const collapsedSet = collapsedByOutline[outline.id];
-    const secRows = outline.sections.map((s, i)=> sectionEditorRowHTML(s, i, collapsedSet.has(s.id))).join('');
-    container.innerHTML = `
-      <div class="space-y-3">
-        <div class="flex items-center gap-2">
-          <button class="btn-xs" data-act="add-section">+ Add Section</button>
-        </div>
-        <div class="space-y-3" data-role="sections">
-          ${secRows || '<div class="text-sm muted">No sections yet. Add one.</div>'}
-        </div>
-      </div>`;
-    const sectionsHost = container.querySelector('[data-role="sections"]');
-
-    container.querySelector('[data-act="add-section"]').addEventListener('click', ()=>{
-      const s = defaultSection(); outline.sections.push(s); saveOutlines();
-      sectionsHost.insertAdjacentHTML('beforeend', sectionEditorRowHTML(s, outline.sections.length-1, false));
-      wireSectionRow(sectionsHost.lastElementChild, outline, outline.sections.length-1, collapsedSet);
-      renderHomeSavedBar();
-    });
-
-    [...sectionsHost.children].forEach((row, idx)=> wireSectionRow(row, outline, idx, collapsedSet));
-  }
-  function wireSectionRow(row, outline, idx, collapsedSet){
-    const sec = outline.sections[idx];
-    if(row.classList.contains('section-collapsed')){
-      row.querySelector('[data-act="expand"]').addEventListener('click', ()=>{
-        collapsedSet.delete(sec.id);
-        renderOutlineEditor(row.parentElement.parentElement, outline);
-      });
-      return;
+        </div>`;
     }
-    const titleEl = row.querySelector('.sec-title');
-    const minsEl = row.querySelector('.sec-mins');
-    const descEl = row.querySelector('.sec-desc');
-    const linksHost = row.querySelector('.links-host');
-    const save = ()=>{ saveOutlines(); renderHomeSavedBar(); };
+    function renderOutlineEditor(container, outline){
+      if(!container) return;
+      if(!collapsedByOutline[outline.id]) collapsedByOutline[outline.id] = new Set();
+      const collapsedSet = collapsedByOutline[outline.id];
+      const secRows = outline.sections.map((s, i)=> sectionEditorRowHTML(s, i, collapsedSet.has(s.id))).join('');
+      container.innerHTML = `
+        <div class="space-y-3">
+          <div class="flex items-center gap-2">
+            <button class="btn-xs" data-act="add-section">+ Add Section</button>
+          </div>
+          <div class="space-y-3" data-role="sections">
+            ${secRows || '<div class="text-sm muted">No sections yet. Add one.</div>'}
+          </div>
+        </div>`;
+      const sectionsHost = container.querySelector('[data-role="sections"]');
 
-    titleEl.addEventListener('input', ()=>{ sec.name = titleEl.value; save(); });
-    minsEl.addEventListener('input', ()=>{ sec.minutes = Math.max(0.25, Number(minsEl.value)||5); save(); });
-    descEl.addEventListener('input', ()=>{ sec.desc = descEl.value; save(); });
+      container.querySelector('[data-act="add-section"]')?.addEventListener('click', ()=>{
+        const s = defaultSection(); outline.sections.push(s); saveOutlines();
+        sectionsHost.insertAdjacentHTML('beforeend', sectionEditorRowHTML(s, outline.sections.length-1, false));
+        wireSectionRow(sectionsHost.lastElementChild, outline, outline.sections.length-1, collapsedSet);
+        renderHomeSavedBar();
+      });
 
-    row.querySelector('[data-act="up"]').addEventListener('click', ()=>{
-      if(idx<=0) return; const [m]=outline.sections.splice(idx,1); outline.sections.splice(idx-1,0,m); save(); renderOutlineEditor(row.parentElement.parentElement, outline);
+      [...sectionsHost.children].forEach((row, idx)=> wireSectionRow(row, outline, idx, collapsedSet));
+    }
+    function wireSectionRow(row, outline, idx, collapsedSet){
+      const sec = outline.sections[idx];
+      if(row.classList.contains('section-collapsed')){
+        row.querySelector('[data-act="expand"]')?.addEventListener('click', ()=>{
+          collapsedSet.delete(sec.id);
+          renderOutlineEditor(row.parentElement.parentElement, outline);
+        });
+        return;
+      }
+      const titleEl = row.querySelector('.sec-title');
+      const minsEl = row.querySelector('.sec-mins');
+      const descEl = row.querySelector('.sec-desc');
+      const linksHost = row.querySelector('.links-host');
+      const save = ()=>{ saveOutlines(); renderHomeSavedBar(); };
+
+      titleEl?.addEventListener('input', ()=>{ sec.name = titleEl.value; save(); });
+      minsEl?.addEventListener('input', ()=>{ sec.minutes = Math.max(0.25, Number(minsEl.value)||5); save(); });
+      descEl?.addEventListener('input', ()=>{ sec.desc = descEl.value; save(); });
+
+      row.querySelector('[data-act="up"]')?.addEventListener('click', ()=>{ if(idx<=0) return; const [m]=outline.sections.splice(idx,1); outline.sections.splice(idx-1,0,m); save(); renderOutlineEditor(row.parentElement.parentElement, outline); });
+      row.querySelector('[data-act="down"]')?.addEventListener('click', ()=>{ if(idx>=outline.sections.length-1) return; const [m]=outline.sections.splice(idx,1); outline.sections.splice(idx+1,0,m); save(); renderOutlineEditor(row.parentElement.parentElement, outline); });
+      row.querySelector('[data-act="remove"]')?.addEventListener('click', ()=>{ outline.sections.splice(idx,1); save(); renderOutlineEditor(row.parentElement.parentElement, outline); });
+      row.querySelector('[data-act="save-section"]')?.addEventListener('click', ()=>{ save(); collapsedSet.add(sec.id); renderOutlineEditor(row.parentElement.parentElement, outline); });
+
+      row.querySelector('[data-act="add-link"]')?.addEventListener('click', ()=>{
+        const newLink = { id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:'New link', url:'', icon:'emoji', emoji:'🔗', img:'' };
+        sec.links.push(newLink); save();
+        linksHost.insertAdjacentHTML('beforeend', linkEditorRowHTML(newLink, idx, sec.links.length-1));
+        wireLinkRow(linksHost.lastElementChild, sec, sec.links.length-1, row, outline, collapsedSet);
+      });
+
+      [...linksHost.children].forEach((lnRow, linkIdx)=> wireLinkRow(lnRow, sec, linkIdx, row, outline, collapsedSet));
+    }
+    function wireLinkRow(lnRow, sec, linkIdx, sectionRow, outline, collapsedSet){
+      const link = sec.links[linkIdx];
+      const labelEl = lnRow.querySelector('.link-label');
+      const urlEl = lnRow.querySelector('.link-url');
+      const iconEl = lnRow.querySelector('.link-icon');
+      const extraEl = lnRow.querySelector('.link-extra');
+      const save = ()=> saveOutlines();
+      function syncIconExtra(){ const isEmoji = iconEl.value==='emoji'; lnRow.querySelector('.link-extra-label').textContent = isEmoji? 'Emoji/Text' : 'Image URL'; extraEl.placeholder = isEmoji? '🔗 or ♟️' : 'https://...png'; }
+      labelEl?.addEventListener('input', ()=>{ link.label = labelEl.value; save(); });
+      urlEl?.addEventListener('input', ()=>{ link.url = urlEl.value; save(); });
+      iconEl?.addEventListener('change', ()=>{ link.icon = iconEl.value; if(link.icon==='emoji'){ link.img=''; if(!link.emoji) link.emoji='🔗'; } else { link.emoji=''; if(!link.img) link.img=''; } syncIconExtra(); save(); });
+      extraEl?.addEventListener('input', ()=>{ if((link.icon||'emoji')==='emoji') link.emoji = extraEl.value; else link.img = extraEl.value; save(); });
+      lnRow.querySelector('[data-act="remove-link"]')?.addEventListener('click', ()=>{ sec.links.splice(linkIdx,1); save(); renderOutlineEditor(sectionRow.parentElement.parentElement, outline); });
+      syncIconExtra();
+    }
+
+    /* Home quick bar */
+    const manageOutlinesLink = document.getElementById('manageOutlinesLink');
+    manageOutlinesLink?.addEventListener('click', ()=>{
+      const savedBtn= [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='savedTab');
+      const homeBtn = [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='homeTab');
+      savedBtn?.classList.add('active'); homeBtn?.classList.remove('active');
+      document.getElementById('savedTab')?.classList.remove('hidden'); document.getElementById('homeTab')?.classList.add('hidden');
+      renderSavedOutlines();
     });
-    row.querySelector('[data-act="down"]').addEventListener('click', ()=>{
-      if(idx>=outline.sections.length-1) return; const [m]=outline.sections.splice(idx,1); outline.sections.splice(idx+1,0,m); save(); renderOutlineEditor(row.parentElement.parentElement, outline);
-    });
-    row.querySelector('[data-act="remove"]').addEventListener('click', ()=>{
-      outline.sections.splice(idx,1); save(); renderOutlineEditor(row.parentElement.parentElement, outline);
-    });
-    row.querySelector('[data-act="save-section"]').addEventListener('click', ()=>{
-      save(); collapsedSet.add(sec.id); renderOutlineEditor(row.parentElement.parentElement, outline);
-    });
+    function gotoHome(){
+      const homeBtn = [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='homeTab');
+      const savedBtn= [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='savedTab');
+      homeBtn?.classList.add('active'); savedBtn?.classList.remove('active');
+      document.getElementById('homeTab')?.classList.remove('hidden'); document.getElementById('savedTab')?.classList.add('hidden');
+    }
+    function renderHomeSavedBar(){
+      const scroller = document.getElementById('homeSavedScroller'); if(!scroller) return;
+      scroller.innerHTML = savedOutlines.map(o=>`<button class="link-card whitespace-nowrap" data-load-oid="${o.id}" title="Load into current session"><span class="text-sm font-semibold">${escapeHtml(o.title)}</span></button>`).join('');
+      scroller.querySelectorAll('[data-load-oid]').forEach(btn=>{
+        const o = savedOutlines.find(x=>x.id===btn.dataset.loadOid); btn.addEventListener('click', ()=> o && applyOutlineToCurrent(o));
+      });
+    }
 
-    row.querySelector('[data-act="add-link"]').addEventListener('click', ()=>{
-      const newLink = { id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:'New link', url:'', icon:'emoji', emoji:'🔗', img:'' };
-      sec.links.push(newLink); save();
-      linksHost.insertAdjacentHTML('beforeend', linkEditorRowHTML(newLink, idx, sec.links.length-1));
-      wireLinkRow(linksHost.lastElementChild, sec, sec.links.length-1, row, outline, collapsedSet);
-    });
+    /* Split & board */
+    const split = document.getElementById('split'); const splitHandle = document.getElementById('splitHandle');
+    const showOutlineBtn = document.getElementById('showOutlineBtn'); const collapseOutlineBtn = document.getElementById('collapseOutlineBtn');
+    function applySplit(pct){ pct=Math.max(40,Math.min(85,pct)); split?.style.setProperty('--leftRatio', pct + '%'); prefs.splitRatio = pct; savePrefs(); }
+    applySplit(prefs.splitRatio||56);
+    let resizing=false; splitHandle?.addEventListener('pointerdown', (e)=>{ if(split?.classList.contains('collapsed')) return; resizing=true; splitHandle.setPointerCapture(e.pointerId); });
+    splitHandle?.addEventListener('pointermove', (e)=>{ if(!resizing) return; const rect=split.getBoundingClientRect(); const x=Math.max(rect.left+120, Math.min(e.clientX, rect.right-260)); const pct=((x-rect.left)/rect.width)*100; applySplit(pct); });
+    splitHandle?.addEventListener('pointerup', ()=>{ resizing=false; });
+    function setOutlineCollapsed(collapsed){ split?.classList.toggle('collapsed', collapsed); showOutlineBtn?.classList.toggle('hidden', !collapsed); prefs.outlineCollapsed = collapsed; savePrefs(); }
+    collapseOutlineBtn?.addEventListener('click', ()=> setOutlineCollapsed(true));
+    showOutlineBtn?.addEventListener('click', ()=> setOutlineCollapsed(false));
 
-    [...linksHost.children].forEach((lnRow, linkIdx)=> wireLinkRow(lnRow, sec, linkIdx, row, outline, collapsedSet));
-  }
-  function wireLinkRow(lnRow, sec, linkIdx, sectionRow, outline, collapsedSet){
-    const link = sec.links[linkIdx];
-    const labelEl = lnRow.querySelector('.link-label');
-    const urlEl = lnRow.querySelector('.link-url');
-    const iconEl = lnRow.querySelector('.link-icon');
-    const extraEl = lnRow.querySelector('.link-extra');
-    const save = ()=> saveOutlines();
-    function syncIconExtra(){ const isEmoji = iconEl.value==='emoji'; lnRow.querySelector('.link-extra-label').textContent = isEmoji? 'Emoji/Text' : 'Image URL'; extraEl.placeholder = isEmoji? '🔗 or ♟️' : 'https://...png'; }
-    labelEl.addEventListener('input', ()=>{ link.label = labelEl.value; save(); });
-    urlEl.addEventListener('input', ()=>{ link.url = urlEl.value; save(); });
-    iconEl.addEventListener('change', ()=>{ link.icon = iconEl.value; if(link.icon==='emoji'){ link.img=''; if(!link.emoji) link.emoji='🔗'; } else { link.emoji=''; if(!link.img) link.img=''; } syncIconExtra(); save(); });
-    extraEl.addEventListener('input', ()=>{ if((link.icon||'emoji')==='emoji') link.emoji = extraEl.value; else link.img = extraEl.value; save(); });
-    lnRow.querySelector('[data-act="remove-link"]').addEventListener('click', ()=>{ sec.links.splice(linkIdx,1); save(); renderOutlineEditor(sectionRow.parentElement.parentElement, outline); });
-    syncIconExtra();
-  }
+    /* Board window */
+    const floatBtn = document.getElementById('floatBtn');
+    const boardWin = document.getElementById('boardWin');
+    const boardHeader = document.getElementById('boardHeader');
+    const boardIframe = document.getElementById('boardIframe');
+    const fenBar = document.getElementById('fenBar');
+    const popOut = document.getElementById('popOut');
+    const minimizeBoard = document.getElementById('minimizeBoard');
+    const closeBoard = document.getElementById('closeBoard');
+    function setIframeToAnalysisFen(fen){ const url = `https://lichess.org/embed/analysis?fen=${encodeURIComponent(fen)}&theme=auto&bg=auto`; if(boardIframe) boardIframe.src = url; if(popOut) popOut.href = url; }
+    function showBoard(){ boardWin?.classList.remove('minimized'); if(minimizeBoard){ minimizeBoard.textContent='Minimize'; minimizeBoard.setAttribute('aria-expanded','true'); } if(boardWin) boardWin.style.display='block'; }
+    function hideBoard(){ if(boardWin) boardWin.style.display='none'; }
+    floatBtn?.addEventListener('click', ()=> showBoard());
+    minimizeBoard?.addEventListener('click', (e)=>{ e.stopPropagation(); if(!boardWin||!minimizeBoard) return; const isMin=boardWin.classList.toggle('minimized'); minimizeBoard.textContent=isMin?'Restore':'Minimize'; minimizeBoard.setAttribute('aria-expanded', String(!isMin)); });
+    closeBoard?.addEventListener('click', (e)=>{ e.stopPropagation(); try{ if(boardIframe) boardIframe.src='about:blank'; if(popOut) popOut.href='#'; }catch{} boardWin?.classList.remove('minimized'); if(minimizeBoard){ minimizeBoard.textContent='Minimize'; minimizeBoard.setAttribute('aria-expanded','true'); } hideBoard(); });
+    (function(){
+      const eR=document.querySelector('.resizer.e'), sR=document.querySelector('.resizer.s'), seR=document.querySelector('.resizer.se');
+      if(!boardHeader||!boardWin||!eR||!sR||!seR) return;
+      let dragging=false, dx=0, dy=0;
+      boardHeader.addEventListener('pointerdown', ev=>{ if (ev.target.closest('button, a, input, select, textarea')) return; dragging=true; boardHeader.setPointerCapture(ev.pointerId); const r=boardWin.getBoundingClientRect(); dx=ev.clientX-r.left; dy=ev.clientY-r.top; });
+      boardHeader.addEventListener('pointermove', ev=>{ if(!dragging) return; const ww=innerWidth, wh=innerHeight; const nx=Math.min(ww-40,Math.max(10,ev.clientX-dx)); const ny=Math.min(wh-40,Math.max(10,ev.clientY-dy)); boardWin.style.left=nx+'px'; boardWin.style.top=ny+'px'; boardWin.style.right='auto'; boardWin.style.bottom='auto'; });
+      function endDrag(){ if(!dragging) return; dragging=false; }
+      boardHeader.addEventListener('pointerup', endDrag); boardHeader.addEventListener('pointercancel', endDrag);
+      function startResize(handle, mode){
+        return function(ev){
+          ev.preventDefault(); handle.setPointerCapture(ev.pointerId);
+          const start={x:ev.clientX,y:ev.clientY}; const rect=boardWin.getBoundingClientRect();
+          function mm(evv){ const ddx=evv.clientX-start.x, ddy=evv.clientY-start.y; let w=rect.width, h=rect.height; if(mode.includes('ew')) w=Math.max(380, rect.width+ddx); if(mode.includes('ns')) h=Math.max(320, rect.height+ddy); if(mode.includes('nwse')){ w=Math.max(380, rect.width+ddx); h=Math.max(320, rect.height+ddy); } boardWin.style.width=w+'px'; boardWin.style.height=h+'px'; }
+          function end(){ try{ handle.releasePointerCapture(ev.pointerId);}catch{} document.removeEventListener('pointermove',mm); document.removeEventListener('pointerup',end); }
+          document.addEventListener('pointermove',mm); document.addEventListener('pointerup',end);
+        }
+      }
+      eR.addEventListener('pointerdown', startResize(eR,'ew'));
+      sR.addEventListener('pointerdown', startResize(sR,'ns'));
+      seR.addEventListener('pointerdown', startResize(seR,'nwse'));
+    })();
 
-  // Saved: header controls
-  const manageOutlinesLink = document.getElementById('manageOutlinesLink');
-  manageOutlinesLink.addEventListener('click', ()=>{
-    const savedBtn= [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='savedTab');
-    const homeBtn = [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='homeTab');
-    if(savedBtn && homeBtn){ savedBtn.classList.add('active'); homeBtn.classList.remove('active'); }
-    document.getElementById('savedTab').classList.remove('hidden'); document.getElementById('homeTab').classList.add('hidden');
-    renderSavedOutlines();
-  });
-  function gotoHome(){
-    const homeBtn = [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='homeTab');
-    const savedBtn= [...document.querySelectorAll('.tab-link')].find(b=>b.dataset.tab==='savedTab');
-    if(homeBtn && savedBtn){ homeBtn.classList.add('active'); savedBtn.classList.remove('active'); }
-    document.getElementById('homeTab').classList.remove('hidden'); document.getElementById('savedTab').classList.add('hidden');
-  }
-  function renderHomeSavedBar(){
-    const scroller = document.getElementById('homeSavedScroller'); if(!scroller) return;
-    scroller.innerHTML = savedOutlines.map(o=>`<button class="link-card whitespace-nowrap" data-load-oid="${o.id}" title="Load into current session"><span class="text-sm">${escapeHtml(o.title)}</span></button>`).join('');
-    scroller.querySelectorAll('[data-load-oid]').forEach(btn=>{
-      const o = savedOutlines.find(x=>x.id===btn.dataset.loadOid); btn.addEventListener('click', ()=> applyOutlineToCurrent(o));
-    });
-  }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+    function beep(){ try{ const AC=window.AudioContext||window.webkitAudioContext; const ctx=new AC(); const now=ctx.currentTime; const o1=ctx.createOscillator(), g1=ctx.createGain(); o1.type='sine'; o1.frequency.value=880; o1.connect(g1); g1.connect(ctx.destination); g1.gain.setValueAtTime(.0001,now); g1.gain.exponentialRampToValueAtTime(.18,now+.01); o1.start(now); o1.stop(now+.12); const o2=ctx.createOscillator(), g2=ctx.createGain(); o2.type='sine'; o2.frequency.value=1318.5; o2.connect(g2); g2.connect(ctx.destination); g2.gain.setValueAtTime(.0001,now+.13); g2.gain.exponentialRampToValueAtTime(.16,now+.15); o2.start(now+.13); o2.stop(now+.28);}catch{} }
 
-  // Create outline: wire up buttons (previously inert)
-  createOutlineBtn.addEventListener('click', ()=>{
-    createOutlineForm.classList.toggle('hidden', false);
-    newOutlineTitleInput.value = '';
-    newOutlineTitleInput.focus();
-  });
-  createOutlineCancel.addEventListener('click', ()=> {
-    createOutlineForm.classList.add('hidden');
-  });
-  createOutlineConfirm.addEventListener('click', ()=>{
-    const title = (newOutlineTitleInput.value||'').trim() || 'New outline';
-    const outline = { id:'O'+Date.now(), title, sections:[], createdAt: Date.now() };
-    savedOutlines.unshift(outline);
-    saveOutlines();
-    createOutlineForm.classList.add('hidden');
-    renderSavedOutlines();
-    renderHomeSavedBar();
-  });
+    function renderCurrent(){
+      const sched=currentSession; const cur=sched[currentIndex];
+      const currentTitleEl=document.getElementById('currentTitle');
+      if(currentTitleEl) currentTitleEl.textContent=cur?cur.name:'—';
+      if(clockEl && secondsLeft!==lastDisplayedSec){ clockEl.textContent=secsToClock(secondsLeft); lastDisplayedSec=secondsLeft; }
+      const key = cur ? cur.id : null;
+      if(key){ if(sectionDescEl) sectionDescEl.value = loadNoteFor(key); if(sectionDescEl) sectionDescEl.oninput = ()=> saveNoteFor(key, sectionDescEl.value); }
+      renderCurrentLinks();
+    }
+    function renderAll(){ buildProgress(); updateProgress(); updateLegendActive(); renderCurrent(); renderShelf(); renderOutline(); updateClockColor(); }
 
-  // Split & board prefs
-  const split = document.getElementById('split'); const splitHandle = document.getElementById('splitHandle');
-  const showOutlineBtn = document.getElementById('showOutlineBtn'); const collapseOutlineBtn = document.getElementById('collapseOutlineBtn');
-  function applySplit(pct){ pct=Math.max(40,Math.min(85,pct)); split.style.setProperty('--leftRatio', pct + '%'); prefs.splitRatio = pct; savePrefs(); }
-  applySplit(prefs.splitRatio||56);
-  let resizing=false; splitHandle.addEventListener('pointerdown', (e)=>{ if(split.classList.contains('collapsed')) return; resizing=true; splitHandle.setPointerCapture(e.pointerId); });
-  splitHandle.addEventListener('pointermove', (e)=>{ if(!resizing) return; const rect=split.getBoundingClientRect(); const x=Math.max(rect.left+120, Math.min(e.clientX, rect.right-260)); const pct=((x-rect.left)/rect.width)*100; applySplit(pct); });
-  splitHandle.addEventListener('pointerup', ()=>{ resizing=false; });
-  function setOutlineCollapsed(collapsed){ split.classList.toggle('collapsed', collapsed); showOutlineBtn.classList.toggle('hidden', !collapsed); prefs.outlineCollapsed = collapsed; savePrefs(); }
-  collapseOutlineBtn.addEventListener('click', ()=> setOutlineCollapsed(true));
-  showOutlineBtn.addEventListener('click', ()=> setOutlineCollapsed(false));
+    /* ---------- Auth ---------- */
+    const signOutBtn = document.getElementById('signOutBtn'); signOutBtn?.addEventListener('click', ()=> signOut(auth));
+    const userBadge  = document.getElementById('userBadge'); const authOpenBtn= document.getElementById('authOpenBtn'); const userEmail  = document.getElementById('userEmail');
 
-  // Board window
-  const floatBtn = document.getElementById('floatBtn');
-  const boardWin = document.getElementById('boardWin');
-  const boardHeader = document.getElementById('boardHeader');
-  const boardIframe = document.getElementById('boardIframe');
-  const fenBar = document.getElementById('fenBar');
-  const applyFenBtn = document.getElementById('applyFen');
-  const openViewerBtn = document.getElementById('openViewer');
-  const popOut = document.getElementById('popOut');
-  const minimizeBoard = document.getElementById('minimizeBoard');
-  const closeBoard = document.getElementById('closeBoard');
-  function setIframeToAnalysisFen(fen){ const url = `https://lichess.org/embed/analysis?fen=${encodeURIComponent(fen)}&theme=auto&bg=auto`; boardIframe.src = url; popOut.href = url; }
-  function setIframeToGame(gameIdOrUrl){ const id = (gameIdOrUrl||'').split('/').pop().split('#')[0].split('?')[0]; const url = `https://lichess.org/embed/${id}#0?theme=auto&bg=auto`; boardIframe.src = url; popOut.href = url; }
-  function showBoard(){ boardWin.classList.remove('minimized'); minimizeBoard.textContent='Minimize'; minimizeBoard.setAttribute('aria-expanded','true'); boardWin.style.display='block'; }
-  function hideBoard(){ boardWin.style.display='none'; }
-  floatBtn.addEventListener('click', ()=> showBoard());
-  minimizeBoard.addEventListener('click', (e)=>{ e.stopPropagation(); const isMin=boardWin.classList.toggle('minimized'); minimizeBoard.textContent=isMin?'Restore':'Minimize'; minimizeBoard.setAttribute('aria-expanded', String(!isMin)); });
-  closeBoard.addEventListener('click', (e)=>{ e.stopPropagation(); try{ boardIframe.src='about:blank'; popOut.href='#'; }catch{} boardWin.classList.remove('minimized'); minimizeBoard.textContent='Minimize'; minimizeBoard.setAttribute('aria-expanded','true'); hideBoard(); });
+    const modalEl = document.getElementById('authModal');
+    const authModalTitle = document.getElementById('authModalTitle');
+    const closeAuthModal = document.getElementById('closeAuthModal');
+    const googleAuthBtn = document.getElementById('googleAuthBtn');
+    const emailInput = document.getElementById('emailInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const showPw = document.getElementById('showPw');
+    const forgotBtn = document.getElementById('forgotBtn');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const authError = document.getElementById('authError');
+    const toggleAuthModeBtn = document.getElementById('toggleAuthMode');
+    let authMode = 'signin';
 
-  // Make header draggable
-  (function(){
-    let dragging=false, dx=0, dy=0;
-    boardHeader.addEventListener('pointerdown', e=>{ if (e.target.closest('button, a, input, select, textarea')) return; dragging=true; boardHeader.setPointerCapture(e.pointerId); const r=boardWin.getBoundingClientRect(); dx=e.clientX-r.left; dy=e.clientY-r.top; });
-    boardHeader.addEventListener('pointermove', e=>{ if(!dragging) return; const ww=innerWidth, wh=innerHeight; const nx=Math.min(ww-40,Math.max(10,e.clientX-dx)); const ny=Math.min(wh-40,Math.max(10,e.clientY-dy)); boardWin.style.left=nx+'px'; boardWin.style.top=ny+'px'; boardWin.style.right='auto'; boardWin.style.bottom='auto'; });
-    function endDrag(){ if(!dragging) return; dragging=false; }
-    boardHeader.addEventListener('pointerup', endDrag); boardHeader.addEventListener('pointercancel', endDrag);
-    function startResize(handle, mode){
-      return function(e){
-        e.preventDefault(); handle.setPointerCapture(e.pointerId);
-        const start={x:e.clientX,y:e.clientY}; const rect=boardWin.getBoundingClientRect();
-        function mm(ev){ const dx=ev.clientX-start.x, dy=ev.clientY-start.y; let w=rect.width, h=rect.height; if(mode.includes('ew')) w=Math.max(380, rect.width+dx); if(mode.includes('ns')) h=Math.max(320, rect.height+dy); if(mode.includes('nwse')){ w=Math.max(380, rect.width+dx); h=Math.max(320, rect.height+dy); } boardWin.style.width=w+'px'; boardWin.style.height=h+'px'; }
-        function end(){ try{ handle.releasePointerCapture(e.pointerId);}catch{} document.removeEventListener('pointermove',mm); document.removeEventListener('pointerup',end); }
-        document.addEventListener('pointermove',mm); document.addEventListener('pointerup',end);
+    function setAuthUI(signedIn, email=''){
+      if(signedIn){
+        authOpenBtn?.classList.add('hidden'); userBadge?.classList.remove('hidden'); if(userEmail) userEmail.textContent = email || ''; if(cloudStatus) cloudStatus.textContent = 'Cloud sync on';
+      }else{
+        userBadge?.classList.add('hidden'); authOpenBtn?.classList.remove('hidden'); if(cloudStatus) cloudStatus.textContent = 'Local mode';
       }
     }
-    document.querySelector('.resizer.e').addEventListener('pointerdown', startResize(document.querySelector('.resizer.e'),'ew'));
-    document.querySelector('.resizer.s').addEventListener('pointerdown', startResize(document.querySelector('.resizer.s'),'ns'));
-    document.querySelector('.resizer.se').addEventListener('pointerdown', startResize(document.querySelector('.resizer.se'),'nwse'));
-  })();
+    function openAuthModal(mode='signin'){
+      authMode = mode;
+      modalEl?.classList.remove('hidden'); modalEl?.classList.add('flex');
+      if(authError) authError.textContent='';
+      if(emailInput) emailInput.value=''; if(passwordInput) passwordInput.value='';
+      emailInput?.focus();
+      if(authModalTitle) authModalTitle.textContent = mode === 'signin' ? 'Sign in' : 'Create your account';
+      if(authSubmitBtn) authSubmitBtn.textContent  = mode === 'signin' ? 'Sign in with email' : 'Sign up with email';
+      if(toggleAuthModeBtn) toggleAuthModeBtn.textContent = mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in';
+    }
+    function closeModal(){ modalEl?.classList.add('hidden'); modalEl?.classList.remove('flex'); }
+    authOpenBtn?.addEventListener('click', ()=> openAuthModal('signin'));
+    closeAuthModal?.addEventListener('click', closeModal);
+    modalEl?.addEventListener('click', (e)=>{ if(e.target === modalEl) closeModal(); });
+    showPw?.addEventListener('change', ()=>{ if(passwordInput) passwordInput.type = showPw.checked ? 'text' : 'password'; });
+    toggleAuthModeBtn?.addEventListener('click', ()=> openAuthModal(authMode==='signin' ? 'signup' : 'signin'));
 
-  // Board toolbar actions (wire up)
-  applyFenBtn.addEventListener('click', ()=>{
-    const fen = (fenBar.value||'').trim(); if(!fen) return;
-    setIframeToAnalysisFen(fen); showBoard();
+    googleAuthBtn?.addEventListener('click', async ()=>{
+      if(authError) authError.textContent = '';
+      try{ await signInWithPopup(auth, provider); closeModal(); }
+      catch(e){ if(authError) authError.textContent = e.message || 'Google sign-in failed'; }
+    });
+
+    async function handleEmailSubmit(){
+      if(authError) authError.textContent = '';
+      const email = (emailInput?.value||'').trim();
+      const pw    = passwordInput?.value||'';
+      if(!email || !pw){ if(authError) authError.textContent = 'Please enter email and password.'; return; }
+      try{
+        if(authMode === 'signin'){ await signInWithEmailAndPassword(auth, email, pw); }
+        else { await createUserWithEmailAndPassword(auth, email, pw); }
+        closeModal();
+      }catch(e){ if(authError) authError.textContent = e.message || 'Authentication failed'; }
+    }
+    authSubmitBtn?.addEventListener('click', handleEmailSubmit);
+    emailInput?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') handleEmailSubmit(); });
+    passwordInput?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') handleEmailSubmit(); });
+    forgotBtn?.addEventListener('click', async ()=>{
+      const email = (emailInput?.value||'').trim();
+      if(!email){ if(authError) authError.textContent = 'Enter your email first.'; return; }
+      try{ await sendPasswordResetEmail(auth, email); if(authError) authError.textContent = 'Password reset email sent.'; }
+      catch(e){ if(authError) authError.textContent = e.message || 'Could not send reset email.'; }
+    });
+
+    onAuthStateChanged(auth, async (user)=>{
+      currentUser = user || null;
+      if(!user){ setAuthUI(false); return; }
+      setAuthUI(true, user.email || '');
+      try{
+        const ref = userDocRef(user.uid);
+        const snap = await getDoc(ref);
+        if(snap.exists()){
+          const data = snap.data() || {};
+          if(Array.isArray(data.currentSession)) currentSession = data.currentSession;
+          if(data.notes) sectionNotes = data.notes || {};
+          if(data.prefs) prefs = {...prefs, ...data.prefs};
+          if(Array.isArray(data.widgetShelf)) widgetShelf = data.widgetShelf;
+          if(Array.isArray(data.savedOutlines)) savedOutlines = data.savedOutlines;
+          if(data.timer) timerState = {...timerState, ...data.timer};
+          if('sessions' in data || 'activePreset' in data){
+            await setDoc(ref, { sessions: deleteField(), activePreset: deleteField() }, { merge:true });
+          }
+          saveCurrentSession(); saveNotes(); savePrefs(); saveShelf(); saveOutlines(); saveTimerLocal();
+        }else{
+          await setDoc(ref, { currentSession, notes:sectionNotes, prefs, widgetShelf, savedOutlines, timer: timerState, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        }
+        renderAll(); renderHomeSavedBar();
+        setTimerFromState(timerState);
+        if(cloudStatus) cloudStatus.textContent = 'Cloud sync on';
+      }catch(e){ console.error(e); if(cloudStatus) cloudStatus.textContent = 'Cloud load failed'; }
+    });
+
+    /* ---------- Theme ---------- */
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const closeSettings = document.getElementById('closeSettings');
+    const themeBg = document.getElementById('themeBg');
+    const themeFg = document.getElementById('themeFg');
+    const themeAccent = document.getElementById('themeAccent');
+    const themeBorder = document.getElementById('themeBorder');
+    const themeBorderW = document.getElementById('themeBorderW');
+    const themeBorderWVal = document.getElementById('themeBorderWVal');
+    const saveThemeBtn = document.getElementById('saveThemeBtn');
+    const resetThemeBtn = document.getElementById('resetThemeBtn');
+    function applyTheme(t){
+      const root = document.documentElement; if(!t) return;
+      root.style.setProperty('--bg', t.bg || '#ffffff');
+      root.style.setProperty('--fg', t.fg || '#0f172a');
+      root.style.setProperty('--accent', t.accent || '#0ea5e9');
+      root.style.setProperty('--accent-600', t.accent || '#0284c7');
+      root.style.setProperty('--accent-100', '#e0f2fe');
+      root.style.setProperty('--border', t.border || '#94a3b8');
+      root.style.setProperty('--borderW', (t.borderW ?? 2) + 'px');
+      root.style.setProperty('--panel', t.bg || '#ffffff');
+      root.style.setProperty('--panel-muted', '#f8fafc');
+    }
+    function openSettings(){
+      const t = prefs.theme || {bg:'#ffffff',fg:'#0f172a',accent:'#0ea5e9',border:'#94a3b8',borderW:2};
+      if(themeBg) themeBg.value = toHex(t.bg); if(themeFg) themeFg.value = toHex(t.fg); if(themeAccent) themeAccent.value = toHex(t.accent); if(themeBorder) themeBorder.value = toHex(t.border); if(themeBorderW) themeBorderW.value = t.borderW ?? 2; if(themeBorderWVal) themeBorderWVal.textContent = (t.borderW ?? 2) + 'px';
+      settingsModal?.classList.remove('hidden'); settingsModal?.classList.add('flex');
+    }
+    function closeSettingsModal(){ settingsModal?.classList.add('hidden'); settingsModal?.classList.remove('flex'); }
+    function toHex(c){ if(/^#/.test(c)) return c; const m = c.match(/(\d+),\s*(\d+),\s*(\d+)/); if(!m) return '#000000'; const n=(x)=>('0'+parseInt(x,10).toString(16)).slice(-2); return '#'+n(m[1])+n(m[2])+n(m[3]); }
+    settingsBtn?.addEventListener('click', openSettings);
+    closeSettings?.addEventListener('click', closeSettingsModal);
+    settingsModal?.addEventListener('click', (e)=>{ if(e.target===settingsModal) closeSettingsModal(); });
+    themeBorderW?.addEventListener('input', ()=>{ if(themeBorderWVal) themeBorderWVal.textContent = themeBorderW.value + 'px'; });
+    saveThemeBtn?.addEventListener('click', ()=>{ prefs.theme = { bg:themeBg?.value, fg:themeFg?.value, accent:themeAccent?.value, border:themeBorder?.value, borderW:Number(themeBorderW?.value)||2 }; applyTheme(prefs.theme); savePrefs(); closeSettingsModal(); });
+    resetThemeBtn?.addEventListener('click', ()=>{ prefs.theme = { bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 }; applyTheme(prefs.theme); savePrefs(); closeSettingsModal(); });
+    applyTheme(prefs.theme);
+
+    /* -------- Initial render -------- */
+    renderAll(); renderHomeSavedBar(); setTimerFromState(timerState);
+    window.addEventListener('beforeunload', ()=>{ timerState.lastSyncTs = Date.now(); saveTimerLocal(); });
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ timerState.lastSyncTs = Date.now(); saveTimerLocal(); touchCloud(); } });
   });
-  openViewerBtn.addEventListener('click', ()=>{
-    const input = prompt('Enter a Lichess game URL or ID'); if(!input) return;
-    setIframeToGame(input); showBoard();
-  });
-
-  // Theme settings
-  const settingsBtn = document.getElementById('settingsBtn');
-  const settingsModal = document.getElementById('settingsModal');
-  const closeSettings = document.getElementById('closeSettings');
-  const themeBg = document.getElementById('themeBg');
-  const themeFg = document.getElementById('themeFg');
-  const themeAccent = document.getElementById('themeAccent');
-  const themeBorder = document.getElementById('themeBorder');
-  const themeBorderW = document.getElementById('themeBorderW');
-  const themeBorderWVal = document.getElementById('themeBorderWVal');
-  const saveThemeBtn = document.getElementById('saveThemeBtn');
-  const resetThemeBtn = document.getElementById('resetThemeBtn');
-  function applyTheme(t){
-    const root = document.documentElement; if(!t) return;
-    root.style.setProperty('--bg', t.bg || '#ffffff');
-    root.style.setProperty('--fg', t.fg || '#0f172a');
-    root.style.setProperty('--accent', t.accent || '#0ea5e9');
-    root.style.setProperty('--accent-600', t.accent || '#0284c7');
-    root.style.setProperty('--accent-100', '#e0f2fe');
-    root.style.setProperty('--border', t.border || '#e5e7eb');
-    root.style.setProperty('--borderW', (t.borderW ?? 1) + 'px');
-    root.style.setProperty('--panel', t.bg || '#ffffff');
-    root.style.setProperty('--panel-muted', '#f8fafc');
-  }
-  function openSettings(){
-    const t = prefs.theme || {bg:'#ffffff',fg:'#0f172a',accent:'#0ea5e9',border:'#e5e7eb',borderW:1};
-    themeBg.value = toHex(t.bg); themeFg.value = toHex(t.fg); themeAccent.value = toHex(t.accent); themeBorder.value = toHex(t.border); themeBorderW.value = t.borderW ?? 1; themeBorderWVal.textContent = (t.borderW ?? 1) + 'px';
-    settingsModal.classList.remove('hidden'); settingsModal.classList.add('flex');
-  }
-  function closeSettingsModal(){ settingsModal.classList.add('hidden'); settingsModal.classList.remove('flex'); }
-  function toHex(c){ if(/^#/.test(c)) return c; const m = c.match(/(\d+),\s*(\d+),\s*(\d+)/); if(!m) return '#000000'; const n=(x)=>('0'+parseInt(x,10).toString(16)).slice(-2); return '#'+n(m[1])+n(m[2])+n(m[3]); }
-  settingsBtn.addEventListener('click', openSettings);
-  closeSettings.addEventListener('click', closeSettingsModal);
-  settingsModal.addEventListener('click', (e)=>{ if(e.target===settingsModal) closeSettingsModal(); });
-  themeBorderW.addEventListener('input', ()=> themeBorderWVal.textContent = themeBorderW.value + 'px');
-  saveThemeBtn.addEventListener('click', ()=>{ prefs.theme = { bg:themeBg.value, fg:themeFg.value, accent:themeAccent.value, border:themeBorder.value, borderW:Number(themeBorderW.value)||1 }; applyTheme(prefs.theme); savePrefs(); closeSettingsModal(); });
-  resetThemeBtn.addEventListener('click', ()=>{ prefs.theme = { bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#e5e7eb', borderW:1 }; applyTheme(prefs.theme); savePrefs(); closeSettingsModal(); });
-  applyTheme(prefs.theme);
-
-  // ------- Shelf controls (previously inert) -------
-  addWidgetBtn.addEventListener('click', ()=>{
-    const label = prompt('Widget title (e.g., Lichess Analysis)'); if(label===null) return;
-    const url   = prompt('URL (https://...)'); if(url===null) return;
-    let icon    = (prompt('Icon type: "emoji" or "img" (default emoji)')||'emoji').toLowerCase().trim();
-    if(icon!=='img') icon='emoji';
-    let emoji='🔗', img='';
-    if(icon==='emoji'){ const e = prompt('Emoji/Text for icon', '🔗'); if(e!==null) emoji = e || '🔗'; }
-    else { const im = prompt('Image URL (favicon, etc)'); if(im!==null) img = im || ''; }
-    const id = 'w_'+Date.now()+Math.random().toString(16).slice(2);
-    widgetShelf.push({ id, label, url, icon, emoji, img });
-    saveShelf(); renderShelf();
-  });
-  resetShelfBtn.addEventListener('click', ()=>{
-    if(!confirm('Reset link shelf to defaults?')) return;
-    widgetShelf = defaultShelf();
-    saveShelf(); renderShelf();
-  });
-
-  // -------- Session done modal helpers --------
-  const doneModal = document.getElementById('doneModal');
-  const doneClose = document.getElementById('doneClose');
-  const doneReset = document.getElementById('doneReset');
-  function showDoneModal(){ doneModal.style.display='flex'; }
-  function hideDoneModal(){ doneModal.style.display='none'; }
-  doneClose.addEventListener('click', hideDoneModal);
-  doneReset.addEventListener('click', ()=>{ hideDoneModal(); document.getElementById('resetBtn').click(); });
-
-  // -------- Initial render / legacy cleanup --------
-  localStorage.removeItem('studySessions_v11');
-  localStorage.removeItem('preset_v11');
-  renderAll(); renderHomeSavedBar(); setTimerFromState(timerState);
-
-  // Persist on close/hidden
-  window.addEventListener('beforeunload', ()=>{ timerState.lastSyncTs = Date.now(); saveTimerLocal(); });
-  document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ timerState.lastSyncTs = Date.now(); saveTimerLocal(); touchCloud(); } });
-
-  // Utils
-  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
-  function beep(){ try{ const AC=window.AudioContext||window.webkitAudioContext; const ctx=new AC(); const now=ctx.currentTime; const o1=ctx.createOscillator(), g1=ctx.createGain(); o1.type='sine'; o1.frequency.value=880; o1.connect(g1); g1.connect(ctx.destination); g1.gain.setValueAtTime(.0001,now); g1.gain.exponentialRampToValueAtTime(.18,now+.01); o1.start(now); o1.stop(now+.12); const o2=ctx.createOscillator(), g2=ctx.createGain(); o2.type='sine'; o2.frequency.value=1318.5; o2.connect(g2); g2.connect(ctx.destination); g2.gain.setValueAtTime(.0001,now+.13); g2.gain.exponentialRampToValueAtTime(.16,now+.15); o2.start(now+.13); o2.stop(now+.28);}catch{} }
-
 </script>
 
 <!-- Auth Modal -->
 <div id="authModal" class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden items-center justify-center z-[100]">
   <div class="w-[92vw] max-w-md card p-5 shadow-xl">
     <div class="flex items-start justify-between mb-4">
-      <h3 id="authModalTitle" class="text-xl font-semibold">Sign in</h3>
+      <h3 id="authModalTitle" class="text-xl font-extrabold">Sign in</h3>
       <button id="closeAuthModal" class="muted hover:text-black" title="Close">✕</button>
     </div>
     <div class="space-y-3">
@@ -1246,6 +1379,9 @@
         <button id="forgotBtn" class="underline">Forgot password?</button>
       </div>
       <button id="authSubmitBtn" class="w-full px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white">Sign in with email</button>
+      <div class="text-xs text-center">
+        <button id="toggleAuthMode" class="underline">New here? Create an account</button>
+      </div>
       <div id="authError" class="text-sm text-rose-600 min-h-[1rem]"></div>
     </div>
   </div>
