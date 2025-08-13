@@ -19,6 +19,7 @@
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <button id="settingsBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]" title="Customize UI">⚙️ Settings</button>
+
       <div id="authArea" class="flex items-center gap-2">
         <button id="authOpenBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Sign in / Sign up</button>
         <div id="userBadge" class="hidden items-center gap-2">
@@ -26,6 +27,7 @@
           <button id="signOutBtn" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white">Sign out</button>
         </div>
       </div>
+
       <span id="cloudStatus" class="text-xs muted">Local mode</span>
     </div>
   </header>
@@ -166,7 +168,7 @@
         <div class="text-sm">Merge <strong id="mergeSourceName"></strong> ➕ <strong id="mergeTargetName"></strong></div>
         <div class="flex flex-wrap items-center gap-2">
           <label class="text-sm muted">New outline name</label>
-          <input id="mergeTitleInput" class="input flex-1" placeholder="e.g., ‘Balanced + Openings’"/>
+          <input id="mergeTitleInput" class="input flex-1" placeholder="e.g. ‘Balanced + Openings’"/>
           <button id="mergeConfirmBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Merge</button>
           <button id="mergeCancelBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Cancel</button>
         </div>
@@ -190,70 +192,86 @@
     <div id="savedList" class="grid lg:grid-cols-2 gap-4"></div>
   </section>
 
-  <!-- HOW TO USE -->
+  <!-- HELP -->
   <section id="helpTab" class="hidden">
-    <div class="grid lg:grid-cols-2 gap-6">
-      <div class="card p-5">
-        <h3 class="text-xl font-extrabold mb-2">1) Build your session</h3>
-        <ol class="list-decimal pl-5 space-y-2 text-sm">
-          <li>Use <strong>+ Add Section</strong> to create blocks (title + minutes).</li>
-          <li>Toggle <strong>Edit Section</strong> to drag link widgets into the current section.</li>
-          <li>Add <strong>Notes</strong> per section. Everything syncs to the cloud when you’re signed in.</li>
-        </ol>
-      </div>
-      <div class="card p-5">
-        <h3 class="text-xl font-extrabold mb-2">2) Run the timer</h3>
-        <ol class="list-decimal pl-5 space-y-2 text-sm">
-          <li>Press <strong>Start</strong>. The progress bar shows each block; click anywhere on it to jump.</li>
-          <li>Use <strong>Prev/Next</strong> to move, or <strong>Reset</strong> to restart.</li>
-          <li><strong>Live Analysis</strong> bubble opens a draggable Lichess board.</li>
-        </ol>
-      </div>
-      <div class="card p-5">
-        <h3 class="text-xl font-extrabold mb-2">3) Save & reuse outlines</h3>
-        <ol class="list-decimal pl-5 space-y-2 text-sm">
-          <li>Create/rename/reorder sections and links in <strong>Saved Outlines</strong>.</li>
-          <li>Click <strong>Load</strong> to apply an outline to the current session.</li>
-          <li>Drag one outline onto another to <strong>merge</strong> (keeps originals).</li>
-        </ol>
-      </div>
-      <div class="card p-5">
-        <h3 class="text-xl font-extrabold mb-2">4) Cloud sync</h3>
-        <ul class="list-disc pl-5 space-y-2 text-sm">
-          <li>Sign in with Google or email to enable sync.</li>
-          <li>We save: current session, progress/timer state, notes, link widgets, UI prefs, and saved outlines.</li>
-          <li>On reload, your progress is restored (even if the page was closed).</li>
-        </ul>
-      </div>
+    <div class="card p-5">
+      <h3 class="block-title mb-2">How to use</h3>
+      <ol class="list-decimal pl-6 space-y-1 text-sm">
+        <li>Create or load a saved outline on the right.</li>
+        <li>Start the session timer, then jump between sections using the progress bar or outline.</li>
+        <li>Edit links/notes for the current section with “Edit Section”.</li>
+        <li>In Saved Outlines, drag a plan onto another to merge them.</li>
+        <li>Open ⚙️ Settings to tweak theme and defaults.</li>
+      </ol>
     </div>
   </section>
 </div>
 
-<!-- Floating analysis launcher -->
-<button id="floatBtn" class="fixed bottom-6 right-6 w-[58px] h-[58px] rounded-full text-white z-50 shadow-2xl"
-        style="background:linear-gradient(135deg,var(--accent-600),var(--accent))" title="Live Lichess analysis">
-  <svg viewBox="0 0 24 24" fill="none" width="28" height="28"><path d="M6 7c2.5-3.5 9-3.5 12 0 3 3.5 2 9-3 12-3 2-8 0-9-4" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
-</button>
-
-<div id="boardWin" class="fixed bottom-24 right-9 w-[560px] h-[620px] bg-white border border-[var(--border)] rounded-[14px] shadow-2xl z-[60] hidden">
-  <div id="boardHeader" class="h-11 flex items-center justify-between px-2 bg-gradient-to-b from-white to-[var(--panel-muted)] border-b border-[var(--border)] rounded-t-[14px] cursor-grab">
-    <div class="flex items-center gap-2">
-      <span class="text-sky-600 font-semibold">Live Analysis Board</span>
-      <span class="text-xs muted">(/embed/analysis)</span>
+<!-- SETTINGS MODAL -->
+<div id="settingsModal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop" data-close="1"></div>
+  <div class="modal-panel max-w-[680px]" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-lg font-semibold">Appearance</h3>
+      <button class="btn-xxs" data-close="1">✕</button>
     </div>
-    <div class="flex items-center gap-2">
-      <button id="minimizeBoard" class="text-xs px-2 py-1 rounded-md border border-[var(--border)]" type="button">Minimize</button>
-      <button id="closeBoard" class="text-xs px-2 py-1 rounded-md bg-rose-600 hover:bg-rose-500 text-white" type="button">Close</button>
+    <div class="grid grid-cols-2 gap-3">
+      <label class="flex flex-col gap-1"><span class="text-sm">Background</span><input id="setBg" type="color" class="input h-10 p-1"/></label>
+      <label class="flex flex-col gap-1"><span class="text-sm">Text</span><input id="setFg" type="color" class="input h-10 p-1"/></label>
+      <label class="flex flex-col gap-1"><span class="text-sm">Accent</span><input id="setAccent" type="color" class="input h-10 p-1"/></label>
+      <label class="flex flex-col gap-1"><span class="text-sm">Border</span><input id="setBorder" type="color" class="input h-10 p-1"/></label>
+      <label class="flex flex-col gap-1"><span class="text-sm">Border width (px)</span><input id="setBorderW" type="number" min="0" max="6" step="1" class="input"/></label>
+      <label class="col-span-2 flex items-center gap-2 mt-1">
+        <input id="setFocusDefault" type="checkbox"/> <span>Start in focus mode by default</span>
+      </label>
+    </div>
+    <div class="mt-4 flex items-center justify-between">
+      <button id="settingsResetBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Reset defaults</button>
+      <div class="flex items-center gap-2">
+        <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
+        <button id="settingsSaveBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
+      </div>
     </div>
   </div>
-  <div id="boardContent" class="absolute inset-x-0 bottom-0 top-11 flex flex-col">
-    <div id="boardToolbar" class="p-2 flex gap-2 items-center border-b border-[var(--border)]">
-      <input id="fenBar" class="flex-1 input" placeholder="FEN to load"/>
-      <button id="applyFen" class="px-2 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white" type="button">Load FEN</button>
-      <button id="openViewer" class="px-2 py-1 rounded-lg border border-[var(--border)]" type="button">Open Game Viewer</button>
-      <a id="popOut" target="_blank" rel="noopener" class="px-2 py-1 rounded-lg border border-[var(--border)]" href="#">Open in new tab</a>
+</div>
+
+<!-- AUTH MODAL -->
+<div id="authModal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop" data-close="1"></div>
+  <div class="modal-panel max-w-[520px]" role="dialog" aria-modal="true">
+    <div class="mb-4">
+      <div class="flex items-center justify-between">
+        <h3 id="authTitle" class="text-xl font-semibold">Welcome back</h3>
+        <button class="btn-xxs" data-close="1">✕</button>
+      </div>
+      <p id="authSubtitle" class="text-sm muted mt-1">Sign in to sync your data across devices.</p>
     </div>
-    <iframe id="boardIframe" class="flex-1 rounded-b-[14px]" title="Lichess analysis"></iframe>
+
+    <div class="space-y-3">
+      <button id="googleBtn" class="w-full px-3 py-2 rounded-xl border border-[var(--border)] flex items-center justify-center gap-2">
+        <img alt="" src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5"/> Continue with Google
+      </button>
+
+      <div class="auth-sep"><span>or</span></div>
+
+      <div id="emailFields" class="grid gap-2">
+        <input id="emailInput" type="email" class="input" placeholder="Email"/>
+        <input id="passInput" type="password" class="input" placeholder="Password"/>
+      </div>
+
+      <div id="signinRow" class="flex flex-wrap gap-3 justify-center">
+        <button id="emailSignInBtn" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white btn-wide">Sign in</button>
+        <button id="emailResetBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] btn-wide">Reset password</button>
+      </div>
+
+      <div id="signupRow" class="hidden flex justify-center">
+        <button id="emailSignUpBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white btn-wide">Create account</button>
+      </div>
+
+      <div class="text-sm text-center mt-2">
+        <span id="toggleAuthMode" class="underline cursor-pointer">New here? Create an account</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -295,7 +313,7 @@
     { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
     { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
   ];
-  let prefs = loadJSON('prefs_v1') || { splitRatio:56, outlineCollapsed:false, theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 } };
+  let prefs = loadJSON('prefs_v1') || { splitRatio:56, outlineCollapsed:false, focusDefault:false, theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 } };
   let savedOutlines = loadJSON('saved_outlines_v1') || [];
   let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0 };
 
@@ -327,12 +345,12 @@
 
   const touchCloud = ()=> { if(currentUser){ saveCloudDebounced(); } };
 
-  // Periodic + lifecycle flushing
+  // Periodic flush
   setInterval(()=>{ if(currentUser && dirty) saveCloudDebounced(); }, 5000);
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ if(currentUser) saveCloudDebounced(); } });
   window.addEventListener('beforeunload', ()=>{ if(currentUser) saveCloudDebounced(); });
 
-  // Local save wrappers (now also mark cloud-dirty + push)
+  // Local save wrappers
   const saveCurrentSession = ()=>{ saveJSON('current_session_v1', currentSession); markDirty(); touchCloud(); };
   const saveNotes          = ()=>{ saveJSON('section_notes_v1', sectionNotes);     markDirty(); touchCloud(); };
   const saveShelf          = ()=>{ saveJSON('linkShelf_v1', widgetShelf);         markDirty(); touchCloud(); };
@@ -404,7 +422,7 @@
   function loop(){
     if(!running) return;
     const remaining=Math.max(0,Math.ceil((endTimeMs-performance.now())/1000));
-    if(remaining!==secondsLeft){ secondsLeft=remaining; renderAll(); }
+    if(remaining!==secondsLeft){ secondsLeft=remaining; $('#clock').textContent=secsToClock(secondsLeft); updateProgress(); }
     if(secondsLeft<=0){
       if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); syncEnd(); beep(); renderAll(); }
       else{ stopTimer(); beep(); sessionStarted=false; updateStartBtnLabel(); markTimer(); alert('Session complete! 🎉'); return; }
@@ -431,9 +449,17 @@
     sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; progressSegments.appendChild(seg); });
     let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); progressTicks.appendChild(tick); }
     sched.forEach((sec,i)=>{ const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); chip.innerHTML=`${escapeHtml(sec.name||'')} <span class="opacity-80">(${sec.minutes||0}m)</span>`; chip.onclick=()=>jumpToSection(i); legend.appendChild(chip); });
+    updateProgress();   // ensure fill width is applied after building
   }
   function updateLegendActive(){ legend.querySelectorAll('.chip').forEach((el, i)=> el.classList.toggle('chip-active', i===currentIndex)); }
-  function updateProgress(){ const sched=currentSession; const total=scheduleTotalSecs(sched)||1; const pct=Math.min(100,Math.max(0,(elapsedSeconds(sched,currentIndex,secondsLeft)/total)*100)); progressFill.style.width=pct+'%'; progressPctEl.textContent=Math.floor(pct)+'%'; updateLegendActive(); }
+  function updateProgress(){
+    const sched=currentSession; const total=scheduleTotalSecs(sched);
+    if(!total){ progressFill.style.width='0%'; progressPctEl.textContent='0%'; return; }
+    const pct=Math.min(100,Math.max(0,(elapsedSeconds(sched,currentIndex,secondsLeft)/total)*100));
+    progressFill.style.width = pct + '%';
+    progressPctEl.textContent = Math.floor(pct) + '%';
+    updateLegendActive();
+  }
   function pctFromEvent(e){ const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
   function jumpFromPct(p){ const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0; for(let i=0;i<sched.length;i++){ const dur=minsToSecs(sched[i].minutes||0); if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); renderAll(); markTimer(); return; } cum+=dur; } currentIndex=sched.length-1; secondsLeft=0; stopTimer(); renderAll(); markTimer(); }
   let scrubbing=false;
@@ -641,7 +667,6 @@
     saveCurrentSession(); saveNotes(); saveTimerLocal(); renderAll(); updateStartBtnLabel();
   }
 
-  // Install Saved Outlines tab logic
   const { renderSavedOutlines } = setupSavedOutlines({
     getSavedOutlines: ()=> savedOutlines,
     setSavedOutlines: (arr)=>{ savedOutlines = arr; },
@@ -652,7 +677,7 @@
     renderHomeSavedBar
   });
 
-  /*************** Misc helpers ***************/
+  /*************** Helpers ***************/
   function escapeHtml(s){ return (s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
   function parseDropPayload(dt){
     let data = ''; const types = dt?.types ? Array.from(dt.types) : [];
@@ -665,30 +690,50 @@
   let ctx=null, osc=null;
   function beep(){ try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); osc=ctx.createOscillator(); const g=ctx.createGain(); osc.connect(g); g.connect(ctx.destination); osc.type='square'; osc.frequency.value=880; g.gain.value=.05; osc.start(); setTimeout(()=>{ osc.stop(); }, 120); }catch{} }
 
-  /*************** Auth UI ***************/
+  /*************** Auth modal UI ***************/
   const authOpenBtn = $('#authOpenBtn'); const userBadge = $('#userBadge'); const userEmail = $('#userEmail'); const signOutBtn = $('#signOutBtn');
-  function openAuth(){
-    const mode = prompt('Sign in — type: "google", "email", or "reset"', 'google')?.toLowerCase();
-    if(!mode) return;
-    if(mode==='google'){ signInWithPopup(auth, provider).catch(err=> alert(err.message||'Sign-in failed')); }
-    else if(mode==='email'){
-      const email = prompt('Email:'); const pass = prompt('Password:'); if(!email||!pass) return;
-      signInWithEmailAndPassword(auth, email, pass).catch(async ()=>{
-        try{ await createUserWithEmailAndPassword(auth, email, pass); }
-        catch(e){ alert(e.message||'Email sign-in failed'); }
-      });
-    } else if(mode==='reset'){
-      const email = prompt('Email to reset password for:'); if(!email) return;
-      sendPasswordResetEmail(auth, email).then(()=> alert('Reset email sent.')).catch(e=> alert(e.message||'Reset failed'));
-    }
+  const authModal = $('#authModal'); const authTitle=$('#authTitle'); const authSubtitle=$('#authSubtitle');
+  const emailInput=$('#emailInput'); const passInput=$('#passInput');
+  const googleBtn=$('#googleBtn'); const emailSignInBtn=$('#emailSignInBtn'); const emailSignUpBtn=$('#emailSignUpBtn'); const emailResetBtn=$('#emailResetBtn');
+  const signinRow=$('#signinRow'); const signupRow=$('#signupRow'); const toggleAuthMode=$('#toggleAuthMode');
+
+  let authMode='signin';
+  function showModal(modal){ modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false'); }
+  function hideModal(modal){ modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
+  function setAuthMode(mode){
+    authMode=mode;
+    const isSignUp = mode==='signup';
+    signinRow.classList.toggle('hidden', isSignUp);
+    signupRow.classList.toggle('hidden', !isSignUp);
+    toggleAuthMode.textContent = isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account';
+    authTitle.textContent = isSignUp ? 'Create your account' : 'Welcome back';
+    authSubtitle.textContent = isSignUp ? 'Make an account to enable cloud sync.' : 'Sign in to sync your data across devices.';
   }
-  authOpenBtn.onclick = openAuth;
+  toggleAuthMode.onclick = ()=> setAuthMode(authMode==='signin'?'signup':'signin');
+  authOpenBtn.onclick = ()=>{ emailInput.value=''; passInput.value=''; setAuthMode('signin'); showModal(authModal); };
+  authModal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') hideModal(authModal); });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ hideModal(authModal); hideModal(settingsModal); } });
+
+  googleBtn.onclick = ()=> signInWithPopup(auth, provider).catch(err=> alert(err.message||'Google sign-in failed'));
+  emailSignInBtn.onclick = async ()=>{
+    try{ await signInWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); }
+    catch(e){ alert(e.message||'Sign-in failed'); }
+  };
+  emailSignUpBtn.onclick = async ()=>{
+    try{ await createUserWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); }
+    catch(e){ alert(e.message||'Sign-up failed'); }
+  };
+  emailResetBtn.onclick = async ()=>{
+    try{ if(!emailInput.value.trim()) return alert('Enter your email first.'); await sendPasswordResetEmail(auth, emailInput.value.trim()); alert('Reset email sent.'); }
+    catch(e){ alert(e.message||'Reset failed'); }
+  };
   signOutBtn.onclick = ()=> signOut(auth);
 
   onAuthStateChanged(auth, async (user)=>{
     currentUser = user || null;
     if(user){
       authOpenBtn.classList.add('hidden'); userBadge.classList.remove('hidden'); userEmail.textContent = user.email || user.uid; setCloudMode('Syncing…');
+      hideModal(authModal);
       try{
         const snap = await getDoc(userDocRef(user.uid));
         if(snap.exists()){
@@ -708,17 +753,10 @@
     }
   });
 
-  /*************** Settings (theme) ***************/
-  const settingsBtn = $('#settingsBtn');
-  settingsBtn.onclick = ()=>{
-    const bg=prompt('Background hex', prefs.theme?.bg||'#ffffff')||prefs.theme?.bg||'#ffffff';
-    const fg=prompt('Text hex', prefs.theme?.fg||'#0f172a')||prefs.theme?.fg||'#0f172a';
-    const accent=prompt('Accent hex', prefs.theme?.accent||'#0ea5e9')||prefs.theme?.accent||'#0ea5e9';
-    const border=prompt('Border hex', prefs.theme?.border||'#94a3b8')||prefs.theme?.border||'#94a3b8';
-    const borderW=parseInt(prompt('Border width px (0-4)', String(prefs.theme?.borderW??2))||String(prefs.theme?.borderW??2),10);
-    prefs.theme={ bg,fg,accent,border,borderW:isNaN(borderW)?2:borderW };
-    applyTheme(prefs.theme); savePrefs();
-  };
+  /*************** Settings modal UI ***************/
+  const settingsModal = $('#settingsModal');
+  const setBg=$('#setBg'), setFg=$('#setFg'), setAccent=$('#setAccent'), setBorder=$('#setBorder'), setBorderW=$('#setBorderW'), setFocusDefault=$('#setFocusDefault');
+  const settingsSaveBtn=$('#settingsSaveBtn'), settingsResetBtn=$('#settingsResetBtn');
   function applyTheme(t){
     document.documentElement.style.setProperty('--bg', t.bg || '#ffffff');
     document.documentElement.style.setProperty('--fg', t.fg || '#0f172a');
@@ -728,49 +766,45 @@
     document.documentElement.style.setProperty('--panel-muted', t.panelMuted || '#f8fafc');
     document.documentElement.style.setProperty('--borderW', (t.borderW ?? 2) + 'px');
   }
+  function openSettings(){
+    setBg.value = prefs.theme?.bg || '#ffffff';
+    setFg.value = prefs.theme?.fg || '#0f172a';
+    setAccent.value = prefs.theme?.accent || '#0ea5e9';
+    setBorder.value = prefs.theme?.border || '#94a3b8';
+    setBorderW.value = String(prefs.theme?.borderW ?? 2);
+    setFocusDefault.checked = !!prefs.focusDefault;
+    showModal(settingsModal);
+  }
+  function closeSettings(){ hideModal(settingsModal); }
+  document.querySelectorAll('#settingsModal [data-close="1"]').forEach(b=> b.addEventListener('click', closeSettings));
+  settingsModal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') closeSettings(); });
+  $('#settingsBtn').onclick = openSettings;
+  settingsSaveBtn.onclick = ()=>{
+    prefs.theme = {
+      bg:setBg.value, fg:setFg.value, accent:setAccent.value, border:setBorder.value, borderW:Math.max(0, Number(setBorderW.value)||2)
+    };
+    prefs.focusDefault = !!setFocusDefault.checked;
+    applyTheme(prefs.theme); savePrefs(); closeSettings();
+  };
+  settingsResetBtn.onclick = ()=>{
+    prefs.theme = { bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 };
+    prefs.focusDefault = false;
+    applyTheme(prefs.theme); savePrefs(); openSettings();
+  };
   applyTheme(prefs.theme||{});
 
   /*************** Initial render ***************/
   function renderCurrent(){
     const s=currentSession[currentIndex]; if(!s){ currentTitleEl.textContent='—'; sectionDescEl.value=''; linksDiv.innerHTML=''; return; }
     currentTitleEl.textContent = s.name || 'Untitled';
-    sectionDescEl.value = sectionNotes[s.id] || '';
+    sectionNotes[s.id] = sectionNotes[s.id] || '';
+    sectionDescEl.value = sectionNotes[s.id];
     renderCurrentLinks();
+    $('#clock').textContent = secsToClock(secondsLeft);
   }
-  function renderAll(){ renderOutline(); buildProgress(); updateProgress(); $('#clock').textContent = secsToClock(secondsLeft); renderCurrent(); }
+  function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
 
   setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
-
-  /*************** Float analysis window ***************/
-  (function makeBoardWindowInteractive(){
-    const win = document.getElementById('boardWin');
-    const btn = document.getElementById('floatBtn');
-    const header = document.getElementById('boardHeader');
-    const minimize = document.getElementById('minimizeBoard');
-    const closeBtn = document.getElementById('closeBoard');
-    const iframe = document.getElementById('boardIframe');
-    const popOut = document.getElementById('popOut');
-    const openViewer = document.getElementById('openViewer');
-    const applyFen = document.getElementById('applyFen');
-    const fenBar = document.getElementById('fenBar');
-
-    let dragging=false, offsetX=0, offsetY=0;
-    function setUrl(u){ iframe.src = u; popOut.href = u; }
-    function open(){ win.style.display='block'; if(!iframe.src) setUrl('https://lichess.org/embed/analysis'); }
-    function close(){ win.style.display='none'; }
-    function toggleMin(){ win.classList.toggle('minimized'); minimize.textContent = win.classList.contains('minimized') ? 'Expand' : 'Minimize'; }
-    btn.addEventListener('mousedown', (e)=>{ const r=btn.getBoundingClientRect(); offsetX=e.clientX-r.left; offsetY=e.clientY-r.top; dragging=true; document.body.style.userSelect='none'; });
-    window.addEventListener('mousemove', (e)=>{ if(!dragging) return; btn.style.left = (e.clientX-offsetX) + 'px'; btn.style.top = (e.clientY-offsetY) + 'px'; btn.style.position='fixed'; });
-    window.addEventListener('mouseup', ()=>{ dragging=false; document.body.style.userSelect=''; });
-    btn.addEventListener('click', open);
-    header.addEventListener('mousedown', (e)=>{ const r=win.getBoundingClientRect(); offsetX=e.clientX-r.left; offsetY=e.clientY-r.top; dragging=true; document.body.style.userSelect='none'; });
-    window.addEventListener('mousemove', (e)=>{ if(!dragging) return; win.style.left=(e.clientX-offsetX)+'px'; win.style.top=(e.clientY-offsetY)+'px'; win.style.position='fixed'; });
-    window.addEventListener('mouseup', ()=>{ dragging=false; document.body.style.userSelect=''; });
-    minimize.addEventListener('click', toggleMin);
-    closeBtn.addEventListener('click', close);
-    openViewer.addEventListener('click', ()=> setUrl('https://lichess.org/embed/analysis'));
-    applyFen.addEventListener('click', ()=>{ const f=(fenBar.value||'').trim(); if(f) setUrl('https://lichess.org/embed/analysis/'+encodeURIComponent(f)); });
-  })();
 </script>
 </body>
 </html>
