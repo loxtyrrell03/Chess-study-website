@@ -42,3 +42,21 @@ html,body{background:var(--bg);color:var(--fg)}
 .editor-link-row{display:flex;align-items:center;gap:.5rem}
 .no-print{print-color-adjust:exact}
 
+/* ======= Progress bar visuals (ensure highlighted fill is visible) ======= */
+#progressHost{position:relative; background:linear-gradient(180deg,#fff,#f9fafb)}
+#progressFill{background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 40%, transparent)); border-right:2px solid var(--accent-600); z-index:1}
+#progressSegments{z-index:0}
+#progressTicks{z-index:2}
+#scrubOverlay{z-index:3}
+
+/* ======= Modals ======= */
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:80}
+.modal.hidden{display:none}
+.modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.42);backdrop-filter:blur(2px)}
+.modal-panel{position:relative;z-index:1;background:var(--panel);border:var(--borderW) solid var(--border);border-radius:14px;box-shadow:0 25px 70px rgba(15,23,42,.25);padding:18px;max-width:720px;width:calc(100% - 28px)}
+
+/* Auth extras */
+.auth-sep{display:flex;align-items:center;gap:.75rem;color:var(--muted);font-size:.9rem}
+.auth-sep span{white-space:nowrap}
+.auth-sep::before,.auth-sep::after{content:"";height:1px;background:color-mix(in srgb,var(--border) 70%,transparent);flex:1}
+.btn-wide{min-width:160px;text-align:center}
