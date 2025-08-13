@@ -1,517 +1,113 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Skillflow — Structure your training. Master any skill.</title>
-  <meta name="color-scheme" content="light dark"/>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="./styles.css"/>
-</head>
-<body class="min-h-screen">
-<div class="max-w-7xl mx-auto px-5 py-6">
+// saved-outlines.js
+// Encapsulates the Saved Outlines tab UI/logic. Expects simple callbacks from index.
 
-  <!-- Header -->
-  <header class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Skillflow</h1>
-      <p class="text-sm muted -mt-1">Structure your training. Master any skill.</p>
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <button id="settingsBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]" title="Customize UI">⚙️ Settings</button>
+export function setupSavedOutlines({
+  getSavedOutlines,
+  setSavedOutlines,
+  saveOutlinesLocal,
+  getWidgetShelf,
+  applyOutline,
+  touchCloud,
+  renderHomeSavedBar
+}){
+  const savedList = document.getElementById('savedList');
+  const createOutlineBtn = document.getElementById('createOutlineBtn');
+  const createOutlineForm = document.getElementById('createOutlineForm');
+  const newOutlineTitleInput = document.getElementById('newOutlineTitle');
+  const createOutlineConfirm = document.getElementById('createOutlineConfirm');
+  const createOutlineCancel = document.getElementById('createOutlineCancel');
 
-      <div id="authArea" class="flex items-center gap-2">
-        <button id="authOpenBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Sign in / Sign up</button>
-        <div id="userBadge" class="hidden items-center gap-2">
-          <span id="userEmail" class="text-sm muted"></span>
-          <button id="signOutBtn" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white">Sign out</button>
-        </div>
-      </div>
+  const mergeBar = document.getElementById('mergeBar');
+  const mergeSourceName = document.getElementById('mergeSourceName');
+  const mergeTargetName = document.getElementById('mergeTargetName');
+  const mergeTitleInput = document.getElementById('mergeTitleInput');
+  const mergeConfirmBtn = document.getElementById('mergeConfirmBtn');
+  const mergeCancelBtn  = document.getElementById('mergeCancelBtn');
 
-      <span id="cloudStatus" class="text-xs muted">Local mode</span>
-    </div>
-  </header>
+  let mergeProposal = null;
 
-  <!-- Tabs -->
-  <nav class="mb-6">
-    <div class="tabs-bar">
-      <button class="tab-link active" data-tab="homeTab">Home</button>
-      <div class="tab-sep"></div>
-      <button class="tab-link" data-tab="savedTab">Saved Outlines</button>
-      <div class="tab-sep"></div>
-      <button class="tab-link" data-tab="helpTab">How to use</button>
-    </div>
-  </nav>
-
-  <!-- HOME -->
-  <section id="homeTab">
-    <!-- Progress -->
-    <section class="mb-4">
-      <div class="flex items-center justify-between mb-1">
-        <div class="block-sub">Progress — click to jump</div>
-        <div id="progressPct" class="text-xs muted">0%</div>
-      </div>
-      <div id="progressHost" class="relative w-full h-6 rounded-2xl overflow-hidden card">
-        <div id="progressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
-        <div id="progressSegments" class="absolute inset-0 flex"></div>
-        <div id="progressTicks" class="absolute inset-0 pointer-events-none"></div>
-        <div id="scrubOverlay" class="absolute inset-0 cursor-pointer"></div>
-      </div>
-      <div id="legend" class="mt-2 flex flex-wrap gap-2 text-sm"></div>
-    </section>
-
-    <!-- Controls -->
-    <section class="flex flex-wrap items-center gap-3 mb-3">
-      <button id="startBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm">Start Study Session</button>
-      <button id="prevBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">◀ Prev</button>
-      <button id="nextBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Next ▶</button>
-      <button id="resetBtn" class="ml-auto px-3 py-2 rounded-xl border border-[var(--border)]">Reset</button>
-      <button id="showOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] hidden">Show Outline ▸</button>
-    </section>
-
-    <div id="split">
-      <!-- LEFT -->
-      <section id="leftPane">
-        <div class="card p-6 section-card">
-          <div class="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
-            <div>
-              <div class="block-sub">Current Section</div>
-              <h2 id="currentTitle" class="text-2xl font-extrabold mt-1">—</h2>
-            </div>
-            <div class="flex items-center gap-2">
-              <button id="editSectionBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Edit Section</button>
-              <div id="clock" class="clock-badge text-2xl tabular-nums">00:00</div>
-            </div>
-          </div>
-
-          <!-- Shelf (Home) -->
-          <div id="shelfWrap" class="mt-4 hidden">
-            <div class="flex items-center justify-between">
-              <h3 class="block-title">Link widgets</h3>
-              <div class="flex items-center gap-2">
-                <button id="addWidgetBtn" class="btn-xs">+ New Widget</button>
-                <button id="resetShelfBtn" class="btn-xs">Reset Shelf</button>
-              </div>
-            </div>
-            <div id="linkShelf" class="mt-2 editor-shelf"></div>
-            <div class="text-xs muted mt-1">Drag a widget into the current section.</div>
-          </div>
-
-          <!-- Links in current -->
-          <div id="linksWrap" class="mt-4">
-            <div class="flex items-center justify-between">
-              <h3 class="block-title">Links in this section</h3>
-              <button id="clearSectionLinks" class="btn-xs hidden">Clear</button>
-            </div>
-            <div id="links" class="mt-2 flex flex-wrap gap-2 p-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] min-h-[44px]"></div>
-          </div>
-
-          <!-- Notes -->
-          <div class="mt-4">
-            <label class="block-title">Section notes</label>
-            <p class="text-xs muted -mt-1 mb-1">Optional mini-checklist or reminders.</p>
-            <textarea id="sectionDesc" class="w-full mt-1 input text-sm" placeholder="Add notes, mini-checklist, links…"></textarea>
-          </div>
-        </div>
-      </section>
-
-      <!-- HANDLE -->
-      <div id="splitHandle"></div>
-
-      <!-- RIGHT -->
-      <aside id="rightPane">
-        <div class="card p-4 h-full flex flex-col">
-
-          <!-- Quick load -->
-          <div id="homeSavedRow" class="mb-3">
-            <div class="flex items-center justify-between">
-              <h4 class="block-title">Saved Outlines</h4>
-              <button id="manageOutlinesLink" class="text-xs underline" data-tab-jump="savedTab">Manage</button>
-            </div>
-            <div id="homeSavedScroller" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
-          </div>
-
-          <div class="flex items-center justify-between">
-            <h3 class="block-title">Session outline</h3>
-            <button id="collapseOutlineBtn" class="text-xs px-2 py-1 rounded-md border border-[var(--border)]">▾ Hide</button>
-          </div>
-
-          <ul id="outline" class="mt-3 flex-1 overflow-auto"></ul>
-
-          <!-- Inline Add -->
-          <div id="inlineAddRow" class="mt-2 hidden">
-            <div class="flex flex-wrap items-center gap-2">
-              <input id="addTitleInput" class="input flex-1" placeholder="Section title"/>
-              <input id="addMinsInput" class="input w-28" type="number" min="0.25" step="0.25" placeholder="Minutes"/>
-              <button id="addConfirmBtn" class="btn-xs">Add</button>
-              <button id="addCancelBtn" class="btn-xs">Cancel</button>
-            </div>
-          </div>
-
-          <div class="mt-3 flex items-center gap-2">
-            <button id="addOutlineItem" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Add Section</button>
-            <div id="totalMins" class="ml-auto text-xs muted">Total: 0 minutes</div>
-          </div>
-        </div>
-      </aside>
-    </div>
-
-    <footer class="mt-10 text-center text-xs muted">
-      Skillflow — minimal, keyboard-friendly session manager. ♟️
-    </footer>
-  </section>
-
-  <!-- SAVED OUTLINES -->
-  <section id="savedTab" class="hidden">
-    <div id="mergeBar" class="card p-4 mb-4" style="display:none">
-      <div class="flex flex-col gap-2">
-        <div class="text-sm">Merge <strong id="mergeSourceName"></strong> ➕ <strong id="mergeTargetName"></strong></div>
-        <div class="flex flex-wrap items-center gap-2">
-          <label class="text-sm muted">New outline name</label>
-          <input id="mergeTitleInput" class="input flex-1" placeholder="e.g. ‘Balanced + Openings’"/>
-          <button id="mergeConfirmBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Merge</button>
-          <button id="mergeCancelBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Cancel</button>
-        </div>
-        <div class="text-xs muted">Original outlines are kept. Sections from the dragged outline are appended after the target’s sections.</div>
-      </div>
-    </div>
-
-    <div class="mb-3 flex items-center gap-2">
-      <button id="createOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Create new outline</button>
-      <div id="createOutlineForm" class="card p-4 mb-0 hidden">
-        <label class="text-sm">Outline title</label>
-        <div class="mt-2 flex items-center gap-2">
-          <input id="newOutlineTitle" class="input flex-1" placeholder="e.g., 90-min Balanced Plan"/>
-          <button id="createOutlineConfirm" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Create</button>
-          <button id="createOutlineCancel" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Cancel</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="text-sm muted mb-3">Tip: drag one outline card onto another to propose a merge (only when NOT editing).</div>
-    <div id="savedList" class="grid lg:grid-cols-2 gap-4"></div>
-  </section>
-
-  <!-- HELP -->
-  <section id="helpTab" class="hidden">
-    <div class="card p-5">
-      <h3 class="block-title mb-2">How to use</h3>
-      <ol class="list-decimal pl-6 space-y-1 text-sm">
-        <li>Create or load a saved outline on the right.</li>
-        <li>Start the session timer, then jump between sections using the progress bar or outline.</li>
-        <li>Edit links/notes for the current section with “Edit Section”.</li>
-        <li>In Saved Outlines, drag a plan onto another to merge them.</li>
-        <li>Open ⚙️ Settings to tweak theme and defaults.</li>
-      </ol>
-    </div>
-  </section>
-</div>
-
-<!-- SETTINGS MODAL -->
-<div id="settingsModal" class="modal hidden" aria-hidden="true">
-  <div class="modal-backdrop" data-close="1"></div>
-  <div class="modal-panel max-w-[680px]" role="dialog" aria-modal="true">
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="text-lg font-semibold">Appearance</h3>
-      <button class="btn-xxs" data-close="1">✕</button>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <label class="flex flex-col gap-1"><span class="text-sm">Background</span><input id="setBg" type="color" class="input h-10 p-1"/></label>
-      <label class="flex flex-col gap-1"><span class="text-sm">Text</span><input id="setFg" type="color" class="input h-10 p-1"/></label>
-      <label class="flex flex-col gap-1"><span class="text-sm">Accent</span><input id="setAccent" type="color" class="input h-10 p-1"/></label>
-      <label class="flex flex-col gap-1"><span class="text-sm">Border</span><input id="setBorder" type="color" class="input h-10 p-1"/></label>
-      <label class="flex flex-col gap-1"><span class="text-sm">Border width (px)</span><input id="setBorderW" type="number" min="0" max="6" step="1" class="input"/></label>
-      <label class="col-span-2 flex items-center gap-2 mt-1">
-        <input id="setFocusDefault" type="checkbox"/> <span>Start in focus mode by default</span>
-      </label>
-    </div>
-    <div class="mt-4 flex items-center justify-between">
-      <button id="settingsResetBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Reset defaults</button>
-      <div class="flex items-center gap-2">
-        <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
-        <button id="settingsSaveBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- AUTH MODAL -->
-<div id="authModal" class="modal hidden" aria-hidden="true">
-  <div class="modal-backdrop" data-close="1"></div>
-  <div class="modal-panel max-w-[520px]" role="dialog" aria-modal="true">
-    <div class="mb-4">
-      <div class="flex items-center justify-between">
-        <h3 id="authTitle" class="text-xl font-semibold">Welcome back</h3>
-        <button class="btn-xxs" data-close="1">✕</button>
-      </div>
-      <p id="authSubtitle" class="text-sm muted mt-1">Sign in to sync your data across devices.</p>
-    </div>
-
-    <div class="space-y-3">
-      <button id="googleBtn" class="w-full px-3 py-2 rounded-xl border border-[var(--border)] flex items-center justify-center gap-2">
-        <img alt="" src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5"/> Continue with Google
-      </button>
-
-      <div class="auth-sep"><span>or</span></div>
-
-      <div id="emailFields" class="grid gap-2">
-        <input id="emailInput" type="email" class="input" placeholder="Email"/>
-        <input id="passInput" type="password" class="input" placeholder="Password"/>
-      </div>
-
-      <div id="signinRow" class="flex flex-wrap gap-3 justify-center">
-        <button id="emailSignInBtn" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white btn-wide">Sign in</button>
-        <button id="emailResetBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] btn-wide">Reset password</button>
-      </div>
-
-      <div id="signupRow" class="hidden flex justify-center">
-        <button id="emailSignUpBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white btn-wide">Create account</button>
-      </div>
-
-      <div class="text-sm text-center mt-2">
-        <span id="toggleAuthMode" class="underline cursor-pointer">New here? Create an account</span>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- App -->
-<script type="module">
-  /*************** Firebase ***************/
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
-  import {
-    getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut,
-    createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail
-  } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-  import { getFirestore, doc, getDoc, setDoc, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-
-  import { setupSavedOutlines } from "./saved-outlines.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyAMyUlfqqOlnt-kHO-C-vB_rzJ-9eudxck",
-    authDomain: "chessstudyplanner.firebaseapp.com",
-    projectId: "chessstudyplanner",
-    storageBucket: "chessstudyplanner.firebasestorage.app",
-    messagingSenderId: "73363049381",
-    appId: "1:73363049381:web:48da4a1e06b9744fccf64c",
-    measurementId: "G-8PE090JLZH"
-  };
-  const app = initializeApp(firebaseConfig);
-  getAnalytics(app);
-
-  /*************** Local state + helpers ***************/
-  const saveJSON = (k,v)=> localStorage.setItem(k, JSON.stringify(v));
-  const loadJSON = (k)=> { try{ return JSON.parse(localStorage.getItem(k)); }catch{ return null } };
-  const $ = (q)=> document.querySelector(q);
-
-  // Primary state
-  let currentSession = loadJSON('current_session_v1') || [];
-  let sectionNotes   = loadJSON('section_notes_v1') || {};
-  let widgetShelf    = loadJSON('linkShelf_v1')    || [
-    { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',          icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-    { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-    { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
-  ];
-  let prefs = loadJSON('prefs_v1') || { splitRatio:56, outlineCollapsed:false, focusDefault:false, theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 } };
-  let savedOutlines = loadJSON('saved_outlines_v1') || [];
-  let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0 };
-
-  // Cloud
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: "select_account" });
-  const cloudStatus = $('#cloudStatus');
-  let currentUser = null;
-  const userDocRef = (uid)=> doc(db, 'users', uid, 'apps', 'chess_planner_v2');
-
-  const debounce = (fn,ms=1000)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
-  let dirty = false;
-  const markDirty = ()=> { dirty = true; };
-  const setLocalMode = (m='Local mode')=> cloudStatus.textContent = m;
-  const setCloudMode = (m='Cloud sync on')=> cloudStatus.textContent = m;
-
-  const saveCloudDebounced = debounce(async ()=>{
-    if(!currentUser) return;
-    try{
-      await setDoc(userDocRef(currentUser.uid), {
-        currentSession, notes: sectionNotes, prefs, widgetShelf, savedOutlines,
-        timer: timerState, updatedAt: serverTimestamp(), sessions: deleteField(), activePreset: deleteField()
-      }, { merge:true });
-      cloudStatus.textContent = 'Saved to cloud ✓';
-      dirty = false;
-    }catch(e){ cloudStatus.textContent='Cloud save failed'; }
-  }, 1200);
-
-  const touchCloud = ()=> { if(currentUser){ saveCloudDebounced(); } };
-
-  // Periodic flush
-  setInterval(()=>{ if(currentUser && dirty) saveCloudDebounced(); }, 5000);
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ if(currentUser) saveCloudDebounced(); } });
-  window.addEventListener('beforeunload', ()=>{ if(currentUser) saveCloudDebounced(); });
-
-  // Local save wrappers
-  const saveCurrentSession = ()=>{ saveJSON('current_session_v1', currentSession); markDirty(); touchCloud(); };
-  const saveNotes          = ()=>{ saveJSON('section_notes_v1', sectionNotes);     markDirty(); touchCloud(); };
-  const saveShelf          = ()=>{ saveJSON('linkShelf_v1', widgetShelf);         markDirty(); touchCloud(); };
-  const savePrefs          = ()=>{ saveJSON('prefs_v1', prefs);                   markDirty(); touchCloud(); };
-  const saveOutlinesLocal  = ()=>{ saveJSON('saved_outlines_v1', savedOutlines);  markDirty(); touchCloud(); };
-  const saveTimerLocal     = ()=>{ saveJSON('timer_state_v2', timerState);        markDirty(); touchCloud(); };
-
-  /*************** Tabs ***************/
-  const tabButtons=[...document.querySelectorAll('.tab-link')];
-  const homeTab=$('#homeTab'); const savedTab=$('#savedTab'); const helpTab=$('#helpTab');
-  tabButtons.forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      tabButtons.forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      const id=btn.dataset.tab;
-      homeTab.classList.toggle('hidden', id!=='homeTab');
-      savedTab.classList.toggle('hidden', id!=='savedTab');
-      helpTab.classList.toggle('hidden', id!=='helpTab');
-      if(id==='savedTab') renderSavedOutlines();
-      if(id==='homeTab') renderHomeSavedBar();
+  function ensureOutlineShapes(outlines){
+    outlines.forEach(o=>{
+      o.sections = o.sections || [];
+      o.sections.forEach(s=>{
+        if(typeof s.minutes!=='number') s.minutes = Number(s.minutes)||5;
+        if(!('desc' in s)) s.desc='';
+        if(!('links' in s)) s.links=[];
+        if(!('name' in s)) s.name='Untitled';
+        if(!('id' in s)) s.id='S'+Math.random().toString(16).slice(2);
+      });
     });
-  });
-  document.querySelectorAll('[data-tab-jump]').forEach(b=> b.onclick = ()=> document.querySelector(`.tab-link[data-tab="${b.dataset.tabJump}"]`)?.click());
-
-  /*************** Progress / Timer ***************/
-  const startBtn = $('#startBtn'); const prevBtn=$('#prevBtn'); const nextBtn=$('#nextBtn'); const resetBtn=$('#resetBtn');
-  const currentTitleEl = $('#currentTitle'); const sectionDescEl=$('#sectionDesc'); const linksDiv=$('#links');
-  const linkShelfDiv=$('#linkShelf'); const shelfWrap=$('#shelfWrap'); const editSectionBtn=$('#editSectionBtn'); const clearSectionLinksBtn=$('#clearSectionLinks');
-  const addWidgetBtn=$('#addWidgetBtn'); const resetShelfBtn=$('#resetShelfBtn');
-
-  const outline=$('#outline'); const addOutlineItemBtn=$('#addOutlineItem'); const inlineAddRow=$('#inlineAddRow');
-  const addTitleInput=$('#addTitleInput'); const addMinsInput=$('#addMinsInput'); const addConfirmBtn=$('#addConfirmBtn'); const addCancelBtn=$('#addCancelBtn');
-  const totalMins=$('#totalMins'); const clockEl=$('#clock');
-
-  const progressHost=$('#progressHost'), progressFill=$('#progressFill'), progressSegments=$('#progressSegments'),
-        progressTicks=$('#progressTicks'), progressPctEl=$('#progressPct'), legend=$('#legend'), scrubOverlay=$('#scrubOverlay');
-
-  function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
-  function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
-  function scheduleTotalSecs(s){ return s.reduce((a,b)=>a+minsToSecs(b.minutes||0),0); }
-  function elapsedSeconds(sched, idx, secsLeft){ const past=sched.slice(0,idx).reduce((a,b)=>a+minsToSecs(b.minutes||0),0); const cur=sched[idx]?minsToSecs(sched[idx].minutes||0)-secsLeft:0; return past+cur; }
-
-  let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, sessionStarted=false, totalSessionSecs=0;
-
-  function updateClockColor(){
-    clockEl.classList.remove('text-emerald-600','text-rose-600');
-    if(sessionStarted){ (running?clockEl.classList.add('text-emerald-600'):clockEl.classList.add('text-rose-600')); }
   }
-  function updateStartBtnLabel(){
-    if(!sessionStarted) startBtn.textContent='Start Study Session';
-    else if(running) startBtn.textContent='Pause Session';
-    else startBtn.textContent='Resume Session';
-  }
-  function setTimerFromState(st){
-    sessionStarted=!!st.sessionStarted; running=false; currentIndex=st.currentIndex||0; secondsLeft=Math.max(0,Math.round(st.secondsLeft||0));
-    if(st.running && st.lastSyncTs){
-      let delta=Math.floor((Date.now()-st.lastSyncTs)/1000), idx=currentIndex, remain=secondsLeft;
-      while(delta>0 && currentSession[idx]){
-        if(delta>=remain){ delta-=remain; idx++; remain=currentSession[idx]?minsToSecs(currentSession[idx].minutes||0):0; }
-        else{ remain-=delta; delta=0; }
-      }
-      currentIndex=Math.min(idx, Math.max(0,currentSession.length-1)); secondsLeft=Math.max(0,remain||0);
-    }
-    totalSessionSecs=scheduleTotalSecs(currentSession); updateStartBtnLabel(); renderAll();
-  }
-  function syncEnd(){ endTimeMs=performance.now()+secondsLeft*1000; }
-  function startTimer(){ if(running) return; running=true; syncEnd(); loop(); updateStartBtnLabel(); updateClockColor(); markTimer(); }
-  function stopTimer(){ running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateStartBtnLabel(); updateClockColor(); markTimer(); }
-  function loop(){
-    if(!running) return;
-    const remaining=Math.max(0,Math.ceil((endTimeMs-performance.now())/1000));
-    if(remaining!==secondsLeft){ secondsLeft=remaining; $('#clock').textContent=secsToClock(secondsLeft); updateProgress(); }
-    if(secondsLeft<=0){
-      if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); syncEnd(); beep(); renderAll(); }
-      else{ stopTimer(); beep(); sessionStarted=false; updateStartBtnLabel(); markTimer(); alert('Session complete! 🎉'); return; }
-    }
-    rafId=requestAnimationFrame(loop);
-  }
-  const markTimer = ()=>{
-    timerState={ sessionStarted,running,currentIndex,secondsLeft,lastSyncTs:Date.now() };
-    saveTimerLocal();
-  };
 
-  startBtn.onclick = ()=>{
-    if(!currentSession.length) return;
-    if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(currentSession[0].minutes||0); totalSessionSecs=scheduleTotalSecs(currentSession); sessionStarted=true; markTimer(); startTimer(); }
-    else{ running?stopTimer():startTimer(); }
-  };
-  prevBtn.onclick = ()=>{ if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } updateStartBtnLabel(); };
-  nextBtn.onclick = ()=>{ if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } else stopTimer(); updateStartBtnLabel(); };
-  resetBtn.onclick = ()=>{ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((currentSession[0]||{}).minutes||0); renderAll(); updateStartBtnLabel(); markTimer(); };
+  function anySavedEditorOpen(){ return !!savedList.querySelector('.editor:not(.hidden)'); }
 
-  function buildProgress(){
-    const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
-    progressSegments.innerHTML=''; legend.innerHTML=''; progressTicks.innerHTML='';
-    sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; progressSegments.appendChild(seg); });
-    let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); progressTicks.appendChild(tick); }
-    sched.forEach((sec,i)=>{ const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); chip.innerHTML=`${escapeHtml(sec.name||'')} <span class="opacity-80">(${sec.minutes||0}m)</span>`; chip.onclick=()=>jumpToSection(i); legend.appendChild(chip); });
-    updateProgress();   // ensure fill width is applied after building
+  function sectionEditorBlockHTML(s, idx){
+    const linksHTML = (s.links||[]).map((l, li)=> editorLinkRowHTML(l, idx, li)).join('');
+    return `
+      <div class="border border-[var(--border)] rounded-lg p-3" data-idx="${idx}">
+        <div class="flex flex-wrap items-center gap-2">
+          <input class="input flex-1 sec-title" value="${escapeHtml(s.name)}" placeholder="Section title"/>
+          <input class="input w-24 sec-mins" type="number" value="${(+s.minutes)||0}" min="0" step="0.25"/>
+          <button class="btn-xxs" data-act="delete">Delete</button>
+        </div>
+        <div class="mt-2">
+          <label class="text-xs muted">Notes</label>
+          <textarea class="input w-full mt-1 sec-desc" rows="2" placeholder="Add notes…">${escapeHtml(s.desc||'')}</textarea>
+        </div>
+        <div class="mt-2">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold">Links</span>
+            <span class="text-xs muted">Drag from shelf • Drag to reorder</span>
+          </div>
+          <div class="mt-2 space-y-2 editor-links-area" data-idx="${idx}">
+            ${linksHTML || `<div class="text-xs muted">No links yet.</div>`}
+          </div>
+        </div>
+      </div>`;
   }
-  function updateLegendActive(){ legend.querySelectorAll('.chip').forEach((el, i)=> el.classList.toggle('chip-active', i===currentIndex)); }
-  function updateProgress(){
-    const sched=currentSession; const total=scheduleTotalSecs(sched);
-    if(!total){ progressFill.style.width='0%'; progressPctEl.textContent='0%'; return; }
-    const pct=Math.min(100,Math.max(0,(elapsedSeconds(sched,currentIndex,secondsLeft)/total)*100));
-    progressFill.style.width = pct + '%';
-    progressPctEl.textContent = Math.floor(pct) + '%';
-    updateLegendActive();
+  function editorLinkRowHTML(l, sidx, li){
+    const icon = l.icon==='img' && l.img ? `<img src="${l.img}" class="w-4 h-4 rounded-[3px] object-cover" alt=""/>` : `<span>${l.emoji||'🔗'}</span>`;
+    return `
+      <div class="editor-link-row" draggable="true" data-sidx="${sidx}" data-li="${li}">
+        <span class="w-5 h-5 flex items-center justify-center border border-[var(--border)] rounded">${icon}</span>
+        <input class="input flex-1 link-title" value="${escapeHtml(l.label||'')}" placeholder="Label"/>
+        <input class="input flex-[2] link-url" value="${escapeHtml(l.url||'')}" placeholder="https://…"/>
+        <button class="btn-xxs" data-act="icon">Icon</button>
+        <button class="btn-xxs" data-act="remove">Remove</button>
+      </div>`;
   }
-  function pctFromEvent(e){ const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
-  function jumpFromPct(p){ const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0; for(let i=0;i<sched.length;i++){ const dur=minsToSecs(sched[i].minutes||0); if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); renderAll(); markTimer(); return; } cum+=dur; } currentIndex=sched.length-1; secondsLeft=0; stopTimer(); renderAll(); markTimer(); }
-  let scrubbing=false;
-  scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true;scrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEvent(e));});
-  scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing)jumpFromPct(pctFromEvent(e));});
-  scrubOverlay.addEventListener('pointerup',()=>{scrubbing=false;});
-  scrubOverlay.addEventListener('pointercancel',()=>{scrubbing=false;});
 
-  function jumpToSection(i){ if(!currentSession[i]) return; currentIndex=i; secondsLeft=minsToSecs(currentSession[i].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); }
+  function renderOutlineEditor(container, outlineObj){
+    const id = outlineObj.id;
+    container.innerHTML = `
+      <div class="mb-3">
+        <div class="flex items-center justify-between">
+          <div class="block-title">Link widgets</div>
+          <div class="text-xs muted">Drag into a section’s Links</div>
+        </div>
+        <div class="mt-2 editor-shelf" id="editorShelf_${id}"></div>
+      </div>
+      <div class="space-y-3" id="editorBody_${id}"></div>
+      <div class="mt-2 flex items-center gap-2">
+        <button class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm" data-act="add-section">+ Add Section</button>
+        <span class="ml-auto text-xs muted">${outlineObj.sections.length} section${outlineObj.sections.length!==1?'s':''}</span>
+      </div>
+    `;
 
-  /*************** Current panel (Home) ***************/
-  let isEditingSection=false;
-  editSectionBtn.onclick = ()=>{ isEditingSection=!isEditingSection; updateEditUI(); };
-  function updateEditUI(){
-    shelfWrap.classList.toggle('hidden', !isEditingSection);
-    clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
-    editSectionBtn.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
-    renderCurrentLinks(); renderShelf();
-  }
-  function currentSectionRef(){ return currentSession[currentIndex]; }
-
-  addWidgetBtn.onclick = ()=>{
-    const label=prompt('Widget title:','Lichess')?.trim(); if(!label) return;
-    const url=prompt('URL (https://…):','https://lichess.org')?.trim(); if(!url) return;
-    let icon=(prompt('Icon type: emoji / img','emoji')||'emoji').toLowerCase();
-    let emoji='🔗', img=''; if(icon==='img'){ img=prompt('Image URL (.png/.ico):','https://lichess1.org/assets/logo/lichess-favicon-256.png')?.trim()||''; } else { emoji=prompt('Emoji/Text:','♟️')?.trim()||'🔗'; icon='emoji'; }
-    widgetShelf.push({ id:'w_'+Date.now().toString(36), label, url, icon, emoji, img }); saveShelf(); renderShelf();
-  };
-  resetShelfBtn.onclick = ()=>{
-    if(!confirm('Reset link shelf to defaults?')) return;
-    widgetShelf = [
-      { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',          icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-      { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-      { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
-    ];
-    saveShelf(); renderShelf();
-  };
-
-  function widgetCardHTML(w){
-    const icon = (w.icon==='img' && w.img)
-      ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>`
-      : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
-    return `<div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${w.id}" style="cursor:${isEditingSection?'grab':'default'}">
-      ${icon}
-      <div class="min-w-0"><div class="truncate">${escapeHtml(w.label||'Untitled')}</div><div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div></div>
-    </div>`;
-  }
-  function renderShelf(){
-    linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
-    linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
+    // Shelf built from Home shelf (shared)
+    const shelfEl = container.querySelector(`#editorShelf_${id}`);
+    const widgetShelf = getWidgetShelf();
+    shelfEl.innerHTML = widgetShelf.map(w=>{
+      const icon = (w.icon==='img' && w.img)
+        ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>`
+        : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
+      return `<div class="link-card editor-shelf-item" draggable="true" data-wid="${w.id}">
+        ${icon}
+        <div class="min-w-0"><div class="truncate">${escapeHtml(w.label)}</div><div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div></div>
+      </div>`;
+    }).join('');
+    shelfEl.querySelectorAll('.editor-shelf-item').forEach(card=>{
       card.addEventListener('dragstart', e=>{
-        if(!isEditingSection){ e.preventDefault(); return; }
         const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid});
         try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
         e.dataTransfer.effectAllowed='copy';
@@ -519,165 +115,201 @@
       });
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
     });
+
+    const body = container.querySelector(`#editorBody_${id}`);
+    body.innerHTML = outlineObj.sections.map((s, idx)=> sectionEditorBlockHTML(s, idx)).join('');
+    attachSectionEditorHandlers(body, outlineObj, id);
+
+    container.querySelector('[data-act="add-section"]').onclick = ()=>{
+      outlineObj.sections.push({ id:'S'+Date.now()+Math.random().toString(16).slice(2), name:'New section', minutes:5, desc:'', links:[] });
+      saveOutlinesLocal(); touchCloud(); renderOutlineEditor(container, outlineObj);
+    };
   }
 
-  function renderCurrentLinks(){
-    const sec=currentSectionRef(); const arr=sec?.links||[];
-    linksDiv.innerHTML = arr.map((w,i)=>`
-      <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
-        ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
-        <a class="truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
-        ${isEditingSection ? `<div class="ml-auto flex items-center gap-1"><button class="btn-xs" data-act="edit">Edit</button><button class="btn-xs" data-act="remove">Del</button></div>` : ''}
-      </div>`).join('');
-    linksDiv.querySelectorAll('.section-link').forEach(card=>{
-      card.addEventListener('dragstart', e=>{
-        if(!isEditingSection){ e.preventDefault(); return; }
-        const index=Number(card.dataset.idx);
-        const payloadStr = JSON.stringify({type:'reorder', index});
-        try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
-        e.dataTransfer.effectAllowed='move';
-        card.classList.add('drag-ghost');
-      });
-      card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-    });
+  function attachSectionEditorHandlers(container, outlineObj, oid){
+    // Inputs
+    container.querySelectorAll('[data-idx]').forEach(block=>{
+      const idx = +block.dataset.idx;
+      const title = block.querySelector('.sec-title');
+      const mins  = block.querySelector('.sec-mins');
+      const desc  = block.querySelector('.sec-desc');
+      title.addEventListener('input', ()=>{ outlineObj.sections[idx].name = title.value; saveOutlinesLocal(); });
+      mins.addEventListener('input', ()=>{ outlineObj.sections[idx].minutes = Math.max(0, Number(mins.value)||0); saveOutlinesLocal(); });
+      desc.addEventListener('input', ()=>{ outlineObj.sections[idx].desc = desc.value; saveOutlinesLocal(); });
 
-    if(isEditingSection){
-      const sec=currentSectionRef();
-      linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          const i=Number(btn.closest('[data-idx]').dataset.idx);
-          const target=sec.links[i];
-          const label = prompt('Title:', target?.label || '') ?? null; if(label===null) return;
-          const url   = prompt('URL:', target?.url || '') ?? null; if(url===null) return;
-          const type  = prompt('Icon type: emoji / img (leave empty to keep)', target?.icon || '') || target?.icon || 'emoji';
-          let emoji   = target?.emoji || '🔗'; let img = target?.img || '';
-          if(type==='emoji'){ emoji = prompt('Emoji/Text:', emoji) || '🔗'; img=''; }
-          if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
-          Object.assign(target,{label,url,icon:type,emoji,img}); saveCurrentSession(); renderCurrentLinks();
+      block.querySelector('[data-act="delete"]').addEventListener('click', ()=>{
+        if(!confirm('Delete section?')) return;
+        outlineObj.sections.splice(idx,1);
+        saveOutlinesLocal(); renderOutlineEditor(block.closest('.editor'), outlineObj);
+      });
+
+      // Link field changes
+      block.querySelectorAll('.link-title').forEach((inp, li)=> inp.addEventListener('input', ()=>{ outlineObj.sections[idx].links[li].label = inp.value; saveOutlinesLocal(); }));
+      block.querySelectorAll('.link-url').forEach((inp, li)=> inp.addEventListener('input', ()=>{ outlineObj.sections[idx].links[li].url = inp.value; saveOutlinesLocal(); }));
+
+      // Buttons on link rows
+      block.querySelectorAll('[data-act="remove"]').forEach((btn, li)=> btn.addEventListener('click', ()=>{
+        outlineObj.sections[idx].links.splice(li,1); saveOutlinesLocal(); renderOutlineEditor(block.closest('.editor'), outlineObj);
+      }));
+      block.querySelectorAll('[data-act="icon"]').forEach((btn, li)=> btn.addEventListener('click', ()=>{
+        const cur = outlineObj.sections[idx].links[li];
+        const type = (prompt('Icon type: emoji / img', cur.icon||'emoji')||'emoji').toLowerCase();
+        if(type==='img'){ cur.icon='img'; cur.img=prompt('Image URL (.png/.ico):', cur.img||'')||''; cur.emoji=''; }
+        else{ cur.icon='emoji'; cur.emoji=prompt('Emoji/text:', cur.emoji||'🔗')||'🔗'; cur.img=''; }
+        saveOutlinesLocal(); renderOutlineEditor(block.closest('.editor'), outlineObj);
+      }));
+
+      // Drag FROM link rows (reorder)
+      block.querySelectorAll('.editor-link-row').forEach(row=>{
+        row.addEventListener('dragstart', e=>{
+          const sidx = Number(row.dataset.sidx); const li = Number(row.dataset.li);
+          const payloadStr = JSON.stringify({type:'reorder', index: li, sidx});
+          try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
+          e.dataTransfer.effectAllowed='move';
+          row.classList.add('drag-ghost');
         });
+        row.addEventListener('dragend', ()=> row.classList.remove('drag-ghost'));
       });
-      linksDiv.querySelectorAll('[data-act="remove"]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{ const i=Number(btn.closest('[data-idx]').dataset.idx); sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); });
+
+      // Drop target for adding/reordering links
+      const linksArea = block.querySelector('.editor-links-area');
+      let over=0;
+      linksArea.addEventListener('dragenter', ()=>{ over++; linksArea.classList.add('drag-over-outline'); });
+      linksArea.addEventListener('dragleave', ()=>{ over=Math.max(0,over-1); if(over===0) linksArea.classList.remove('drag-over-outline'); });
+      linksArea.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+      linksArea.addEventListener('drop', e=>{
+        e.preventDefault(); over=0; linksArea.classList.remove('drag-over-outline');
+        const payload = parseDropPayload(e.dataTransfer); if(!payload) return;
+        const section = outlineObj.sections[idx];
+        if(payload.type==='shelf'){
+          const w=(getWidgetShelf()||[]).find(x=>x.id===payload.id); if(!w) return;
+          section.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
+          saveOutlinesLocal(); renderOutlineEditor(linksArea.closest('.editor'), outlineObj);
+        }else if(payload.type==='reorder' && (payload.sidx===undefined || payload.sidx===idx)){
+          const from = payload.index;
+          const items=[...linksArea.querySelectorAll('.editor-link-row')];
+          let to = items.length;
+          for(let i=0;i<items.length;i++){ const r=items[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
+          if(from===to) return;
+          const [m]=section.links.splice(from,1); section.links.splice(to,0,m);
+          saveOutlinesLocal(); renderOutlineEditor(linksArea.closest('.editor'), outlineObj);
+        }
       });
-    }
+    });
   }
 
-  // Drop handlers (home)
-  let overCount = 0;
-  linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over-outline'); });
-  linksDiv.addEventListener('dragleave', e=>{ if(!isEditingSection) return; overCount=Math.max(0, overCount-1); if(overCount===0) linksDiv.classList.remove('drag-over-outline'); });
-  linksDiv.addEventListener('dragover', e=>{ if(!isEditingSection) return; e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
-  linksDiv.addEventListener('drop', e=>{
-    if(!isEditingSection) return; e.preventDefault(); overCount=0; linksDiv.classList.remove('drag-over-outline');
-    const payload = parseDropPayload(e.dataTransfer);
-    if(!payload) return;
-    const sec=currentSectionRef(); if(!sec) return;
-    if(payload.type==='shelf'){
-      const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
-      sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
-      saveCurrentSession(); renderCurrentLinks();
-    } else if(payload.type==='reorder'){
-      const from=payload.index; const cards=[...linksDiv.querySelectorAll('.section-link')];
-      let to=cards.length; for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
-      if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks();
-    }
-  });
-
-  sectionDescEl.addEventListener('input', ()=>{ const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); });
-
-  /*************** Outline (Home) ***************/
-  function renderOutline(){
-    outline.innerHTML = currentSession.map((s,i)=>`
-      <li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}">
-        <div class="flex items-center gap-3">
-          <button class="text-left min-w-0 flex-1 truncate text-sm font-semibold focus:outline-none">${escapeHtml(s.name||'')}</button>
-          <div class="flex items-center gap-2 shrink-0">
-            <span class="text-xs w-16 text-right">${Number(s.minutes||0)}m</span>
+  function renderSavedOutlines(afterRenderCb){
+    const savedOutlines = getSavedOutlines();
+    ensureOutlineShapes(savedOutlines);
+    savedList.innerHTML = savedOutlines.map(o=>`
+      <div class="card p-4" data-oid="${o.id}">
+        <div class="flex items-center gap-2">
+          <input class="input flex-1 outline-title" value="${escapeHtml(o.title)}" aria-label="Outline title"/>
+          <div class="ml-auto flex items-center gap-2">
             <button class="btn-xs" data-act="edit">Edit</button>
+            <button class="btn-xs" data-act="load">Load</button>
             <button class="btn-xs" data-act="delete">Delete</button>
           </div>
         </div>
-      </li>`).join('');
+        <div class="mt-3 hidden editor"></div>
+      </div>`).join('');
 
-    outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
-      li.addEventListener('click', (e)=>{ if(e.target.closest('[data-act]')) return; jumpToSection(idx); });
-    });
-    outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
-        const cur=currentSession[idx];
-        li.innerHTML = `
-          <div class="flex items-center gap-2">
-            <input class="input flex-1 text-sm" id="edtTitle" value="${escapeHtml(cur.name||'')}" />
-            <input class="input w-24 text-sm" id="edtValue" type="number" step="0.1" min="0.01" value="${(+cur.minutes||0).toFixed(2).replace(/\.00$/,'')}" />
-            <select id="edtUnit" class="input h-9 w-20 text-sm">
-              <option value="minutes" selected>min</option>
-              <option value="seconds">sec</option>
-              <option value="hours">hr</option>
-            </select>
-            <button class="btn-xxs" id="edtSave">Save</button>
-            <button class="btn-xxs" id="edtCancel">Cancel</button>
-          </div>`;
-        const edtTitle=li.querySelector('#edtTitle'), edtValue=li.querySelector('#edtValue'), edtUnit=li.querySelector('#edtUnit');
-        const toMinutes = (value, unit)=>{ const v=Number(value)||0; if(unit==='seconds') return v/60; if(unit==='hours') return v*60; return v; };
-        const saveInline = ()=>{ cur.name = edtTitle.value.trim() || cur.name; cur.minutes = Math.max(0.01, toMinutes(edtValue.value, edtUnit.value)); saveCurrentSession(); if(currentSession[currentIndex]?.id===cur.id){ secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes)); if(running) syncEnd(); markTimer(); } renderOutline(); buildProgress(); updateProgress(); renderCurrent(); };
-        li.querySelector('#edtSave').onclick = saveInline; li.querySelector('#edtCancel').onclick = renderOutline;
+    // Per-card wiring
+    savedList.querySelectorAll('[data-oid]').forEach(card=>{
+      const oid = card.dataset.oid;
+      const outlineObj = getSavedOutlines().find(x=>x.id===oid);
+
+      // Allow drag-to-merge ONLY when no editor is open
+      const willAllowDnD = ()=> !anySavedEditorOpen();
+      const setCardDraggable = ()=>{
+        card.draggable = willAllowDnD();
+        card.classList.toggle('opacity-60', anySavedEditorOpen());
+      };
+      setCardDraggable();
+
+      card.addEventListener('dragstart', (e)=>{ if(!willAllowDnD()){ e.preventDefault(); return; } e.dataTransfer.setData('text/plain', oid); e.dataTransfer.effectAllowed='move'; card.classList.add('drag-ghost'); });
+      card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+      card.addEventListener('dragover', (e)=>{ if(!willAllowDnD()) return; e.preventDefault(); card.classList.add('drag-over-outline'); });
+      card.addEventListener('dragleave', ()=> card.classList.remove('drag-over-outline'));
+      card.addEventListener('drop', (e)=>{
+        if(!willAllowDnD()) return;
+        e.preventDefault(); card.classList.remove('drag-over-outline');
+        const sourceId = e.dataTransfer.getData('text/plain'); const targetId = oid; if(!sourceId || sourceId===targetId) return;
+        const src = getSavedOutlines().find(x=>x.id===sourceId); const tgt = getSavedOutlines().find(x=>x.id===targetId); if(!src || !tgt) return;
+        mergeProposal = {sourceId, targetId};
+        mergeSourceName.textContent = src.title; mergeTargetName.textContent = tgt.title;
+        mergeTitleInput.value = `${tgt.title} + ${src.title}`; mergeBar.style.display='block'; mergeTitleInput.focus();
+      });
+
+      // Title change (live)
+      card.querySelector('.outline-title')?.addEventListener('input', e=>{
+        outlineObj.title = e.target.value;
+        saveOutlinesLocal();
+        renderHomeSavedBar();
+        touchCloud();
+      });
+
+      // Edit toggle
+      card.querySelector('[data-act="edit"]').addEventListener('click', ()=>{
+        const editor = card.querySelector('.editor');
+        const opening = editor.classList.contains('hidden');
+        editor.classList.toggle('hidden', !opening);
+        if(opening){ card.setAttribute('data-editing','true'); renderOutlineEditor(editor, outlineObj); }
+        else{ card.removeAttribute('data-editing'); }
+        savedList.querySelectorAll('[data-oid]').forEach(c=> c.draggable = !anySavedEditorOpen());
+        savedList.querySelectorAll('[data-oid]').forEach(c=> c.classList.toggle('opacity-60', anySavedEditorOpen()));
+      });
+
+      // Load into Home
+      card.querySelector('[data-act="load"]').addEventListener('click', ()=>{ applyOutline(outlineObj); document.querySelector('.tab-link[data-tab="homeTab"]')?.click(); });
+
+      // Delete outline
+      card.querySelector('[data-act="delete"]').addEventListener('click', ()=>{
+        if(!confirm('Delete this outline?')) return;
+        const arr = getSavedOutlines().slice();
+        const idx = arr.findIndex(x=>x.id===oid);
+        if(idx>=0){ arr.splice(idx,1); setSavedOutlines(arr); saveOutlinesLocal(); renderSavedOutlines(); renderHomeSavedBar(); touchCloud(); }
       });
     });
-    outline.querySelectorAll('[data-act="delete"]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const id = btn.closest('li[data-id]').dataset.id;
-        const delIdx = currentSession.findIndex(s=>s.id===id);
-        if(delIdx<0 || !confirm('Delete this section?')) return;
-        const deletingCurrent = delIdx === currentIndex;
-        currentSession.splice(delIdx,1);
-        if(currentSession.length===0){ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=0; }
-        else{
-          if(delIdx < currentIndex) currentIndex--;
-          if(deletingCurrent){ currentIndex = Math.min(currentIndex, currentSession.length-1); secondsLeft = minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); }
-        }
-        saveCurrentSession(); renderAll(); markTimer();
-      });
-    });
-    if(totalMins) totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(currentSession)/60)} minutes`;
+
+    // Merge bar
+    mergeCancelBtn.onclick = ()=>{ mergeProposal=null; mergeBar.style.display='none'; };
+    mergeConfirmBtn.onclick = ()=>{
+      if(!mergeProposal) return;
+      const arr = getSavedOutlines().slice();
+      const {sourceId, targetId} = mergeProposal; const src = arr.find(x=>x.id===sourceId); const tgt = arr.find(x=>x.id===targetId); if(!src || !tgt) return;
+      const newSections = [
+        ...tgt.sections.map(s=>({ ...structuredClone(s), id:'S'+Math.random().toString(16).slice(2) })),
+        ...src.sections.map(s=>({ ...structuredClone(s), id:'S'+Math.random().toString(16).slice(2) }))
+      ];
+      const title = (mergeTitleInput.value||'').trim() || `${tgt.title} + ${src.title}`;
+      const merged = { id:'O'+Date.now(), title, sections:newSections, createdAt: Date.now() };
+      arr.unshift(merged); setSavedOutlines(arr); saveOutlinesLocal(); mergeProposal=null; mergeBar.style.display='none'; renderSavedOutlines(); renderHomeSavedBar(); touchCloud();
+    };
+
+    if(typeof afterRenderCb==='function') afterRenderCb();
   }
 
-  addOutlineItemBtn.onclick = ()=>{ inlineAddRow.classList.remove('hidden'); addTitleInput.value=''; addMinsInput.value=''; addTitleInput.focus(); };
-  addCancelBtn.onclick = ()=> inlineAddRow.classList.add('hidden');
-  addConfirmBtn.onclick = ()=>{
-    const title=(addTitleInput.value||'').trim() || 'New section'; const mins=Math.max(0.25, Number(addMinsInput.value)||5);
-    currentSession.push({ id:'S'+Date.now(), name:title, minutes:mins, links:[] });
-    inlineAddRow.classList.add('hidden'); saveCurrentSession(); renderAll(); markTimer();
+  // Create outline UI
+  createOutlineBtn.onclick = ()=>{
+    createOutlineForm.classList.remove('hidden');
+    newOutlineTitleInput.value=''; newOutlineTitleInput.focus();
+  };
+  createOutlineCancel.onclick = ()=> createOutlineForm.classList.add('hidden');
+  createOutlineConfirm.onclick = ()=>{
+    const title = (newOutlineTitleInput.value||'').trim() || 'New outline';
+    const arr = getSavedOutlines().slice();
+    const outlineObj = { id:'O'+Date.now()+Math.random().toString(16).slice(2), title, sections:[], createdAt: Date.now() };
+    arr.unshift(outlineObj); setSavedOutlines(arr); saveOutlinesLocal();
+    createOutlineForm.classList.add('hidden');
+    renderSavedOutlines(()=>{ // open editor instantly
+      const card = document.querySelector(`[data-oid="${outlineObj.id}"]`);
+      if(card){ const editor = card.querySelector('.editor'); if(editor && editor.classList.contains('hidden')){ editor.classList.remove('hidden'); card.setAttribute('data-editing','true'); renderOutlineEditor(editor, outlineObj); } }
+    });
+    touchCloud();
   };
 
-  /*************** Saved Outlines module wiring ***************/
-  const homeSavedScroller = $('#homeSavedScroller');
-  function renderHomeSavedBar(){
-    homeSavedScroller.innerHTML = savedOutlines.map(o=>`<button class="chip" data-oid="${o.id}" title="Load outline">${escapeHtml(o.title)}</button>`).join('') || `<div class="text-xs muted">No saved outlines yet.</div>`;
-    homeSavedScroller.querySelectorAll('[data-oid]').forEach(btn=>{
-      const id=btn.dataset.oid; btn.onclick = ()=>{ const o=savedOutlines.find(x=>x.id===id); if(o) applyOutlineToCurrent(o); };
-    });
-  }
-  function applyOutlineToCurrent(outlineObj){
-    const clone = outlineObj.sections.map(s=>({ id:s.id||('S'+Math.random().toString(16).slice(2)), name:s.name, minutes:s.minutes, links:structuredClone(s.links||[]) }));
-    currentSession = clone;
-    sectionNotes = {};
-    clone.forEach(sec=>{ const src = outlineObj.sections.find(ss=>ss.id===sec.id); if(src && src.desc!=null) sectionNotes[sec.id] = src.desc; });
-    timerState = { sessionStarted:false, running:false, currentIndex:0, secondsLeft:minsToSecs((clone[0]||{}).minutes||0), outlineId: outlineObj.id, lastSyncTs: Date.now() };
-    saveCurrentSession(); saveNotes(); saveTimerLocal(); renderAll(); updateStartBtnLabel();
-  }
-
-  const { renderSavedOutlines } = setupSavedOutlines({
-    getSavedOutlines: ()=> savedOutlines,
-    setSavedOutlines: (arr)=>{ savedOutlines = arr; },
-    saveOutlinesLocal,
-    getWidgetShelf: ()=> widgetShelf,
-    applyOutline: applyOutlineToCurrent,
-    touchCloud,
-    renderHomeSavedBar
-  });
-
-  /*************** Helpers ***************/
+  // Utilities
   function escapeHtml(s){ return (s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
   function parseDropPayload(dt){
     let data = ''; const types = dt?.types ? Array.from(dt.types) : [];
@@ -686,125 +318,14 @@
     if(!data) data = dt.getData('application/json') || dt.getData('Text') || '';
     try{ return JSON.parse(data); }catch{ return null; }
   }
-  // Beep
-  let ctx=null, osc=null;
-  function beep(){ try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); osc=ctx.createOscillator(); const g=ctx.createGain(); osc.connect(g); g.connect(ctx.destination); osc.type='square'; osc.frequency.value=880; g.gain.value=.05; osc.start(); setTimeout(()=>{ osc.stop(); }, 120); }catch{} }
 
-  /*************** Auth modal UI ***************/
-  const authOpenBtn = $('#authOpenBtn'); const userBadge = $('#userBadge'); const userEmail = $('#userEmail'); const signOutBtn = $('#signOutBtn');
-  const authModal = $('#authModal'); const authTitle=$('#authTitle'); const authSubtitle=$('#authSubtitle');
-  const emailInput=$('#emailInput'); const passInput=$('#passInput');
-  const googleBtn=$('#googleBtn'); const emailSignInBtn=$('#emailSignInBtn'); const emailSignUpBtn=$('#emailSignUpBtn'); const emailResetBtn=$('#emailResetBtn');
-  const signinRow=$('#signinRow'); const signupRow=$('#signupRow'); const toggleAuthMode=$('#toggleAuthMode');
+  // Initial paint
+  function init(){ renderSavedOutlines(); }
+  init();
 
-  let authMode='signin';
-  function showModal(modal){ modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false'); }
-  function hideModal(modal){ modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
-  function setAuthMode(mode){
-    authMode=mode;
-    const isSignUp = mode==='signup';
-    signinRow.classList.toggle('hidden', isSignUp);
-    signupRow.classList.toggle('hidden', !isSignUp);
-    toggleAuthMode.textContent = isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account';
-    authTitle.textContent = isSignUp ? 'Create your account' : 'Welcome back';
-    authSubtitle.textContent = isSignUp ? 'Make an account to enable cloud sync.' : 'Sign in to sync your data across devices.';
-  }
-  toggleAuthMode.onclick = ()=> setAuthMode(authMode==='signin'?'signup':'signin');
-  authOpenBtn.onclick = ()=>{ emailInput.value=''; passInput.value=''; setAuthMode('signin'); showModal(authModal); };
-  authModal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') hideModal(authModal); });
-  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ hideModal(authModal); hideModal(settingsModal); } });
-
-  googleBtn.onclick = ()=> signInWithPopup(auth, provider).catch(err=> alert(err.message||'Google sign-in failed'));
-  emailSignInBtn.onclick = async ()=>{
-    try{ await signInWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); }
-    catch(e){ alert(e.message||'Sign-in failed'); }
+  // Public API back to index
+  return {
+    renderSavedOutlines
   };
-  emailSignUpBtn.onclick = async ()=>{
-    try{ await createUserWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); }
-    catch(e){ alert(e.message||'Sign-up failed'); }
-  };
-  emailResetBtn.onclick = async ()=>{
-    try{ if(!emailInput.value.trim()) return alert('Enter your email first.'); await sendPasswordResetEmail(auth, emailInput.value.trim()); alert('Reset email sent.'); }
-    catch(e){ alert(e.message||'Reset failed'); }
-  };
-  signOutBtn.onclick = ()=> signOut(auth);
+}
 
-  onAuthStateChanged(auth, async (user)=>{
-    currentUser = user || null;
-    if(user){
-      authOpenBtn.classList.add('hidden'); userBadge.classList.remove('hidden'); userEmail.textContent = user.email || user.uid; setCloudMode('Syncing…');
-      hideModal(authModal);
-      try{
-        const snap = await getDoc(userDocRef(user.uid));
-        if(snap.exists()){
-          const d = snap.data()||{};
-          if(d.currentSession) currentSession = d.currentSession;
-          if(d.notes) sectionNotes = d.notes;
-          if(d.prefs) prefs = d.prefs;
-          if(d.widgetShelf) widgetShelf = d.widgetShelf;
-          if(d.savedOutlines) savedOutlines = d.savedOutlines;
-          if(d.timer) timerState = d.timer;
-          applyTheme(prefs.theme||{});
-          setTimerFromState(timerState); renderAll(); renderHomeSavedBar(); setCloudMode('Saved to cloud ✓');
-        } else { setCloudMode('Cloud sync on'); }
-      }catch{ setLocalMode('Cloud read failed'); }
-    } else {
-      authOpenBtn.classList.remove('hidden'); userBadge.classList.add('hidden'); setLocalMode('Local mode');
-    }
-  });
-
-  /*************** Settings modal UI ***************/
-  const settingsModal = $('#settingsModal');
-  const setBg=$('#setBg'), setFg=$('#setFg'), setAccent=$('#setAccent'), setBorder=$('#setBorder'), setBorderW=$('#setBorderW'), setFocusDefault=$('#setFocusDefault');
-  const settingsSaveBtn=$('#settingsSaveBtn'), settingsResetBtn=$('#settingsResetBtn');
-  function applyTheme(t){
-    document.documentElement.style.setProperty('--bg', t.bg || '#ffffff');
-    document.documentElement.style.setProperty('--fg', t.fg || '#0f172a');
-    document.documentElement.style.setProperty('--accent', t.accent || '#0ea5e9');
-    document.documentElement.style.setProperty('--border', t.border || '#94a3b8');
-    document.documentElement.style.setProperty('--panel', t.panel || '#ffffff');
-    document.documentElement.style.setProperty('--panel-muted', t.panelMuted || '#f8fafc');
-    document.documentElement.style.setProperty('--borderW', (t.borderW ?? 2) + 'px');
-  }
-  function openSettings(){
-    setBg.value = prefs.theme?.bg || '#ffffff';
-    setFg.value = prefs.theme?.fg || '#0f172a';
-    setAccent.value = prefs.theme?.accent || '#0ea5e9';
-    setBorder.value = prefs.theme?.border || '#94a3b8';
-    setBorderW.value = String(prefs.theme?.borderW ?? 2);
-    setFocusDefault.checked = !!prefs.focusDefault;
-    showModal(settingsModal);
-  }
-  function closeSettings(){ hideModal(settingsModal); }
-  document.querySelectorAll('#settingsModal [data-close="1"]').forEach(b=> b.addEventListener('click', closeSettings));
-  settingsModal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') closeSettings(); });
-  $('#settingsBtn').onclick = openSettings;
-  settingsSaveBtn.onclick = ()=>{
-    prefs.theme = {
-      bg:setBg.value, fg:setFg.value, accent:setAccent.value, border:setBorder.value, borderW:Math.max(0, Number(setBorderW.value)||2)
-    };
-    prefs.focusDefault = !!setFocusDefault.checked;
-    applyTheme(prefs.theme); savePrefs(); closeSettings();
-  };
-  settingsResetBtn.onclick = ()=>{
-    prefs.theme = { bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 };
-    prefs.focusDefault = false;
-    applyTheme(prefs.theme); savePrefs(); openSettings();
-  };
-  applyTheme(prefs.theme||{});
-
-  /*************** Initial render ***************/
-  function renderCurrent(){
-    const s=currentSession[currentIndex]; if(!s){ currentTitleEl.textContent='—'; sectionDescEl.value=''; linksDiv.innerHTML=''; return; }
-    currentTitleEl.textContent = s.name || 'Untitled';
-    sectionNotes[s.id] = sectionNotes[s.id] || '';
-    sectionDescEl.value = sectionNotes[s.id];
-    renderCurrentLinks();
-    $('#clock').textContent = secsToClock(secondsLeft);
-  }
-  function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
-
-  setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
-</script>
-</body>
-</html>
