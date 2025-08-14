@@ -11,8 +11,8 @@
 // • URLs typed like “aimchess.com” are normalized to “https://www.aimchess.com” on save.
 // • Load button applies the outline and navigates to the Home view.
 // • Outline header has a Duplicate button between Load and Delete; user can rename the copy.
-// • Subsection preview rows are small/indented; drag to reorder. Bins on preview rows.
-// • Link/shelf editing & delete preserved. Outline merge by dragging title preserved.
+// • Subsection preview rows are small/indented; drag to reorder with live placeholder.
+// • Link/shelf editing & delete preserved. Outline merge by dragging title — drop works anywhere on the target card.
 
 export function setupSavedOutlines({
   getSavedOutlines,
@@ -43,7 +43,8 @@ export function setupSavedOutlines({
   const expandedOutlines = new Set(); // outline ids expanded
   const editingSections  = new Set(); // keys `${outlineId}|${sectionId}`
   let draggingOutlineId  = null;      // for merge drag
-  let draggingSec        = null;      // { oid, sid, from } for subsection reorder
+  let draggingSec        = null;      // { oid, sid, from, placeholder, sourceEl }
+  let isMergeDrag        = false;
 
   /* ---------- helpers ---------- */
   const escapeHtml = (s)=> (s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -64,34 +65,41 @@ export function setupSavedOutlines({
     try{ return JSON.parse(str); }catch{ return null; }
   }
   function goHome(){
-    // Try common nav selectors; fall back to #home hash/scroll
+    const tabBtn = document.querySelector('.tab-link[data-tab="homeTab"]');
+    if (tabBtn && typeof tabBtn.click === 'function') { tabBtn.click(); return; }
+
     const cand = ['[data-tab="home"]','[data-route="home"]','[data-nav="home"]','a[href="#home"]','#navHome','#homeTab','#tab-home'];
     for(const sel of cand){
       const el = document.querySelector(sel);
       if(el && typeof el.click==='function'){ el.click(); return; }
     }
+    const home = document.getElementById('homeTab');
+    if (home) {
+      document.getElementById('savedTab')?.classList.add('hidden');
+      document.getElementById('helpTab')?.classList.add('hidden');
+      home.classList.remove('hidden');
+      home.scrollIntoView({ behavior:'smooth', block:'start' });
+      return;
+    }
     if(location.hash !== '#home') location.hash = '#home';
-    (document.getElementById('home') || document.querySelector('[data-view="home"]'))?.scrollIntoView({behavior:'smooth', block:'start'});
   }
   // Normalize "aimchess.com" -> "https://www.aimchess.com", keep http(s) if present
   function normalizeUrl(input){
     let u = (input || '').trim();
     if(!u) return '';
     if(/^https?:\/\//i.test(u)) return u;
-    u = u.replace(/^\/\//,''); // remove protocol-relative
-    // split host/path
+    u = u.replace(/^\/\//,'');
     const slash = u.indexOf('/');
     let host = slash >= 0 ? u.slice(0, slash) : u;
     const rest = slash >= 0 ? u.slice(slash) : '';
     if(!/^www\./i.test(host)){
       const parts = host.split('.');
-      if(parts.length === 2){ host = 'www.' + host; } // add www. for simple hostnames
+      if(parts.length === 2){ host = 'www.' + host; }
     }
     return 'https://' + host + rest;
   }
 
   /* ---------- modals ---------- */
-  // Link/shelf editor (supports onCancel for newly created items)
   function openWidgetEditor(widget, onSave, onCancel){
     const modal = document.createElement('div');
     modal.className = 'modal';
@@ -154,12 +162,11 @@ export function setupSavedOutlines({
       if(icon==='img') img = modal.querySelector('#wImg').value.trim();
       else emoji = modal.querySelector('#wEmoji').value.trim() || '🔗';
       onSave({ label, url, icon, emoji, img });
-      onCancel = null; // prevent cancel handler after successful save
+      onCancel = null;
       close();
     };
   }
 
-  // + Section modal (Title + Minutes)
   function openSectionCreateModal(onCreate){
     const modal = document.createElement('div');
     modal.className = 'modal';
@@ -204,7 +211,6 @@ export function setupSavedOutlines({
 
   /* ---------- HTML builders ---------- */
 
-  // Small, indented preview row (title + minutes + bin)
   function sectionPreviewRowHtml(s){
     return `
       <div class="section-preview" data-sid="${escapeHtml(s.id)}" data-view="preview" draggable="true">
@@ -216,7 +222,6 @@ export function setupSavedOutlines({
       </div>`;
   }
 
-  // Link pill (non-navigating)
   function linkPillHtml(w, i){
     const iconHtml = (w.icon==='img' && w.img)
       ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
@@ -231,12 +236,10 @@ export function setupSavedOutlines({
       </div>`;
   }
 
-  // Links bar inner HTML (no add here anymore)
   function linksBarInnerHtml(links){
     return (links||[]).map((w,i)=> linkPillHtml(w,i)).join('');
   }
 
-  // Inline Widget Shelf (ABOVE Links) — now includes a leading “+ Add”
   function inlineShelfHtml(shelf){
     const add = `<button class="add-pill" data-act="add-shelf" title="Add widget"> Add</button>`;
     const items = (shelf||[]).map(w=>{
@@ -263,7 +266,6 @@ export function setupSavedOutlines({
       </div>`;
   }
 
-  // Edit card (Title + Minutes on same row, compact)
   function sectionEditCardHtml(s){
     const desc = escapeHtml(s.desc || '');
     return `
@@ -295,13 +297,12 @@ export function setupSavedOutlines({
       </div>`;
   }
 
-  // Outline card (now with Duplicate)
   function outlineCardHtml(o, isExpanded){
     const chevron = isExpanded ? '▾' : '▸';
     return `
       <div class="card p-4" data-oid="${escapeHtml(o.id)}">
-        <div class="flex items-center gap-2">
-          <div class="flex-1 font-bold text-lg truncate">${escapeHtml(o.title || 'Untitled outline')}</div>
+        <div class="flex items-center gap-2" data-role="outline-head">
+          <div class="flex-1 font-bold text-lg truncate" data-role="outline-title">${escapeHtml(o.title || 'Untitled outline')}</div>
           <button class="btn-xs" data-act="add-section">+ Section</button>
           <button class="btn-xs" data-act="load">Load</button>
           <button class="btn-xs" data-act="duplicate">Duplicate</button>
@@ -340,7 +341,6 @@ export function setupSavedOutlines({
         const copy = structuredClone(src);
         copy.id = 'O'+Date.now().toString(36);
         copy.title = prompt('Duplicate title:', `Copy of ${src.title || 'Outline'}`)?.trim() || `Copy of ${src.title || 'Outline'}`;
-        // ensure new section ids
         copy.sections = (copy.sections||[]).map((s, i)=> ({...s, id: 'S'+Date.now().toString(36)+i}));
         list.push(copy);
         setSavedOutlines(list); saveAll(); renderSavedOutlines();
@@ -368,38 +368,47 @@ export function setupSavedOutlines({
         });
       });
 
-      // Drag-to-merge (title draggable onto other outline cards)
-      const titleEl = card.querySelector('.font-bold');
+      // Drag-to-merge (title draggable; drop anywhere on another card)
+      const titleEl = card.querySelector('[data-role="outline-title"]');
       if(titleEl){
         titleEl.setAttribute('draggable','true');
         titleEl.addEventListener('dragstart', (e)=>{
           draggingOutlineId = o.id;
+          isMergeDrag = true;
+          document.body.classList.add('is-merge-drag'); // disable header button pointer events
           try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'merge', id:o.id})); }catch{}
           e.dataTransfer.effectAllowed='move';
           card.classList.add('drag-ghost');
         });
         titleEl.addEventListener('dragend', ()=>{
           draggingOutlineId = null;
+          isMergeDrag = false;
+          document.body.classList.remove('is-merge-drag');
           card.classList.remove('drag-ghost');
           document.querySelectorAll('[data-oid]').forEach(el=>{ el.style.outline=''; el.style.outlineOffset=''; });
         });
-        card.addEventListener('dragover', (e)=>{
-          if(draggingOutlineId && draggingOutlineId !== o.id){
-            e.preventDefault();
+
+        // Capture dragover/drop on the whole card so drops work between/over buttons too
+        const onDragOverCard = (e)=>{
+          const incoming = draggingOutlineId;
+          if(incoming && incoming !== o.id){
+            e.preventDefault(); // allow drop
             card.style.outline='2px dashed var(--accent)'; card.style.outlineOffset='4px';
           }
-        });
-        card.addEventListener('dragleave', ()=>{
+        };
+        const onDragLeaveCard = ()=>{
           card.style.outline=''; card.style.outlineOffset='';
-        });
-        card.addEventListener('drop', (e)=>{
+        };
+        const onDropCard = (e)=>{
           card.style.outline=''; card.style.outlineOffset='';
           if(!draggingOutlineId || draggingOutlineId===o.id) return;
           e.preventDefault();
+
           const list = getSavedOutlines() || [];
           const src = byId(list, draggingOutlineId);
           const tgt = o;
           if(!src || !tgt) return;
+
           if(mergeBar){
             mergeBar.style.display='block';
             if(mergeSrcName)  mergeSrcName.textContent  = src.title || 'Untitled';
@@ -418,7 +427,12 @@ export function setupSavedOutlines({
             };
             mergeCancel.onclick = ()=>{ mergeBar.style.display='none'; };
           }
-        });
+        };
+
+        // Use capture = true so children (buttons) can’t swallow the events
+        card.addEventListener('dragover', onDragOverCard, true);
+        card.addEventListener('dragleave', onDragLeaveCard, true);
+        card.addEventListener('drop', onDropCard, true);
       }
 
       // Sections wiring (only if expanded)
@@ -426,50 +440,54 @@ export function setupSavedOutlines({
       const sectionsWrap = card.querySelector('[data-role="sections"]');
       if(!sectionsWrap) return;
 
-      // Drag-reorder subsections (preview rows only)
+      // ---- Subsection reorder with live placeholder ----
+      const makePlaceholder = (h)=>{
+        const ph = document.createElement('div');
+        ph.className = 'section-preview drop-placeholder';
+        ph.style.setProperty('--ph', `${Math.max(36, h)}px`);
+        ph.innerHTML = `<div class="flex items-center gap-2"><div class="title flex-1 muted">Drop here</div></div>`;
+        return ph;
+      };
+      const cleanupDrag = ()=>{
+        if(draggingSec?.sourceEl) draggingSec.sourceEl.classList.remove('dragging');
+        draggingSec?.placeholder?.remove();
+        draggingSec = null;
+      };
+
+      // Preview rows (draggable list items)
       const previewRows = Array.from(sectionsWrap.querySelectorAll('[data-view="preview"]'));
       previewRows.forEach((row, idx)=>{
         row.addEventListener('dragstart', (e)=>{
-          draggingSec = { oid:o.id, sid: row.getAttribute('data-sid'), from: idx };
+          draggingSec = { oid:o.id, sid: row.getAttribute('data-sid'), from: idx, sourceEl: row, placeholder: null };
           try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'sec-move', oid:o.id, sid:draggingSec.sid, from: idx})); }catch{}
           e.dataTransfer.effectAllowed='move';
-          row.classList.add('drag-ghost');
+          row.classList.add('dragging');
+
+          // create placeholder with same height
+          const ph = makePlaceholder(row.offsetHeight);
+          draggingSec.placeholder = ph;
+          row.after(ph);
         });
-        row.addEventListener('dragend', ()=>{
-          draggingSec = null;
-          row.classList.remove('drag-ghost');
-          previewRows.forEach(r=> r.style.outline='');
-        });
-        row.addEventListener('dragover', (e)=>{
+        row.addEventListener('dragend', cleanupDrag);
+
+        // While dragging, moving over another row repositions the placeholder
+        const over = (e)=>{
           const payload = parsePayload(e.dataTransfer) || draggingSec;
           if(payload && (payload.type==='sec-move' || draggingSec) && (payload.oid===o.id)){
             e.preventDefault();
-            row.classList.add('drag-over-outline');
+            const r = row.getBoundingClientRect();
+            const before = e.clientY < (r.top + r.height/2);
+            const ph = draggingSec?.placeholder;
+            if(!ph) return;
+            if(before){
+              if(row.previousSibling !== ph) row.parentElement.insertBefore(ph, row);
+            }else{
+              if(row.nextSibling !== ph) row.after(ph);
+            }
           }
-        });
-        row.addEventListener('dragleave', ()=> row.classList.remove('drag-over-outline'));
-        row.addEventListener('drop', (e)=>{
-          row.classList.remove('drag-over-outline');
-          const payload = parsePayload(e.dataTransfer) || draggingSec;
-          if(!payload || (payload.oid!==o.id)) return;
-          e.preventDefault();
-          const list = getSavedOutlines() || [];
-          const me   = byId(list, o.id); if(!me) return;
-          const from = Number(payload.from);
-          const to   = idx;
-          if(isNaN(from) || isNaN(to) || from===to) return;
-          const [moved] = me.sections.splice(from,1);
-          me.sections.splice(to,0,moved);
-          setSavedOutlines(list); saveAll();
-          renderSavedOutlines();
-        });
-
-        // Click preview -> edit (except bin)
-        row.addEventListener('click', (e)=>{
-          if(e.target && (e.target.closest('[data-act="del-sec"]'))) return;
-          editingSections.add(keyOf(o.id, row.getAttribute('data-sid')));
-          renderSavedOutlines();
-        });
+        };
+        row.addEventListener('dragover', over);
+        row.addEventListener('dragenter', over);
 
         // Delete section
         row.querySelector('[data-act="del-sec"]')?.addEventListener('click', (e)=>{
@@ -482,6 +500,64 @@ export function setupSavedOutlines({
             setSavedOutlines(list); saveAll(); renderSavedOutlines();
           }
         });
+
+        // Click preview -> edit (except bin)
+        row.addEventListener('click', (e)=>{
+          if(e.target && (e.target.closest('[data-act="del-sec"]'))) return;
+          editingSections.add(keyOf(o.id, row.getAttribute('data-sid')));
+          renderSavedOutlines();
+        });
+      });
+
+      // Allow dropping into empty space of the list (e.g., to end)
+      sectionsWrap.addEventListener('dragover', (e)=>{
+        const payload = parsePayload(e.dataTransfer) || draggingSec;
+        if(payload && (payload.type==='sec-move' || draggingSec) && (payload.oid===o.id)){
+          e.preventDefault();
+          if(!draggingSec?.placeholder){
+            const ph = document.createElement('div');
+            ph.className = 'section-preview drop-placeholder';
+            ph.style.setProperty('--ph', '44px');
+            ph.innerHTML = `<div class="flex items-center gap-2"><div class="title flex-1 muted">Drop here</div></div>`;
+            draggingSec.placeholder = ph;
+            sectionsWrap.appendChild(ph);
+          }else{
+            // if not in the DOM, append to end
+            if(!sectionsWrap.contains(draggingSec.placeholder)){
+              sectionsWrap.appendChild(draggingSec.placeholder);
+            }
+          }
+        }
+      });
+      sectionsWrap.addEventListener('drop', (e)=>{
+        const payload = parsePayload(e.dataTransfer) || draggingSec;
+        if(!payload || payload.oid !== o.id) return;
+        e.preventDefault();
+
+        const list = getSavedOutlines() || [];
+        const me   = byId(list, o.id); if(!me) return;
+        const from = Number(payload.from);
+
+        // figure out target index from placeholder position
+        const children = Array.from(sectionsWrap.querySelectorAll('.section-preview:not(.drop-placeholder)'));
+        const ph = draggingSec?.placeholder;
+        let to = me.sections.length - 1;
+        if(ph){
+          // find position: number of non-placeholder previews before placeholder
+          to = Array.from(sectionsWrap.children)
+            .filter(el => el.matches('.section-preview'))
+            .indexOf(ph);
+        }
+        // compensate "remove then insert": if moving downward and dropping after original position
+        const finalTo = (to > from) ? to - 1 : to;
+
+        if(!isNaN(from) && !isNaN(finalTo) && from !== finalTo){
+          const [moved] = me.sections.splice(from,1);
+          me.sections.splice(finalTo,0,moved);
+          setSavedOutlines(list); saveAll();
+        }
+        cleanupDrag();
+        renderSavedOutlines();
       });
 
       // Wire edit cards
@@ -585,7 +661,6 @@ export function setupSavedOutlines({
         // Inline shelf actions (drag & edit & delete + ADD)
         const shelfWrap = secEl.querySelector('[data-role="inline-shelf"]');
         if(shelfWrap){
-          // Add new shelf widget
           shelfWrap.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=>{
             if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
             const shelf = (getWidgetShelf && getWidgetShelf()) || [];
@@ -632,7 +707,6 @@ export function setupSavedOutlines({
               });
             });
           });
-          // delete shelf item
           shelfWrap.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
             btn.addEventListener('click', (e)=>{
               e.stopPropagation();
