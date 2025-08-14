@@ -7,6 +7,36 @@
   <meta name="color-scheme" content="light dark"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="./styles.css"/>
+  <style id="index-overrides">
+    /* ----- Splitter: darker, no inner line ----- */
+    #splitHandle{
+      background:#334155 !important; /* slate-700 */
+      box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);
+      z-index:5;
+    }
+    #splitHandle::after{ content:none !important; } /* removes the blue translucent line */
+
+    /* ----- Progress highlight layering + stronger fill ----- */
+    #progressSegments{ z-index:0 !important; }
+    #progressFill{
+      z-index:2 !important;
+      background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
+      border-right:2px solid var(--accent-600) !important;
+    }
+    #progressTicks{ z-index:3 !important; }
+    #scrubOverlay{ z-index:4 !important; }
+
+    /* ----- Reorder placeholder (Home outline) ----- */
+    .drop-placeholder{
+      opacity:.6;
+      border:2px dashed var(--accent);
+      background:color-mix(in srgb, var(--accent-100) 60%, transparent);
+      height:var(--ph,44px);
+      border-radius:10px;
+      margin:.125rem 0;
+    }
+    .outline-row.dragging{ opacity:.35; }
+  </style>
 </head>
 <body class="min-h-screen">
 <div class="max-w-7xl mx-auto px-5 py-6">
@@ -93,14 +123,14 @@
           <!-- Shelf (Home) -->
           <div id="shelfWrap" class="mt-4 hidden">
             <div class="flex items-center justify-between">
-              <h3 class="block-title">Link widgets</h3>
+              <h3 class="block-title">Widget shelf</h3>
               <div class="flex items-center gap-2">
                 <button id="addWidgetBtn" class="btn-xs">+ New Widget</button>
                 <button id="resetShelfBtn" class="btn-xs">Reset Shelf</button>
               </div>
             </div>
             <div id="linkShelf" class="mt-2 editor-shelf"></div>
-            <div class="text-xs muted mt-1">Drag a widget into the current section.</div>
+            <div class="text-xs muted mt-1">Drag from shelf → links below. Click any item to edit.</div>
           </div>
 
           <!-- Links in current -->
@@ -109,7 +139,8 @@
               <h3 class="block-title">Links in this section</h3>
               <button id="clearSectionLinks" class="btn-xs hidden">Clear</button>
             </div>
-            <div id="links" class="mt-2 flex flex-wrap gap-2 p-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] min-h-[44px]"></div>
+            <!-- Use the same styling as Saved Outlines -->
+            <div id="links" class="section-links-bar mt-2"></div>
           </div>
 
           <!-- Notes -->
@@ -541,6 +572,95 @@
 
   function jumpToSection(i){ if(!currentSession[i]) return; awaitingNext=false; hideNextGate(); currentIndex=i; secondsLeft=minsToSecs(currentSession[i].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); }
 
+  /*************** Helpers (shared with Saved Outlines parity) ***************/
+  function escapeHtml(s){ return (s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+  function parseDropPayload(dt){
+    let data = ''; const types = dt?.types ? Array.from(dt.types) : [];
+    if(types.includes('text/plain')) data = dt.getData('text/plain');
+    if(!data && types.includes('text')) data = dt.getData('text');
+    if(!data) data = dt.getData('application/json') || dt.getData('Text') || '';
+    try{ return JSON.parse(data); }catch{ return null; }
+  }
+  function normalizeUrl(input){
+    let u = (input || '').trim();
+    if(!u) return '';
+    if(/^https?:\/\//i.test(u)) return u;
+    u = u.replace(/^\/\//,'');
+    const slash = u.indexOf('/');
+    let host = slash >= 0 ? u.slice(0, slash) : u;
+    const rest = slash >= 0 ? u.slice(slash) : '';
+    if(!/^www\./i.test(host)){
+      const parts = host.split('.');
+      if(parts.length === 2){ host = 'www.' + host; }
+    }
+    return 'https://' + host + rest;
+  }
+  function openWidgetEditor(widget, onSave, onCancel){
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-backdrop" data-close="1"></div>
+      <div class="modal-panel max-w-[520px]">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-semibold">Edit link</h3>
+          <button class="btn-xxs" data-close="1">✕</button>
+        </div>
+        <div class="grid gap-2">
+          <label class="text-sm">Title
+            <input id="wLabel" class="input mt-1" value="${escapeHtml(widget.label || '')}"/>
+          </label>
+          <label class="text-sm">URL
+            <input id="wUrl" class="input mt-1" value="${escapeHtml(widget.url || '')}" placeholder="https://… or aimchess.com"/>
+          </label>
+          <label class="text-sm">Icon type
+            <select id="wIcon" class="input mt-1">
+              <option value="emoji" ${widget.icon!=='img'?'selected':''}>Emoji/Text</option>
+              <option value="img"   ${widget.icon==='img'?'selected':''}>Image URL</option>
+            </select>
+          </label>
+          <label class="text-sm" id="emojiRow">Emoji/Text
+            <input id="wEmoji" class="input mt-1" value="${escapeHtml(widget.emoji || '')}" placeholder="♟️"/>
+          </label>
+          <label class="text-sm hidden" id="imgRow">Image URL
+            <input id="wImg" class="input mt-1" value="${escapeHtml(widget.img || '')}" placeholder="https://…/icon.png"/>
+          </label>
+        </div>
+        <div class="mt-3 flex items-center justify-end gap-2">
+          <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
+          <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    const iconSel = modal.querySelector('#wIcon');
+    const emojiRow = modal.querySelector('#emojiRow');
+    const imgRow   = modal.querySelector('#imgRow');
+    const syncRows = ()=>{
+      const useImg = iconSel.value==='img';
+      emojiRow.classList.toggle('hidden', useImg);
+      imgRow.classList.toggle('hidden', !useImg);
+    };
+    syncRows(); iconSel.addEventListener('change', syncRows);
+
+    const close = ()=>{ modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 140); };
+    modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ onCancel && onCancel(); close(); } });
+    const onEsc = (e)=>{ if(e.key==='Escape'){ onCancel && onCancel(); close(); document.removeEventListener('keydown', onEsc);} };
+    document.addEventListener('keydown', onEsc);
+
+    modal.querySelector('#wSave').onclick = ()=>{
+      const label = modal.querySelector('#wLabel').value.trim() || 'Untitled';
+      let url     = modal.querySelector('#wUrl').value.trim() || '';
+      url = normalizeUrl(url);
+      const icon  = iconSel.value==='img' ? 'img' : 'emoji';
+      let emoji='', img='';
+      if(icon==='img') img = modal.querySelector('#wImg').value.trim();
+      else emoji = modal.querySelector('#wEmoji').value.trim() || '🔗';
+      onSave({ label, url, icon, emoji, img });
+      onCancel = null;
+      close();
+    };
+  }
+
   /*************** Current panel (Home) ***************/
   let isEditingSection=false;
   editSectionBtn.onclick = ()=>{ isEditingSection=!isEditingSection; updateEditUI(); };
@@ -552,12 +672,21 @@
   }
   function currentSectionRef(){ return currentSession[currentIndex]; }
 
+  // Add widget (same UX as saved outlines: create placeholder -> open editor)
   addWidgetBtn.onclick = ()=>{
-    const label=prompt('Widget title:','Lichess')?.trim(); if(!label) return;
-    const url=prompt('URL (https://…):','https://lichess.org')?.trim(); if(!url) return;
-    let icon=(prompt('Icon type: emoji / img','emoji')||'emoji').toLowerCase();
-    let emoji='🔗', img=''; if(icon==='img'){ img=prompt('Image URL (.png/.ico):','https://lichess1.org/assets/logo/lichess-favicon-256.png')?.trim()||''; } else { emoji=prompt('Emoji/Text:','♟️')?.trim()||'🔗'; icon='emoji'; }
-    widgetShelf.push({ id:'w_'+Date.now().toString(36), label, url, icon, emoji, img }); saveShelf(); renderShelf();
+    if(!isEditingSection) editSectionBtn.click();
+    const wid = 'W'+Date.now().toString(36);
+    const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
+    widgetShelf = [...widgetShelf, placeholder]; saveShelf(); renderShelf();
+    const onCancel = ()=>{
+      const idx = widgetShelf.findIndex(x=>x.id===wid);
+      if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); }
+    };
+    openWidgetEditor(placeholder, (upd)=>{
+      upd.url = normalizeUrl(upd.url);
+      const it = widgetShelf.find(x=>x.id===wid);
+      if(it){ Object.assign(it, upd); saveShelf(); renderShelf(); }
+    }, onCancel);
   };
   resetShelfBtn.onclick = ()=>{
     if(!confirm('Reset link shelf to defaults?')) return;
@@ -569,18 +698,40 @@
     saveShelf(); renderShelf();
   };
 
+  // Shelf cards (same structure as saved outlines)
   function widgetCardHTML(w){
-    const icon = (w.icon==='img' && w.img)
-      ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>`
-      : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
-    return `<div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${w.id}" style="cursor:${isEditingSection?'grab':'default'}">
-      ${icon}
-      <div class="min-w-0"><div class="truncate">${escapeHtml(w.label||'Untitled')}</div><div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div></div>
-    </div>`;
+    const iconHtml = (w.icon==='img' && w.img)
+      ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
+      : `<span class="link-icon">${escapeHtml(w.emoji || '🔗')}</span>`;
+    return `
+      <div class="widget" data-wid="${escapeHtml(w.id)}">
+        <div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${escapeHtml(w.id)}" title="${escapeHtml(w.url || '')}" style="cursor:${isEditingSection?'grab':'default'}">
+          ${iconHtml}
+          <div class="min-w-0">
+            <div class="truncate" style="font-size:.95rem">${escapeHtml(w.label || 'Untitled')}</div>
+            <div class="text-xs muted truncate">${escapeHtml(w.url || '')}</div>
+          </div>
+        </div>
+        ${isEditingSection ? `<button class="bin" data-act="del-shelf" title="Delete from shelf">🗑️</button>` : ''}
+      </div>`;
   }
   function renderShelf(){
-    linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
+    linkShelfDiv.innerHTML = (isEditingSection ? `<button class="add-pill" data-act="add-shelf"> Add</button>` : '')
+      + widgetShelf.map(widgetCardHTML).join('');
+
+    linkShelfDiv.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=> addWidgetBtn.click());
+
+    // Click to edit shelf item (same modal)
     linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        if(!isEditingSection) return;
+        const w = widgetShelf.find(x=>x.id===card.dataset.wid); if(!w) return;
+        openWidgetEditor(w, (upd)=>{
+          upd.url = normalizeUrl(upd.url);
+          Object.assign(w, upd); saveShelf(); renderShelf();
+        });
+      });
+      // Drag from shelf → current section links
       card.addEventListener('dragstart', e=>{
         if(!isEditingSection){ e.preventDefault(); return; }
         const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid});
@@ -590,16 +741,34 @@
       });
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
     });
+
+    // Delete shelf item
+    linkShelfDiv.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        if(!isEditingSection) return;
+        const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid;
+        const idx = widgetShelf.findIndex(x=>x.id===wid);
+        if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); }
+      });
+    });
   }
 
+  // Current section links (same behavior as saved outlines pills)
   function renderCurrentLinks(){
     const sec=currentSectionRef(); const arr=sec?.links||[];
-    linksDiv.innerHTML = arr.map((w,i)=>
-      `<div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
-        ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
-        <a class="truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
-        ${isEditingSection ? `<div class="ml-auto flex items-center gap-1"><button class="btn-xs" data-act="edit">Edit</button><button class="btn-xs" data-act="remove">Del</button></div>` : ''}
+    linksDiv.innerHTML = arr.map((w,i)=>`
+      <div class="widget" data-link-idx="${i}">
+        <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
+          ${w.icon==='img' && w.img
+              ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
+              : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`}
+          <span class="truncate max-w-[14rem]">${escapeHtml(w.label||'Untitled')}</span>
+        </div>
+        ${isEditingSection ? `<button class="bin" data-act="del-link" title="Delete">🗑️</button>` : ''}
       </div>`).join('');
+
+    // Drag-reorder within bar
     linksDiv.querySelectorAll('.section-link').forEach(card=>{
       card.addEventListener('dragstart', e=>{
         if(!isEditingSection){ e.preventDefault(); return; }
@@ -610,30 +779,31 @@
         card.classList.add('drag-ghost');
       });
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+
+      // Click pill to edit (modal)
+      card.addEventListener('click', ()=>{
+        if(!isEditingSection) return;
+        const i = Number(card.dataset.idx); const target = sec.links[i]; if(!target) return;
+        openWidgetEditor(target, (upd)=>{
+          upd.url = normalizeUrl(upd.url);
+          Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks();
+        });
+      });
     });
 
     if(isEditingSection){
-      const sec=currentSectionRef();
-      linksDiv.querySelectorAll('[data-act="edit"]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          const i=Number(btn.closest('[data-idx]').dataset.idx);
-          const target=sec.links[i];
-          const label = prompt('Title:', target?.label || '') ?? null; if(label===null) return;
-          const url   = prompt('URL:', target?.url || '') ?? null; if(url===null) return;
-          const type  = prompt('Icon type: emoji / img (leave empty to keep)', target?.icon || '') || target?.icon || 'emoji';
-          let emoji   = target?.emoji || '🔗'; let img = target?.img || '';
-          if(type==='emoji'){ emoji = prompt('Emoji/Text:', emoji) || '🔗'; img=''; }
-          if(type==='img'){ img = prompt('Image URL:', img) || ''; emoji=''; }
-          Object.assign(target,{label,url,icon:type,emoji,img}); saveCurrentSession(); renderCurrentLinks();
+      linksDiv.querySelectorAll('[data-act="del-link"]').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          const pill = btn.closest('.widget')?.querySelector('.section-link');
+          const i = Number(pill?.dataset.idx ?? -1);
+          if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); }
         });
-      });
-      linksDiv.querySelectorAll('[data-act="remove"]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{ const i=Number(btn.closest('[data-idx]').dataset.idx); sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); });
       });
     }
   }
 
-  // Drop handlers (home)
+  // Drop handlers (home links)
   let overCount = 0;
   linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over-outline'); });
   linksDiv.addEventListener('dragleave', e=>{ if(!isEditingSection) return; overCount=Math.max(0, overCount-1); if(overCount===0) linksDiv.classList.remove('drag-over-outline'); });
@@ -656,10 +826,10 @@
 
   sectionDescEl.addEventListener('input', ()=>{ const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); });
 
-  /*************** Outline (Home) ***************/
+  /*************** Outline (Home) with interactive reorder ***************/
   function renderOutline(){
     outline.innerHTML = currentSession.map((s,i)=>
-      `<li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}">
+      `<li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}" draggable="true">
         <div class="flex items-center gap-3">
           <button class="text-left min-w-0 flex-1 truncate text-sm font-semibold focus:outline-none">${escapeHtml(s.name||'')}</button>
           <div class="flex items-center gap-2 shrink-0">
@@ -670,9 +840,12 @@
         </div>
       </li>`).join('');
 
+    // Jump on click (not when clicking action buttons)
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
       li.addEventListener('click', (e)=>{ if(e.target.closest('[data-act]')) return; jumpToSection(idx); });
     });
+
+    // Inline edit
     outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
@@ -691,10 +864,18 @@
           </div>`;
         const edtTitle=li.querySelector('#edtTitle'), edtValue=li.querySelector('#edtValue'), edtUnit=li.querySelector('#edtUnit');
         const toMinutes = (value, unit)=>{ const v=Number(value)||0; if(unit==='seconds') return v/60; if(unit==='hours') return v*60; return v; };
-        const saveInline = ()=>{ cur.name = edtTitle.value.trim() || cur.name; cur.minutes = Math.max(0.01, toMinutes(edtValue.value, edtUnit.value)); saveCurrentSession(); if(currentSession[currentIndex]?.id===cur.id){ secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes)); if(running) syncEnd(); markTimer(); } renderOutline(); buildProgress(); updateProgress(); renderCurrent(); };
+        const saveInline = ()=>{
+          cur.name = edtTitle.value.trim() || cur.name;
+          cur.minutes = Math.max(0.01, toMinutes(edtValue.value, edtUnit.value));
+          saveCurrentSession();
+          if(currentSession[currentIndex]?.id===cur.id){ secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes)); if(running) syncEnd(); markTimer(); }
+          renderOutline(); buildProgress(); updateProgress(); renderCurrent();
+        };
         li.querySelector('#edtSave').onclick = saveInline; li.querySelector('#edtCancel').onclick = renderOutline;
       });
     });
+
+    // Delete
     outline.querySelectorAll('[data-act="delete"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const id = btn.closest('li[data-id]').dataset.id;
@@ -711,6 +892,70 @@
         saveCurrentSession(); renderAll(); markTimer();
       });
     });
+
+    // Drag reorder with live placeholder
+    let dragging = null;
+    const makePh = (h)=>{ const ph = document.createElement('li'); ph.className='outline-row drop-placeholder'; ph.style.setProperty('--ph', `${Math.max(36,h)}px`); ph.innerHTML = `<div class="text-xs muted px-2">Drop here</div>`; return ph; };
+
+    outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
+      li.addEventListener('dragstart', (e)=>{
+        dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight) };
+        li.classList.add('dragging');
+        li.after(dragging.placeholder);
+        try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'outline-move', from: idx})); }catch{}
+        e.dataTransfer.effectAllowed='move';
+      });
+      li.addEventListener('dragend', ()=>{
+        li.classList.remove('dragging');
+        dragging?.placeholder?.remove();
+        dragging = null;
+      });
+
+      const onOver = (e)=>{
+        if(!dragging) return;
+        e.preventDefault();
+        const r = li.getBoundingClientRect();
+        const before = e.clientY < (r.top + r.height/2);
+        const ph = dragging.placeholder;
+        if(before){
+          if(li.previousSibling !== ph) outline.insertBefore(ph, li);
+        }else{
+          if(li.nextSibling !== ph) li.after(ph);
+        }
+      };
+      li.addEventListener('dragover', onOver);
+      li.addEventListener('dragenter', onOver);
+    });
+
+    outline.addEventListener('dragover', (e)=>{
+      if(!dragging) return; e.preventDefault();
+      if(!outline.contains(dragging.placeholder)) outline.appendChild(dragging.placeholder);
+    });
+    outline.addEventListener('drop', (e)=>{
+      if(!dragging) return; e.preventDefault();
+      const from = dragging.from;
+
+      const rows = Array.from(outline.querySelectorAll('li.outline-row'));
+      const phIndex = rows.indexOf(dragging.placeholder);
+      const to = phIndex < 0 ? rows.length-1 : phIndex;
+
+      const finalTo = (to > from) ? to - 1 : to;
+
+      if(from !== finalTo && from >= 0 && finalTo >= 0){
+        const [moved] = currentSession.splice(from,1);
+        currentSession.splice(finalTo,0,moved);
+
+        if(currentIndex === from) currentIndex = finalTo;
+        else if(currentIndex > from && currentIndex <= finalTo) currentIndex -= 1;
+        else if(currentIndex < from && currentIndex >= finalTo) currentIndex += 1;
+
+        saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent();
+      }
+      dragging.el.classList.remove('dragging');
+      dragging.placeholder.remove();
+      dragging = null;
+    });
+
     if(totalMins) totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(currentSession)/60)} minutes`;
   }
 
@@ -725,9 +970,26 @@
   /*************** Saved Outlines module wiring ***************/
   const homeSavedScroller = $('#homeSavedScroller');
   function renderHomeSavedBar(){
-    homeSavedScroller.innerHTML = savedOutlines.map(o=>`<button class="chip" data-oid="${o.id}" title="Load outline">${escapeHtml(o.title)}</button>`).join('') || `<div class="text-xs muted">No saved outlines yet.</div>`;
+    const activeId = (timerState && timerState.outlineId) || null;
+    homeSavedScroller.innerHTML =
+      (savedOutlines.length
+        ? savedOutlines.map(o=>`
+            <button type="button"
+                    class="chip ${o.id===activeId ? 'chip-active' : ''}"
+                    data-oid="${escapeHtml(o.id)}"
+                    title="${escapeHtml(o.title || 'Outline')}">
+              ${escapeHtml(o.title || 'Untitled')}
+            </button>`).join('')
+        : `<div class="text-xs muted">No saved outlines yet.</div>`);
+
     homeSavedScroller.querySelectorAll('[data-oid]').forEach(btn=>{
-      const id=btn.dataset.oid; btn.onclick = ()=>{ const o=savedOutlines.find(x=>x.id===id); if(o) applyOutlineToCurrent(o); };
+      btn.onclick = ()=>{
+        const o = savedOutlines.find(x=>x.id===btn.dataset.oid);
+        if(o){
+          applyOutlineToCurrent(o);
+          requestAnimationFrame(renderHomeSavedBar); // re-highlight
+        }
+      };
     });
   }
   function applyOutlineToCurrent(outlineObj){
@@ -741,28 +1003,15 @@
   }
 
   const { renderSavedOutlines } = setupSavedOutlines({
-  getSavedOutlines: ()=> savedOutlines,
-  setSavedOutlines: (arr)=>{ savedOutlines = arr; },
-  saveOutlinesLocal,
-  getWidgetShelf: ()=> widgetShelf,
-  setWidgetShelf: (arr)=>{ widgetShelf = arr; saveShelf(); },   // <-- add this
-  applyOutline: applyOutlineToCurrent,
-  touchCloud,
-  renderHomeSavedBar
-});
-
-  /*************** Helpers ***************/
-  function escapeHtml(s){ return (s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
-  function parseDropPayload(dt){
-    let data = ''; const types = dt?.types ? Array.from(dt.types) : [];
-    if(types.includes('text/plain')) data = dt.getData('text/plain');
-    if(!data && types.includes('text')) data = dt.getData('text');
-    if(!data) data = dt.getData('application/json') || dt.getData('Text') || '';
-    try{ return JSON.parse(data); }catch{ return null; }
-  }
-  // Beep
-  let ctx=null, osc=null;
-  function beep(){ try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); osc=ctx.createOscillator(); const g=ctx.createGain(); osc.connect(g); g.connect(ctx.destination); osc.type='square'; osc.frequency.value=880; g.gain.value=.05; osc.start(); setTimeout(()=>{ osc.stop(); }, 120); }catch{} }
+    getSavedOutlines: ()=> savedOutlines,
+    setSavedOutlines: (arr)=>{ savedOutlines = arr; },
+    saveOutlinesLocal,
+    getWidgetShelf: ()=> widgetShelf,
+    setWidgetShelf: (arr)=>{ widgetShelf = arr; saveShelf(); },
+    applyOutline: applyOutlineToCurrent,
+    touchCloud,
+    renderHomeSavedBar
+  });
 
   /*************** Auth modal UI ***************/
   const authOpenBtn = $('#authOpenBtn'); const userBadge = $('#userBadge'); const userEmail = $('#userEmail'); const signOutBtn = $('#signOutBtn');
@@ -878,6 +1127,10 @@
     $('#clock').textContent = secsToClock(secondsLeft);
   }
   function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
+
+  // Beep
+  let ctx=null, osc=null;
+  function beep(){ try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); osc=ctx.createOscillator(); const g=ctx.createGain(); osc.connect(g); g.connect(ctx.destination); osc.type='square'; osc.frequency.value=880; g.gain.value=.05; osc.start(); setTimeout(()=>{ osc.stop(); }, 120); }catch{} }
 
   setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
 </script>
