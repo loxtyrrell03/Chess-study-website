@@ -741,14 +741,15 @@
   }
 
   const { renderSavedOutlines } = setupSavedOutlines({
-    getSavedOutlines: ()=> savedOutlines,
-    setSavedOutlines: (arr)=>{ savedOutlines = arr; },
-    saveOutlinesLocal,
-    getWidgetShelf: ()=> widgetShelf,
-    applyOutline: applyOutlineToCurrent,
-    touchCloud,
-    renderHomeSavedBar
-  });
+  getSavedOutlines: ()=> savedOutlines,
+  setSavedOutlines: (arr)=>{ savedOutlines = arr; },
+  saveOutlinesLocal,
+  getWidgetShelf: ()=> widgetShelf,
+  setWidgetShelf: (arr)=>{ widgetShelf = arr; saveShelf(); },   // <-- add this
+  applyOutline: applyOutlineToCurrent,
+  touchCloud,
+  renderHomeSavedBar
+});
 
   /*************** Helpers ***************/
   function escapeHtml(s){ return (s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }

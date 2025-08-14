@@ -1,331 +1,433 @@
-// saved-outlines.js
-// Encapsulates the Saved Outlines tab UI/logic. Expects simple callbacks from index.
+// saved-outlines.js — inline section shelf + reliable merge drag/drop
+//
+// Exports: setupSavedOutlines({ getSavedOutlines, setSavedOutlines, saveOutlinesLocal,
+//                              getWidgetShelf, setWidgetShelf, applyOutline,
+//                              touchCloud, renderHomeSavedBar })
+//
+// Behavior (Saved tab):
+// • Each section always shows its links as compact, indented pills (no navigation).
+// • Click a section’s “Edit” to reveal an INLINE widget shelf inside that section.
+// • Drag from the inline shelf → drop into that section’s links bar; drag pills to reorder.
+// • Single-click any shelf widget OR link pill to edit (title/url/icon). Never navigates.
+// • Bin buttons delete shelf widgets or section links.
+// • Drag an outline title onto another outline card to MERGE (reliable in all browsers).
 
 export function setupSavedOutlines({
   getSavedOutlines,
   setSavedOutlines,
   saveOutlinesLocal,
   getWidgetShelf,
+  setWidgetShelf,
   applyOutline,
   touchCloud,
   renderHomeSavedBar
-}){
-  const savedList = document.getElementById('savedList');
-  const createOutlineBtn = document.getElementById('createOutlineBtn');
-  const createOutlineForm = document.getElementById('createOutlineForm');
-  const newOutlineTitleInput = document.getElementById('newOutlineTitle');
-  const createOutlineConfirm = document.getElementById('createOutlineConfirm');
-  const createOutlineCancel = document.getElementById('createOutlineCancel');
+}) {
+  const savedListEl   = document.querySelector('#savedList');
+  const mergeBar      = document.querySelector('#mergeBar');
+  const mergeSrcName  = document.querySelector('#mergeSourceName');
+  const mergeTgtName  = document.querySelector('#mergeTargetName');
+  const mergeTitleInp = document.querySelector('#mergeTitleInput');
+  const mergeConfirm  = document.querySelector('#mergeConfirmBtn');
+  const mergeCancel   = document.querySelector('#mergeCancelBtn');
 
-  const mergeBar = document.getElementById('mergeBar');
-  const mergeSourceName = document.getElementById('mergeSourceName');
-  const mergeTargetName = document.getElementById('mergeTargetName');
-  const mergeTitleInput = document.getElementById('mergeTitleInput');
-  const mergeConfirmBtn = document.getElementById('mergeConfirmBtn');
-  const mergeCancelBtn  = document.getElementById('mergeCancelBtn');
+  const createBtn     = document.querySelector('#createOutlineBtn');
+  const createForm    = document.querySelector('#createOutlineForm');
+  const createTitle   = document.querySelector('#newOutlineTitle');
+  const createOk      = document.querySelector('#createOutlineConfirm');
+  const createCancel  = document.querySelector('#createOutlineCancel');
 
-  let mergeProposal = null;
+  // Which sections are currently in "edit" (show inline shelf)
+  // key format: `${outlineId}|${sectionId}`
+  const editingSections = new Set();
 
-  function ensureOutlineShapes(outlines){
-    outlines.forEach(o=>{
-      o.sections = o.sections || [];
-      o.sections.forEach(s=>{
-        if(typeof s.minutes!=='number') s.minutes = Number(s.minutes)||5;
-        if(!('desc' in s)) s.desc='';
-        if(!('links' in s)) s.links=[];
-        if(!('name' in s)) s.name='Untitled';
-        if(!('id' in s)) s.id='S'+Math.random().toString(16).slice(2);
-      });
-    });
+  // Track outline being dragged for merge (robust cross-browser)
+  let draggingOutlineId = null;
+
+  /* ---------------- helpers ---------------- */
+  const escapeHtml = (s)=> (s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const byId = (arr, id)=> arr.find(x=>x.id===id);
+  const keyOf = (oId, sId)=> `${oId}|${sId}`;
+  const fmtMins = (n)=> String(Number(n||0)).replace(/\.0+$/,'');
+  const saveAll = ()=>{
+    saveOutlinesLocal && saveOutlinesLocal();
+    renderHomeSavedBar && renderHomeSavedBar();
+    touchCloud && touchCloud();
+  };
+  function parsePayload(dt){
+    let str=''; const types = dt?.types ? Array.from(dt.types) : [];
+    if(types.includes('text/plain')) str = dt.getData('text/plain');
+    if(!str && types.includes('text')) str = dt.getData('text');
+    if(!str) str = dt.getData('application/json') || dt.getData('Text') || '';
+    try{ return JSON.parse(str); }catch{ return null; }
   }
 
-  function anySavedEditorOpen(){ return !!savedList.querySelector('.editor:not(.hidden)'); }
-
-  function sectionEditorBlockHTML(s, idx){
-    const linksHTML = (s.links||[]).map((l, li)=> editorLinkRowHTML(l, idx, li)).join('');
-    return `
-      <div class="border border-[var(--border)] rounded-lg p-3" data-idx="${idx}">
-        <div class="flex flex-wrap items-center gap-2">
-          <input class="input flex-1 sec-title" value="${escapeHtml(s.name)}" placeholder="Section title"/>
-          <input class="input w-24 sec-mins" type="number" value="${(+s.minutes)||0}" min="0" step="0.25"/>
-          <button class="btn-xxs" data-act="delete">Delete</button>
+  /* ---------------- editors ---------------- */
+  function openWidgetEditor(widget, onSave){
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-backdrop" data-close="1"></div>
+      <div class="modal-panel max-w-[520px]">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-semibold">Edit link</h3>
+          <button class="btn-xxs" data-close="1">✕</button>
         </div>
-        <div class="mt-2">
-          <label class="text-xs muted">Notes</label>
-          <textarea class="input w-full mt-1 sec-desc" rows="2" placeholder="Add notes…">${escapeHtml(s.desc||'')}</textarea>
+        <div class="grid gap-2">
+          <label class="text-sm">Title<input id="wLabel" class="input mt-1" value="${escapeHtml(widget.label||'')}" /></label>
+          <label class="text-sm">URL<input id="wUrl" class="input mt-1" value="${escapeHtml(widget.url||'')}" placeholder="https://…"/></label>
+          <label class="text-sm">Icon type
+            <select id="wIcon" class="input mt-1">
+              <option value="emoji" ${widget.icon!=='img'?'selected':''}>Emoji/Text</option>
+              <option value="img"   ${widget.icon==='img'?'selected':''}>Image URL</option>
+            </select>
+          </label>
+          <label class="text-sm" id="emojiRow">Emoji/Text<input id="wEmoji" class="input mt-1" value="${escapeHtml(widget.emoji||'')}" placeholder="♟️"/></label>
+          <label class="text-sm hidden" id="imgRow">Image URL<input id="wImg" class="input mt-1" value="${escapeHtml(widget.img||'')}" placeholder="https://…/icon.png"/></label>
         </div>
-        <div class="mt-2">
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-semibold">Links</span>
-            <span class="text-xs muted">Drag from shelf • Drag to reorder</span>
-          </div>
-          <div class="mt-2 space-y-2 editor-links-area" data-idx="${idx}">
-            ${linksHTML || `<div class="text-xs muted">No links yet.</div>`}
-          </div>
+        <div class="mt-3 flex items-center justify-end gap-2">
+          <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
+          <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
         </div>
       </div>`;
-  }
-  function editorLinkRowHTML(l, sidx, li){
-    const icon = l.icon==='img' && l.img ? `<img src="${l.img}" class="w-4 h-4 rounded-[3px] object-cover" alt=""/>` : `<span>${l.emoji||'🔗'}</span>`;
-    return `
-      <div class="editor-link-row" draggable="true" data-sidx="${sidx}" data-li="${li}">
-        <span class="w-5 h-5 flex items-center justify-center border border-[var(--border)] rounded">${icon}</span>
-        <input class="input flex-1 link-title" value="${escapeHtml(l.label||'')}" placeholder="Label"/>
-        <input class="input flex-[2] link-url" value="${escapeHtml(l.url||'')}" placeholder="https://…"/>
-        <button class="btn-xxs" data-act="icon">Icon</button>
-        <button class="btn-xxs" data-act="remove">Remove</button>
-      </div>`;
-  }
+    document.body.appendChild(modal);
 
-  function renderOutlineEditor(container, outlineObj){
-    const id = outlineObj.id;
-    container.innerHTML = `
-      <div class="mb-3">
-        <div class="flex items-center justify-between">
-          <div class="block-title">Link widgets</div>
-          <div class="text-xs muted">Drag into a section’s Links</div>
-        </div>
-        <div class="mt-2 editor-shelf" id="editorShelf_${id}"></div>
-      </div>
-      <div class="space-y-3" id="editorBody_${id}"></div>
-      <div class="mt-2 flex items-center gap-2">
-        <button class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm" data-act="add-section">+ Add Section</button>
-        <span class="ml-auto text-xs muted">${outlineObj.sections.length} section${outlineObj.sections.length!==1?'s':''}</span>
-      </div>
-    `;
+    const iconSel = modal.querySelector('#wIcon');
+    const emojiRow = modal.querySelector('#emojiRow');
+    const imgRow   = modal.querySelector('#imgRow');
+    const syncRows = ()=>{ const useImg = iconSel.value==='img'; emojiRow.classList.toggle('hidden', useImg); imgRow.classList.toggle('hidden', !useImg); };
+    syncRows(); iconSel.addEventListener('change', syncRows);
 
-    // Shelf built from Home shelf (shared)
-    const shelfEl = container.querySelector(`#editorShelf_${id}`);
-    const widgetShelf = getWidgetShelf();
-    shelfEl.innerHTML = widgetShelf.map(w=>{
-      const icon = (w.icon==='img' && w.img)
-        ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>`
-        : `<span class="link-icon">${w.emoji||'🔗'}</span>`;
-      return `<div class="link-card editor-shelf-item" draggable="true" data-wid="${w.id}">
-        ${icon}
-        <div class="min-w-0"><div class="truncate">${escapeHtml(w.label)}</div><div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div></div>
-      </div>`;
-    }).join('');
-    shelfEl.querySelectorAll('.editor-shelf-item').forEach(card=>{
-      card.addEventListener('dragstart', e=>{
-        const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid});
-        try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
-        e.dataTransfer.effectAllowed='copy';
-        card.classList.add('drag-ghost');
-      });
-      card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-    });
+    const close = ()=>{ modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 150); };
+    modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') close(); });
+    const onEsc = (e)=>{ if(e.key==='Escape'){ close(); document.removeEventListener('keydown', onEsc);} };
+    document.addEventListener('keydown', onEsc);
 
-    const body = container.querySelector(`#editorBody_${id}`);
-    body.innerHTML = outlineObj.sections.map((s, idx)=> sectionEditorBlockHTML(s, idx)).join('');
-    attachSectionEditorHandlers(body, outlineObj, id);
-
-    container.querySelector('[data-act="add-section"]').onclick = ()=>{
-      outlineObj.sections.push({ id:'S'+Date.now()+Math.random().toString(16).slice(2), name:'New section', minutes:5, desc:'', links:[] });
-      saveOutlinesLocal(); touchCloud(); renderOutlineEditor(container, outlineObj);
+    modal.querySelector('#wSave').onclick = ()=>{
+      const label = modal.querySelector('#wLabel').value.trim() || 'Untitled';
+      const url   = modal.querySelector('#wUrl').value.trim() || '';
+      const icon  = iconSel.value==='img' ? 'img' : 'emoji';
+      let emoji='', img='';
+      if(icon==='img') img = modal.querySelector('#wImg').value.trim();
+      else emoji = modal.querySelector('#wEmoji').value.trim() || '🔗';
+      onSave({ label, url, icon, emoji, img });
+      close();
     };
   }
 
-  function attachSectionEditorHandlers(container, outlineObj, oid){
-    // Inputs
-    container.querySelectorAll('[data-idx]').forEach(block=>{
-      const idx = +block.dataset.idx;
-      const title = block.querySelector('.sec-title');
-      const mins  = block.querySelector('.sec-mins');
-      const desc  = block.querySelector('.sec-desc');
-      title.addEventListener('input', ()=>{ outlineObj.sections[idx].name = title.value; saveOutlinesLocal(); });
-      mins.addEventListener('input', ()=>{ outlineObj.sections[idx].minutes = Math.max(0, Number(mins.value)||0); saveOutlinesLocal(); });
-      desc.addEventListener('input', ()=>{ outlineObj.sections[idx].desc = desc.value; saveOutlinesLocal(); });
+  /* ---------------- rendering ---------------- */
+  function subLinksHTML(links){
+    // compact, indented pills; no anchors (no navigation in Saved)
+    return (links||[]).map((w,i)=> `
+      <div class="relative" data-idx="${i}" style="position:relative;">
+        <div class="link-card section-link" draggable="true" data-idx="${i}" style="padding:.4rem .55rem; font-size:.9rem;">
+          ${w.icon==='img' && w.img
+            ? `<img src="${escapeHtml(w.img)}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>`
+            : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`}
+          <span class="truncate max-w-[12rem]">${escapeHtml(w.label||'Untitled')}</span>
+        </div>
+        <button class="btn-xxs" title="Delete" data-act="del-link"
+          style="position:absolute;top:-8px;right:-8px;border-radius:9999px;border:var(--borderW) solid var(--border);background:#fff;">🗑️</button>
+      </div>`).join('');
+  }
 
-      block.querySelector('[data-act="delete"]').addEventListener('click', ()=>{
-        if(!confirm('Delete section?')) return;
-        outlineObj.sections.splice(idx,1);
-        saveOutlinesLocal(); renderOutlineEditor(block.closest('.editor'), outlineObj);
-      });
+  function inlineShelfHTML(shelf){
+    // shown inside a section only when that section is editing
+    return `
+      <div class="mt-2 p-2 rounded-xl border border-[var(--border)] bg-white" data-role="inline-shelf">
+        <div class="editor-shelf" data-role="shelf-row">
+          ${shelf && shelf.length ? shelf.map(w=>`
+            <div class="relative" data-wid="${w.id}" style="position:relative;">
+              <div class="link-card draggable-shelf" draggable="true" data-wid="${w.id}" title="${escapeHtml(w.url||'')}" style="cursor:grab">
+                ${w.icon==='img' && w.img
+                  ? `<img src="${escapeHtml(w.img)}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>`
+                  : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`}
+                <div class="min-w-0">
+                  <div class="truncate">${escapeHtml(w.label||'Untitled')}</div>
+                  <div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div>
+                </div>
+              </div>
+              <button class="btn-xxs" title="Delete from shelf" data-act="del-shelf"
+                style="position:absolute;top:-8px;right:-8px;border-radius:9999px;border:var(--borderW) solid var(--border);background:#fff;">🗑️</button>
+            </div>
+          `).join('') : `<div class="text-xs muted">No shelf widgets yet.</div>`}
+        </div>
+        <div class="text-xs muted mt-1">Tip: drag a widget into this section’s links. Click any widget to edit.</div>
+      </div>`;
+  }
 
-      // Link field changes
-      block.querySelectorAll('.link-title').forEach((inp, li)=> inp.addEventListener('input', ()=>{ outlineObj.sections[idx].links[li].label = inp.value; saveOutlinesLocal(); }));
-      block.querySelectorAll('.link-url').forEach((inp, li)=> inp.addEventListener('input', ()=>{ outlineObj.sections[idx].links[li].url = inp.value; saveOutlinesLocal(); }));
+  function sectionCardHTML(oId, s){
+    const inEdit = editingSections.has(keyOf(oId, s.id));
+    const links = s.links || [];
+    return `
+      <div class="p-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]" data-sid="${s.id}">
+        <div class="flex items-center gap-2">
+          <div class="font-semibold truncate flex-1">${escapeHtml(s.name||'Untitled section')}</div>
+          <span class="text-xs muted w-14 text-right">${fmtMins(s.minutes)}m</span>
+          <button class="btn-xxs" data-act="${inEdit?'done-sec':'edit-sec'}">${inEdit?'Done':'Edit'}</button>
+        </div>
 
-      // Buttons on link rows
-      block.querySelectorAll('[data-act="remove"]').forEach((btn, li)=> btn.addEventListener('click', ()=>{
-        outlineObj.sections[idx].links.splice(li,1); saveOutlinesLocal(); renderOutlineEditor(block.closest('.editor'), outlineObj);
-      }));
-      block.querySelectorAll('[data-act="icon"]').forEach((btn, li)=> btn.addEventListener('click', ()=>{
-        const cur = outlineObj.sections[idx].links[li];
-        const type = (prompt('Icon type: emoji / img', cur.icon||'emoji')||'emoji').toLowerCase();
-        if(type==='img'){ cur.icon='img'; cur.img=prompt('Image URL (.png/.ico):', cur.img||'')||''; cur.emoji=''; }
-        else{ cur.icon='emoji'; cur.emoji=prompt('Emoji/text:', cur.emoji||'🔗')||'🔗'; cur.img=''; }
-        saveOutlinesLocal(); renderOutlineEditor(block.closest('.editor'), outlineObj);
-      }));
+        <!-- compact, indented sub-links (always visible) -->
+        <div class="mt-2" data-role="links-bar"
+             style="margin-left:16px; background:var(--panel-muted); border:var(--borderW) solid var(--border); border-radius:10px; padding:.45rem .5rem; display:flex; flex-wrap:wrap; gap:.45rem; min-height:40px;">
+          ${subLinksHTML(links)}
+        </div>
 
-      // Drag FROM link rows (reorder)
-      block.querySelectorAll('.editor-link-row').forEach(row=>{
-        row.addEventListener('dragstart', e=>{
-          const sidx = Number(row.dataset.sidx); const li = Number(row.dataset.li);
-          const payloadStr = JSON.stringify({type:'reorder', index: li, sidx});
-          try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
-          e.dataTransfer.effectAllowed='move';
-          row.classList.add('drag-ghost');
+        ${inEdit ? inlineShelfHTML((getWidgetShelf&&getWidgetShelf())||[]) : ''}
+      </div>`;
+  }
+
+  function outlineCardHTML(o){
+    return `
+      <div class="card p-4" data-oid="${o.id}">
+        <div class="flex items-center gap-2">
+          <h4 class="font-bold text-lg truncate flex-1" draggable="true">${escapeHtml(o.title||'Untitled outline')}</h4>
+          <button class="btn-xs" data-act="load">Load</button>
+          <button class="btn-xs" data-act="delete">Delete</button>
+        </div>
+        <div class="mt-3 space-y-3">
+          ${(o.sections||[]).map(s=> sectionCardHTML(o.id, s)).join('')}
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <input class="input flex-1 text-sm" placeholder="Section title" data-role="new-title"/>
+          <input class="input w-28 text-sm" placeholder="Minutes" type="number" min="0.25" step="0.25" data-role="new-mins"/>
+          <button class="btn-xs" data-act="add-section">+ Add Section</button>
+        </div>
+      </div>`;
+  }
+
+  function renderSavedOutlines(){
+    if(!savedListEl) return;
+    const outlines = getSavedOutlines() || [];
+    savedListEl.innerHTML = outlines.length
+      ? outlines.map(outlineCardHTML).join('')
+      : `<div class="card p-4">No saved outlines yet.</div>`;
+
+    // Wire each outline card
+    outlines.forEach(o=>{
+      const card = savedListEl.querySelector(`[data-oid="${o.id}"]`);
+      if(!card) return;
+
+      // ===== Merge via drag title onto another card =====
+      const titleEl = card.querySelector('h4');
+      if (titleEl) {
+        titleEl.setAttribute('draggable', 'true');
+
+        titleEl.addEventListener('dragstart', (e)=>{
+          draggingOutlineId = o.id;
+          try {
+            e.dataTransfer.setData('text/plain', JSON.stringify({ type:'merge', id:o.id }));
+          } catch {}
+          e.dataTransfer.effectAllowed = 'move';
+          card.classList.add('drag-ghost');
         });
-        row.addEventListener('dragend', ()=> row.classList.remove('drag-ghost'));
+
+        titleEl.addEventListener('dragend', ()=>{
+          draggingOutlineId = null;
+          card.classList.remove('drag-ghost');
+          document.querySelectorAll('[data-oid]').forEach(el=>{
+            el.style.outline = ''; el.style.outlineOffset = '';
+          });
+        });
+      }
+
+      // Allow drop anywhere on the card (except itself)
+      card.addEventListener('dragover', (e)=>{
+        if (draggingOutlineId && draggingOutlineId !== o.id) {
+          e.preventDefault();
+          card.style.outline = '2px dashed var(--accent)';
+          card.style.outlineOffset = '4px';
+        }
       });
 
-      // Drop target for adding/reordering links
-      const linksArea = block.querySelector('.editor-links-area');
-      let over=0;
-      linksArea.addEventListener('dragenter', ()=>{ over++; linksArea.classList.add('drag-over-outline'); });
-      linksArea.addEventListener('dragleave', ()=>{ over=Math.max(0,over-1); if(over===0) linksArea.classList.remove('drag-over-outline'); });
-      linksArea.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
-      linksArea.addEventListener('drop', e=>{
-        e.preventDefault(); over=0; linksArea.classList.remove('drag-over-outline');
-        const payload = parseDropPayload(e.dataTransfer); if(!payload) return;
-        const section = outlineObj.sections[idx];
-        if(payload.type==='shelf'){
-          const w=(getWidgetShelf()||[]).find(x=>x.id===payload.id); if(!w) return;
-          section.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
-          saveOutlinesLocal(); renderOutlineEditor(linksArea.closest('.editor'), outlineObj);
-        }else if(payload.type==='reorder' && (payload.sidx===undefined || payload.sidx===idx)){
-          const from = payload.index;
-          const items=[...linksArea.querySelectorAll('.editor-link-row')];
-          let to = items.length;
-          for(let i=0;i<items.length;i++){ const r=items[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
-          if(from===to) return;
-          const [m]=section.links.splice(from,1); section.links.splice(to,0,m);
-          saveOutlinesLocal(); renderOutlineEditor(linksArea.closest('.editor'), outlineObj);
+      card.addEventListener('dragleave', ()=>{
+        card.style.outline = ''; card.style.outlineOffset = '';
+      });
+
+      card.addEventListener('drop', (e)=>{
+        card.style.outline = ''; card.style.outlineOffset = '';
+        if (!draggingOutlineId || draggingOutlineId === o.id) return;
+        e.preventDefault();
+
+        const srcId = draggingOutlineId;
+        const list = getSavedOutlines() || [];
+        const src = byId(list, srcId);
+        const tgt = o;
+        if (!src || !tgt) return;
+
+        if (mergeBar) {
+          mergeBar.style.display = 'block';
+          if (mergeSrcName)  mergeSrcName.textContent  = src.title || 'Untitled';
+          if (mergeTgtName)  mergeTgtName.textContent  = tgt.title || 'Untitled';
+          if (mergeTitleInp) mergeTitleInp.value = `${tgt.title||'Untitled'} + ${src.title||'Untitled'}`;
+
+          mergeConfirm.onclick = ()=>{
+            const merged = {
+              id: 'O'+Date.now().toString(36),
+              title: (mergeTitleInp?.value || '').trim() || `${tgt.title||''} + ${src.title||''}`,
+              sections: [
+                ...(tgt.sections||[]).map(s=>structuredClone(s)),
+                ...(src.sections||[]).map(s=>structuredClone(s))
+              ]
+            };
+            list.push(merged);
+            setSavedOutlines(list);
+            saveAll();
+            mergeBar.style.display = 'none';
+            renderSavedOutlines();
+          };
+          mergeCancel.onclick = ()=>{ mergeBar.style.display = 'none'; };
+        }
+      });
+
+      // ===== Outline header buttons =====
+      card.querySelector('[data-act="load"]')?.addEventListener('click', ()=> applyOutline && applyOutline(o));
+      card.querySelector('[data-act="delete"]')?.addEventListener('click', ()=>{
+        if(!confirm('Delete this outline?')) return;
+        const list = getSavedOutlines(); const idx = list.findIndex(x=>x.id===o.id);
+        if(idx>=0){ list.splice(idx,1); setSavedOutlines(list); saveAll(); renderSavedOutlines(); }
+      });
+
+      // ===== Add section =====
+      const addBtn = card.querySelector('[data-act="add-section"]');
+      addBtn?.addEventListener('click', ()=>{
+        const tInp = card.querySelector('[data-role="new-title"]');
+        const mInp = card.querySelector('[data-role="new-mins"]');
+        const title = (tInp?.value||'').trim() || 'New section';
+        const mins  = Math.max(0.25, Number(mInp?.value || 5));
+        const list = getSavedOutlines(); const me = byId(list, o.id); if(!me) return;
+        me.sections = me.sections || [];
+        me.sections.push({ id:'S'+Date.now().toString(36), name:title, minutes:mins, links:[] });
+        setSavedOutlines(list); saveAll(); renderSavedOutlines();
+      });
+
+      // ===== Per-section behaviors =====
+      card.querySelectorAll('[data-sid]').forEach(secEl=>{
+        const sid  = secEl.getAttribute('data-sid');
+        const k    = keyOf(o.id, sid);
+        const list = getSavedOutlines();
+        const me   = byId(list, o.id);
+        const sec  = me?.sections?.find(x=>x.id===sid);
+        if(!sec) return;
+
+        // Toggle inline shelf
+        secEl.querySelector('[data-act="edit-sec"]')?.addEventListener('click', ()=>{
+          editingSections.add(k); renderSavedOutlines();
+        });
+        secEl.querySelector('[data-act="done-sec"]')?.addEventListener('click', ()=>{
+          editingSections.delete(k); renderSavedOutlines();
+        });
+
+        // Links bar (always visible)
+        const bar = secEl.querySelector('[data-role="links-bar"]');
+        // Drag visuals + accept drops
+        let overCount=0;
+        bar.addEventListener('dragenter', ()=>{ overCount++; bar.classList.add('drag-over-outline'); });
+        bar.addEventListener('dragleave', ()=>{ overCount=Math.max(0,overCount-1); if(overCount===0) bar.classList.remove('drag-over-outline'); });
+        bar.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+        bar.addEventListener('drop', (e)=>{
+          e.preventDefault(); overCount=0; bar.classList.remove('drag-over-outline');
+          const payload = parsePayload(e.dataTransfer);
+          const list2 = getSavedOutlines();
+          const me2 = byId(list2, o.id); const sec2 = me2?.sections?.find(x=>x.id===sid);
+          if(!sec2) return;
+          sec2.links = sec2.links || [];
+
+          if(payload?.type==='shelf'){
+            const shelf = (getWidgetShelf && getWidgetShelf()) || [];
+            const w = shelf.find(x=>x.id===payload.id); if(!w) return;
+            sec2.links.push({ id:'l_'+Date.now().toString(36), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
+            setSavedOutlines(list2); saveAll(); renderSavedOutlines();
+          }else if(payload?.type==='reorder'){
+            const from = payload.index;
+            const cards = [...bar.querySelectorAll('.section-link')];
+            let to = cards.length;
+            for(let i=0;i<cards.length;i++){
+              const r=cards[i].getBoundingClientRect();
+              if(e.clientY < r.top + r.height/2){ to=i; break; }
+            }
+            if(from==null || to==null || from===to) return;
+            const [moved] = sec2.links.splice(from,1);
+            sec2.links.splice(to,0,moved);
+            setSavedOutlines(list2); saveAll(); renderSavedOutlines();
+          }
+        });
+
+        // Link pill interactions (edit/delete/reorder) — never navigate
+        bar.querySelectorAll('.section-link').forEach(pill=>{
+          pill.addEventListener('dragstart', (e)=>{
+            const index = Number(pill.dataset.idx);
+            try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'reorder', index})); }catch{}
+            e.dataTransfer.effectAllowed='move';
+            pill.classList.add('drag-ghost');
+          });
+          pill.addEventListener('dragend', ()=> pill.classList.remove('drag-ghost'));
+          pill.addEventListener('click', ()=>{
+            const list2 = getSavedOutlines(); const me2 = byId(list2, o.id); const sec2 = me2?.sections?.find(x=>x.id===sid);
+            const i = Number(pill.dataset.idx); const w = sec2?.links?.[i]; if(!w) return;
+            openWidgetEditor(w, (upd)=>{ Object.assign(w, upd); setSavedOutlines(list2); saveAll(); renderSavedOutlines(); });
+          });
+        });
+        bar.querySelectorAll('[data-act="del-link"]').forEach(bin=>{
+          bin.addEventListener('click', (ev)=>{
+            ev.stopPropagation();
+            const list2 = getSavedOutlines(); const me2 = byId(list2, o.id); const sec2 = me2?.sections?.find(x=>x.id===sid);
+            const pill = bin.parentElement?.querySelector('.section-link'); const i = Number(pill?.dataset.idx ?? -1);
+            if(i>=0){ sec2.links.splice(i,1); setSavedOutlines(list2); saveAll(); renderSavedOutlines(); }
+          });
+        });
+
+        // Inline shelf (when editing this section)
+        const shelfWrap = secEl.querySelector('[data-role="inline-shelf"]');
+        if(shelfWrap){
+          // draggable shelf cards
+          shelfWrap.querySelectorAll('.draggable-shelf').forEach(card=>{
+            card.addEventListener('dragstart', (e)=>{
+              const id=card.dataset.wid;
+              try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'shelf', id})); }catch{}
+              e.dataTransfer.effectAllowed='copy';
+              card.classList.add('drag-ghost');
+            });
+            card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+            // single-click edits shelf item (not the section link)
+            card.addEventListener('click', ()=>{
+              if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
+              const shelf = (getWidgetShelf&&getWidgetShelf())||[];
+              const w = shelf.find(x=>x.id===card.dataset.wid); if(!w) return;
+              openWidgetEditor(w, (upd)=>{ Object.assign(w, upd); setWidgetShelf([...shelf]); renderSavedOutlines(); });
+            });
+          });
+          // delete shelf item
+          shelfWrap.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
+            btn.addEventListener('click', (e)=>{
+              e.stopPropagation();
+              if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
+              const wid = btn.closest('[data-wid]')?.dataset.wid;
+              const shelf = (getWidgetShelf&&getWidgetShelf())||[];
+              const idx = shelf.findIndex(x=>x.id===wid);
+              if(idx>=0){ shelf.splice(idx,1); setWidgetShelf([...shelf]); renderSavedOutlines(); }
+            });
+          });
         }
       });
     });
   }
 
-  function renderSavedOutlines(afterRenderCb){
-    const savedOutlines = getSavedOutlines();
-    ensureOutlineShapes(savedOutlines);
-    savedList.innerHTML = savedOutlines.map(o=>`
-      <div class="card p-4" data-oid="${o.id}">
-        <div class="flex items-center gap-2">
-          <input class="input flex-1 outline-title" value="${escapeHtml(o.title)}" aria-label="Outline title"/>
-          <div class="ml-auto flex items-center gap-2">
-            <button class="btn-xs" data-act="edit">Edit</button>
-            <button class="btn-xs" data-act="load">Load</button>
-            <button class="btn-xs" data-act="delete">Delete</button>
-          </div>
-        </div>
-        <div class="mt-3 hidden editor"></div>
-      </div>`).join('');
+  /* ---------------- create outline wiring ---------------- */
+  createBtn && (createBtn.onclick = ()=>{
+    createForm?.classList.toggle('hidden');
+    if(createForm && !createForm.classList.contains('hidden')){ createTitle.value=''; createTitle.focus(); }
+  });
+  createCancel && (createCancel.onclick = ()=> createForm?.classList.add('hidden'));
+  createOk && (createOk.onclick = ()=>{
+    const t = (createTitle?.value||'').trim() || 'New outline';
+    const list = getSavedOutlines() || [];
+    list.push({ id:'O'+Date.now().toString(36), title:t, sections:[] });
+    setSavedOutlines(list); saveAll(); createForm?.classList.add('hidden'); renderSavedOutlines();
+  });
 
-    // Per-card wiring
-    savedList.querySelectorAll('[data-oid]').forEach(card=>{
-      const oid = card.dataset.oid;
-      const outlineObj = getSavedOutlines().find(x=>x.id===oid);
+  // Initial draw
+  renderSavedOutlines();
 
-      // Allow drag-to-merge ONLY when no editor is open
-      const willAllowDnD = ()=> !anySavedEditorOpen();
-      const setCardDraggable = ()=>{
-        card.draggable = willAllowDnD();
-        card.classList.toggle('opacity-60', anySavedEditorOpen());
-      };
-      setCardDraggable();
-
-      card.addEventListener('dragstart', (e)=>{ if(!willAllowDnD()){ e.preventDefault(); return; } e.dataTransfer.setData('text/plain', oid); e.dataTransfer.effectAllowed='move'; card.classList.add('drag-ghost'); });
-      card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-      card.addEventListener('dragover', (e)=>{ if(!willAllowDnD()) return; e.preventDefault(); card.classList.add('drag-over-outline'); });
-      card.addEventListener('dragleave', ()=> card.classList.remove('drag-over-outline'));
-      card.addEventListener('drop', (e)=>{
-        if(!willAllowDnD()) return;
-        e.preventDefault(); card.classList.remove('drag-over-outline');
-        const sourceId = e.dataTransfer.getData('text/plain'); const targetId = oid; if(!sourceId || sourceId===targetId) return;
-        const src = getSavedOutlines().find(x=>x.id===sourceId); const tgt = getSavedOutlines().find(x=>x.id===targetId); if(!src || !tgt) return;
-        mergeProposal = {sourceId, targetId};
-        mergeSourceName.textContent = src.title; mergeTargetName.textContent = tgt.title;
-        mergeTitleInput.value = `${tgt.title} + ${src.title}`; mergeBar.style.display='block'; mergeTitleInput.focus();
-      });
-
-      // Title change (live)
-      card.querySelector('.outline-title')?.addEventListener('input', e=>{
-        outlineObj.title = e.target.value;
-        saveOutlinesLocal();
-        renderHomeSavedBar();
-        touchCloud();
-      });
-
-      // Edit toggle
-      card.querySelector('[data-act="edit"]').addEventListener('click', ()=>{
-        const editor = card.querySelector('.editor');
-        const opening = editor.classList.contains('hidden');
-        editor.classList.toggle('hidden', !opening);
-        if(opening){ card.setAttribute('data-editing','true'); renderOutlineEditor(editor, outlineObj); }
-        else{ card.removeAttribute('data-editing'); }
-        savedList.querySelectorAll('[data-oid]').forEach(c=> c.draggable = !anySavedEditorOpen());
-        savedList.querySelectorAll('[data-oid]').forEach(c=> c.classList.toggle('opacity-60', anySavedEditorOpen()));
-      });
-
-      // Load into Home
-      card.querySelector('[data-act="load"]').addEventListener('click', ()=>{ applyOutline(outlineObj); document.querySelector('.tab-link[data-tab="homeTab"]')?.click(); });
-
-      // Delete outline
-      card.querySelector('[data-act="delete"]').addEventListener('click', ()=>{
-        if(!confirm('Delete this outline?')) return;
-        const arr = getSavedOutlines().slice();
-        const idx = arr.findIndex(x=>x.id===oid);
-        if(idx>=0){ arr.splice(idx,1); setSavedOutlines(arr); saveOutlinesLocal(); renderSavedOutlines(); renderHomeSavedBar(); touchCloud(); }
-      });
-    });
-
-    // Merge bar
-    mergeCancelBtn.onclick = ()=>{ mergeProposal=null; mergeBar.style.display='none'; };
-    mergeConfirmBtn.onclick = ()=>{
-      if(!mergeProposal) return;
-      const arr = getSavedOutlines().slice();
-      const {sourceId, targetId} = mergeProposal; const src = arr.find(x=>x.id===sourceId); const tgt = arr.find(x=>x.id===targetId); if(!src || !tgt) return;
-      const newSections = [
-        ...tgt.sections.map(s=>({ ...structuredClone(s), id:'S'+Math.random().toString(16).slice(2) })),
-        ...src.sections.map(s=>({ ...structuredClone(s), id:'S'+Math.random().toString(16).slice(2) }))
-      ];
-      const title = (mergeTitleInput.value||'').trim() || `${tgt.title} + ${src.title}`;
-      const merged = { id:'O'+Date.now(), title, sections:newSections, createdAt: Date.now() };
-      arr.unshift(merged); setSavedOutlines(arr); saveOutlinesLocal(); mergeProposal=null; mergeBar.style.display='none'; renderSavedOutlines(); renderHomeSavedBar(); touchCloud();
-    };
-
-    if(typeof afterRenderCb==='function') afterRenderCb();
-  }
-
-  // Create outline UI
-  createOutlineBtn.onclick = ()=>{
-    createOutlineForm.classList.remove('hidden');
-    newOutlineTitleInput.value=''; newOutlineTitleInput.focus();
-  };
-  createOutlineCancel.onclick = ()=> createOutlineForm.classList.add('hidden');
-  createOutlineConfirm.onclick = ()=>{
-    const title = (newOutlineTitleInput.value||'').trim() || 'New outline';
-    const arr = getSavedOutlines().slice();
-    const outlineObj = { id:'O'+Date.now()+Math.random().toString(16).slice(2), title, sections:[], createdAt: Date.now() };
-    arr.unshift(outlineObj); setSavedOutlines(arr); saveOutlinesLocal();
-    createOutlineForm.classList.add('hidden');
-    renderSavedOutlines(()=>{ // open editor instantly
-      const card = document.querySelector(`[data-oid="${outlineObj.id}"]`);
-      if(card){ const editor = card.querySelector('.editor'); if(editor && editor.classList.contains('hidden')){ editor.classList.remove('hidden'); card.setAttribute('data-editing','true'); renderOutlineEditor(editor, outlineObj); } }
-    });
-    touchCloud();
-  };
-
-  // Utilities
-  function escapeHtml(s){ return (s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
-  function parseDropPayload(dt){
-    let data = ''; const types = dt?.types ? Array.from(dt.types) : [];
-    if(types.includes('text/plain')) data = dt.getData('text/plain');
-    if(!data && types.includes('text')) data = dt.getData('text');
-    if(!data) data = dt.getData('application/json') || dt.getData('Text') || '';
-    try{ return JSON.parse(data); }catch{ return null; }
-  }
-
-  // Initial paint
-  function init(){ renderSavedOutlines(); }
-  init();
-
-  // Public API back to index
-  return {
-    renderSavedOutlines
-  };
+  return { renderSavedOutlines };
 }
-
