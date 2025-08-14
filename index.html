@@ -63,6 +63,12 @@
     <!-- Controls -->
     <section class="flex flex-wrap items-center gap-3 mb-3">
       <button id="startBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm">Start Study Session</button>
+
+      <!-- One-time gate shown right when a section completes -->
+      <button id="readyNextBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm hidden">
+        I’m ready — start next ▶
+      </button>
+
       <button id="prevBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">◀ Prev</button>
       <button id="nextBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Next ▶</button>
       <button id="resetBtn" class="ml-auto px-3 py-2 rounded-xl border border-[var(--border)]">Reset</button>
@@ -315,7 +321,7 @@
   ];
   let prefs = loadJSON('prefs_v1') || { splitRatio:56, outlineCollapsed:false, focusDefault:false, theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 } };
   let savedOutlines = loadJSON('saved_outlines_v1') || [];
-  let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0 };
+  let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0, awaitingNext:false };
 
   // Cloud
   const auth = getAuth(app);
@@ -377,6 +383,8 @@
 
   /*************** Progress / Timer ***************/
   const startBtn = $('#startBtn'); const prevBtn=$('#prevBtn'); const nextBtn=$('#nextBtn'); const resetBtn=$('#resetBtn');
+  const readyNextBtn = $('#readyNextBtn');
+
   const currentTitleEl = $('#currentTitle'); const sectionDescEl=$('#sectionDesc'); const linksDiv=$('#links');
   const linkShelfDiv=$('#linkShelf'); const shelfWrap=$('#shelfWrap'); const editSectionBtn=$('#editSectionBtn'); const clearSectionLinksBtn=$('#clearSectionLinks');
   const addWidgetBtn=$('#addWidgetBtn'); const resetShelfBtn=$('#resetShelfBtn');
@@ -388,12 +396,43 @@
   const progressHost=$('#progressHost'), progressFill=$('#progressFill'), progressSegments=$('#progressSegments'),
         progressTicks=$('#progressTicks'), progressPctEl=$('#progressPct'), legend=$('#legend'), scrubOverlay=$('#scrubOverlay');
 
+  // Split panes (drag-to-resize)
+  const splitEl = $('#split'), leftPane = $('#leftPane'), rightPane = $('#rightPane'), splitHandle = $('#splitHandle');
+  function applySplitRatio(r){ splitEl.style.setProperty('--leftRatio', (r||56) + '%'); }
+  applySplitRatio(prefs.splitRatio||56);
+  let draggingSplit=false, splitLast= prefs.splitRatio||56;
+  splitHandle.addEventListener('pointerdown', (e)=>{
+    draggingSplit=true;
+    splitHandle.setPointerCapture(e.pointerId);
+    document.body.classList.add('no-select');
+    onSplitMove(e);
+  });
+  splitHandle.addEventListener('pointermove', (e)=>{ if(draggingSplit) onSplitMove(e); });
+  splitHandle.addEventListener('pointerup', ()=>{
+    if(!draggingSplit) return;
+    draggingSplit=false;
+    document.body.classList.remove('no-select');
+    prefs.splitRatio = Math.round(splitLast*10)/10;
+    savePrefs();
+  });
+  function onSplitMove(e){
+    const rect = splitEl.getBoundingClientRect();
+    const x = Math.max(rect.left, Math.min(e.clientX, rect.right));
+    const total = rect.width;
+    const minPx = 360; // match CSS min-width
+    const minPct = (minPx/total)*100;
+    let pct = ((x - rect.left)/total)*100;
+    pct = Math.max(minPct, Math.min(100 - minPct, pct));
+    splitLast = pct;
+    applySplitRatio(pct);
+  }
+
   function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
   function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
   function scheduleTotalSecs(s){ return s.reduce((a,b)=>a+minsToSecs(b.minutes||0),0); }
   function elapsedSeconds(sched, idx, secsLeft){ const past=sched.slice(0,idx).reduce((a,b)=>a+minsToSecs(b.minutes||0),0); const cur=sched[idx]?minsToSecs(sched[idx].minutes||0)-secsLeft:0; return past+cur; }
 
-  let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, sessionStarted=false, totalSessionSecs=0;
+  let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, sessionStarted=false, totalSessionSecs=0, awaitingNext=false;
 
   function updateClockColor(){
     clockEl.classList.remove('text-emerald-600','text-rose-600');
@@ -403,9 +442,11 @@
     if(!sessionStarted) startBtn.textContent='Start Study Session';
     else if(running) startBtn.textContent='Pause Session';
     else startBtn.textContent='Resume Session';
+    startBtn.disabled = !!awaitingNext;
   }
   function setTimerFromState(st){
     sessionStarted=!!st.sessionStarted; running=false; currentIndex=st.currentIndex||0; secondsLeft=Math.max(0,Math.round(st.secondsLeft||0));
+    awaitingNext = !!st.awaitingNext;
     if(st.running && st.lastSyncTs){
       let delta=Math.floor((Date.now()-st.lastSyncTs)/1000), idx=currentIndex, remain=secondsLeft;
       while(delta>0 && currentSession[idx]){
@@ -414,7 +455,10 @@
       }
       currentIndex=Math.min(idx, Math.max(0,currentSession.length-1)); secondsLeft=Math.max(0,remain||0);
     }
-    totalSessionSecs=scheduleTotalSecs(currentSession); updateStartBtnLabel(); renderAll();
+    totalSessionSecs=scheduleTotalSecs(currentSession);
+    renderAll();
+    if(awaitingNext) showNextGate(); else hideNextGate();
+    updateStartBtnLabel();
   }
   function syncEnd(){ endTimeMs=performance.now()+secondsLeft*1000; }
   function startTimer(){ if(running) return; running=true; syncEnd(); loop(); updateStartBtnLabel(); updateClockColor(); markTimer(); }
@@ -424,24 +468,51 @@
     const remaining=Math.max(0,Math.ceil((endTimeMs-performance.now())/1000));
     if(remaining!==secondsLeft){ secondsLeft=remaining; $('#clock').textContent=secsToClock(secondsLeft); updateProgress(); }
     if(secondsLeft<=0){
-      if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); syncEnd(); beep(); renderAll(); }
-      else{ stopTimer(); beep(); sessionStarted=false; updateStartBtnLabel(); markTimer(); alert('Session complete! 🎉'); return; }
+      // Section finished
+      if(currentIndex<currentSession.length-1){
+        stopTimer();
+        awaitingNext = true;
+        showNextGate();
+        beep();
+        markTimer();
+        return;
+      }else{
+        stopTimer(); beep(); sessionStarted=false; updateStartBtnLabel(); markTimer(); alert('Session complete! 🎉'); return;
+      }
     }
     rafId=requestAnimationFrame(loop);
   }
   const markTimer = ()=>{
-    timerState={ sessionStarted,running,currentIndex,secondsLeft,lastSyncTs:Date.now() };
+    timerState={ sessionStarted,running,currentIndex,secondsLeft,lastSyncTs:Date.now(), awaitingNext };
     saveTimerLocal();
+  };
+
+  // Gate controls
+  function showNextGate(){ readyNextBtn.classList.remove('hidden'); updateStartBtnLabel(); }
+  function hideNextGate(){ readyNextBtn.classList.add('hidden'); updateStartBtnLabel(); }
+  readyNextBtn.onclick = ()=>{
+    if(!awaitingNext) return;
+    awaitingNext=false;
+    hideNextGate();
+    if(currentIndex<currentSession.length-1){
+      currentIndex++;
+      secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0);
+      syncEnd();
+      startTimer();
+      renderAll();
+      markTimer();
+    }
   };
 
   startBtn.onclick = ()=>{
     if(!currentSession.length) return;
+    if(awaitingNext) return; // wait for explicit confirmation
     if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(currentSession[0].minutes||0); totalSessionSecs=scheduleTotalSecs(currentSession); sessionStarted=true; markTimer(); startTimer(); }
     else{ running?stopTimer():startTimer(); }
   };
-  prevBtn.onclick = ()=>{ if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } updateStartBtnLabel(); };
-  nextBtn.onclick = ()=>{ if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } else stopTimer(); updateStartBtnLabel(); };
-  resetBtn.onclick = ()=>{ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((currentSession[0]||{}).minutes||0); renderAll(); updateStartBtnLabel(); markTimer(); };
+  prevBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } updateStartBtnLabel(); };
+  nextBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } else stopTimer(); updateStartBtnLabel(); };
+  resetBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((currentSession[0]||{}).minutes||0); renderAll(); updateStartBtnLabel(); markTimer(); };
 
   function buildProgress(){
     const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
@@ -449,7 +520,7 @@
     sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; progressSegments.appendChild(seg); });
     let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); progressTicks.appendChild(tick); }
     sched.forEach((sec,i)=>{ const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); chip.innerHTML=`${escapeHtml(sec.name||'')} <span class="opacity-80">(${sec.minutes||0}m)</span>`; chip.onclick=()=>jumpToSection(i); legend.appendChild(chip); });
-    updateProgress();   // ensure fill width is applied after building
+    updateProgress();
   }
   function updateLegendActive(){ legend.querySelectorAll('.chip').forEach((el, i)=> el.classList.toggle('chip-active', i===currentIndex)); }
   function updateProgress(){
@@ -461,14 +532,14 @@
     updateLegendActive();
   }
   function pctFromEvent(e){ const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
-  function jumpFromPct(p){ const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0; for(let i=0;i<sched.length;i++){ const dur=minsToSecs(sched[i].minutes||0); if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); renderAll(); markTimer(); return; } cum+=dur; } currentIndex=sched.length-1; secondsLeft=0; stopTimer(); renderAll(); markTimer(); }
+  function jumpFromPct(p){ const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0; for(let i=0;i<sched.length;i++){ const dur=minsToSecs(sched[i].minutes||0); if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); renderAll(); markTimer(); awaitingNext=false; hideNextGate(); return; } cum+=dur; } currentIndex=sched.length-1; secondsLeft=0; stopTimer(); renderAll(); markTimer(); awaitingNext=false; hideNextGate(); }
   let scrubbing=false;
   scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true;scrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEvent(e));});
   scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing)jumpFromPct(pctFromEvent(e));});
   scrubOverlay.addEventListener('pointerup',()=>{scrubbing=false;});
   scrubOverlay.addEventListener('pointercancel',()=>{scrubbing=false;});
 
-  function jumpToSection(i){ if(!currentSession[i]) return; currentIndex=i; secondsLeft=minsToSecs(currentSession[i].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); }
+  function jumpToSection(i){ if(!currentSession[i]) return; awaitingNext=false; hideNextGate(); currentIndex=i; secondsLeft=minsToSecs(currentSession[i].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); }
 
   /*************** Current panel (Home) ***************/
   let isEditingSection=false;
@@ -523,8 +594,8 @@
 
   function renderCurrentLinks(){
     const sec=currentSectionRef(); const arr=sec?.links||[];
-    linksDiv.innerHTML = arr.map((w,i)=>`
-      <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
+    linksDiv.innerHTML = arr.map((w,i)=>
+      `<div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
         ${w.icon==='img' && w.img ? `<img src="${w.img}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>` : `<span class="link-icon">${w.emoji||'🔗'}</span>`}
         <a class="truncate max-w-[14rem]" href="${w.url||'#'}" target="_blank" rel="noopener">${escapeHtml(w.label||'Untitled')}</a>
         ${isEditingSection ? `<div class="ml-auto flex items-center gap-1"><button class="btn-xs" data-act="edit">Edit</button><button class="btn-xs" data-act="remove">Del</button></div>` : ''}
@@ -587,8 +658,8 @@
 
   /*************** Outline (Home) ***************/
   function renderOutline(){
-    outline.innerHTML = currentSession.map((s,i)=>`
-      <li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}">
+    outline.innerHTML = currentSession.map((s,i)=>
+      `<li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}">
         <div class="flex items-center gap-3">
           <button class="text-left min-w-0 flex-1 truncate text-sm font-semibold focus:outline-none">${escapeHtml(s.name||'')}</button>
           <div class="flex items-center gap-2 shrink-0">
@@ -631,6 +702,7 @@
         if(delIdx<0 || !confirm('Delete this section?')) return;
         const deletingCurrent = delIdx === currentIndex;
         currentSession.splice(delIdx,1);
+        awaitingNext=false; hideNextGate();
         if(currentSession.length===0){ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=0; }
         else{
           if(delIdx < currentIndex) currentIndex--;
@@ -663,7 +735,8 @@
     currentSession = clone;
     sectionNotes = {};
     clone.forEach(sec=>{ const src = outlineObj.sections.find(ss=>ss.id===sec.id); if(src && src.desc!=null) sectionNotes[sec.id] = src.desc; });
-    timerState = { sessionStarted:false, running:false, currentIndex:0, secondsLeft:minsToSecs((clone[0]||{}).minutes||0), outlineId: outlineObj.id, lastSyncTs: Date.now() };
+    timerState = { sessionStarted:false, running:false, currentIndex:0, secondsLeft:minsToSecs((clone[0]||{}).minutes||0), outlineId: outlineObj.id, lastSyncTs: Date.now(), awaitingNext:false };
+    awaitingNext=false; hideNextGate();
     saveCurrentSession(); saveNotes(); saveTimerLocal(); renderAll(); updateStartBtnLabel();
   }
 
@@ -745,6 +818,7 @@
           if(d.savedOutlines) savedOutlines = d.savedOutlines;
           if(d.timer) timerState = d.timer;
           applyTheme(prefs.theme||{});
+          applySplitRatio(prefs.splitRatio||56);
           setTimerFromState(timerState); renderAll(); renderHomeSavedBar(); setCloudMode('Saved to cloud ✓');
         } else { setCloudMode('Cloud sync on'); }
       }catch{ setLocalMode('Cloud read failed'); }
