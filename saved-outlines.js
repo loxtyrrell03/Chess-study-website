@@ -1,4 +1,4 @@
-// saved-outlines.js — compact edit layout + section modal + add-link chip + home navigation
+// saved-outlines.js — compact edit layout + section modal + shelf “Add” + URL normalization + outline duplicate
 //
 // Exports: setupSavedOutlines({ getSavedOutlines, setSavedOutlines, saveOutlinesLocal,
 //                              getWidgetShelf, setWidgetShelf, applyOutline,
@@ -7,8 +7,10 @@
 // Highlights:
 // • + Section opens a small modal (Title + Minutes).
 // • Edit mode is compact; Title + Minutes on the same row with inline "Title" label.
-// • Links bar has a leading “+” chip that inserts a new link and opens its editor (cancel removes it).
+// • Widget shelf shows a leading “+ Add” chip that creates a new shelf widget and opens its editor.
+// • URLs typed like “aimchess.com” are normalized to “https://www.aimchess.com” on save.
 // • Load button applies the outline and navigates to the Home view.
+// • Outline header has a Duplicate button between Load and Delete; user can rename the copy.
 // • Subsection preview rows are small/indented; drag to reorder. Bins on preview rows.
 // • Link/shelf editing & delete preserved. Outline merge by dragging title preserved.
 
@@ -71,6 +73,22 @@ export function setupSavedOutlines({
     if(location.hash !== '#home') location.hash = '#home';
     (document.getElementById('home') || document.querySelector('[data-view="home"]'))?.scrollIntoView({behavior:'smooth', block:'start'});
   }
+  // Normalize "aimchess.com" -> "https://www.aimchess.com", keep http(s) if present
+  function normalizeUrl(input){
+    let u = (input || '').trim();
+    if(!u) return '';
+    if(/^https?:\/\//i.test(u)) return u;
+    u = u.replace(/^\/\//,''); // remove protocol-relative
+    // split host/path
+    const slash = u.indexOf('/');
+    let host = slash >= 0 ? u.slice(0, slash) : u;
+    const rest = slash >= 0 ? u.slice(slash) : '';
+    if(!/^www\./i.test(host)){
+      const parts = host.split('.');
+      if(parts.length === 2){ host = 'www.' + host; } // add www. for simple hostnames
+    }
+    return 'https://' + host + rest;
+  }
 
   /* ---------- modals ---------- */
   // Link/shelf editor (supports onCancel for newly created items)
@@ -89,7 +107,7 @@ export function setupSavedOutlines({
             <input id="wLabel" class="input mt-1" value="${escapeHtml(widget.label || '')}"/>
           </label>
           <label class="text-sm">URL
-            <input id="wUrl" class="input mt-1" value="${escapeHtml(widget.url || '')}" placeholder="https://…"/>
+            <input id="wUrl" class="input mt-1" value="${escapeHtml(widget.url || '')}" placeholder="https://… or aimchess.com"/>
           </label>
           <label class="text-sm">Icon type
             <select id="wIcon" class="input mt-1">
@@ -129,14 +147,14 @@ export function setupSavedOutlines({
 
     modal.querySelector('#wSave').onclick = ()=>{
       const label = modal.querySelector('#wLabel').value.trim() || 'Untitled';
-      const url   = modal.querySelector('#wUrl').value.trim() || '';
+      let url     = modal.querySelector('#wUrl').value.trim() || '';
+      url = normalizeUrl(url);
       const icon  = iconSel.value==='img' ? 'img' : 'emoji';
       let emoji='', img='';
       if(icon==='img') img = modal.querySelector('#wImg').value.trim();
       else emoji = modal.querySelector('#wEmoji').value.trim() || '🔗';
       onSave({ label, url, icon, emoji, img });
-      // prevent onCancel after Save:
-      onCancel = null;
+      onCancel = null; // prevent cancel handler after successful save
       close();
     };
   }
@@ -213,15 +231,14 @@ export function setupSavedOutlines({
       </div>`;
   }
 
-  // Links bar inner HTML (leading + chip, then pills)
+  // Links bar inner HTML (no add here anymore)
   function linksBarInnerHtml(links){
-    const add = `<button class="add-pill" data-act="add-link" title="Add link"> Add</button>`;
-    const pills = (links||[]).map((w,i)=> linkPillHtml(w,i)).join('');
-    return add + pills;
+    return (links||[]).map((w,i)=> linkPillHtml(w,i)).join('');
   }
 
-  // Inline Widget Shelf (ABOVE Links)
+  // Inline Widget Shelf (ABOVE Links) — now includes a leading “+ Add”
   function inlineShelfHtml(shelf){
+    const add = `<button class="add-pill" data-act="add-shelf" title="Add widget"> Add</button>`;
     const items = (shelf||[]).map(w=>{
       const iconHtml = (w.icon==='img' && w.img)
         ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
@@ -241,7 +258,7 @@ export function setupSavedOutlines({
     return `
       <div data-role="inline-shelf">
         <div class="text-xs muted mb-1" style="font-weight:600">Widget shelf</div>
-        <div class="editor-shelf" data-role="shelf-row">${items || '<div class="text-xs muted">No shelf widgets yet.</div>'}</div>
+        <div class="editor-shelf" data-role="shelf-row">${add}${items || ''}</div>
         <div class="text-xs muted mt-1">Drag from shelf → drop into the “Links” bar below. Click any shelf item to edit.</div>
       </div>`;
   }
@@ -278,7 +295,7 @@ export function setupSavedOutlines({
       </div>`;
   }
 
-  // Outline card
+  // Outline card (now with Duplicate)
   function outlineCardHtml(o, isExpanded){
     const chevron = isExpanded ? '▾' : '▸';
     return `
@@ -287,6 +304,7 @@ export function setupSavedOutlines({
           <div class="flex-1 font-bold text-lg truncate">${escapeHtml(o.title || 'Untitled outline')}</div>
           <button class="btn-xs" data-act="add-section">+ Section</button>
           <button class="btn-xs" data-act="load">Load</button>
+          <button class="btn-xs" data-act="duplicate">Duplicate</button>
           <button class="btn-xs" data-act="delete">Delete</button>
           <button class="btn-xxs" data-act="toggle-expand" aria-expanded="${isExpanded ? 'true':'false'}" title="${isExpanded?'Collapse':'Expand'}">${chevron}</button>
         </div>
@@ -315,6 +333,17 @@ export function setupSavedOutlines({
       card.querySelector('[data-act="load"]')?.addEventListener('click', ()=>{
         applyOutline && applyOutline(o);
         goHome();
+      });
+      card.querySelector('[data-act="duplicate"]')?.addEventListener('click', ()=>{
+        const list = getSavedOutlines() || [];
+        const src  = byId(list, o.id); if(!src) return;
+        const copy = structuredClone(src);
+        copy.id = 'O'+Date.now().toString(36);
+        copy.title = prompt('Duplicate title:', `Copy of ${src.title || 'Outline'}`)?.trim() || `Copy of ${src.title || 'Outline'}`;
+        // ensure new section ids
+        copy.sections = (copy.sections||[]).map((s, i)=> ({...s, id: 'S'+Date.now().toString(36)+i}));
+        list.push(copy);
+        setSavedOutlines(list); saveAll(); renderSavedOutlines();
       });
       card.querySelector('[data-act="delete"]')?.addEventListener('click', ()=>{
         if(!confirm('Delete this outline?')) return;
@@ -462,11 +491,9 @@ export function setupSavedOutlines({
         const secEl = sectionsWrap.querySelector(`[data-sid="${escSel(sec.id)}"][data-view="edit"]`);
         if(!secEl) return;
 
-        // Links bar: ensure pills + add chip
+        // Links bar HTML
         const linksBar = secEl.querySelector('[data-role="links-bar"]');
-        if (linksBar) {
-          linksBar.innerHTML = linksBarInnerHtml(sec.links);
-        }
+        if (linksBar) linksBar.innerHTML = linksBarInnerHtml(sec.links);
 
         // Save button
         secEl.querySelector('[data-act="save-section"]')?.addEventListener('click', (ev)=>{
@@ -483,33 +510,6 @@ export function setupSavedOutlines({
           setSavedOutlines(list); saveAll();
           editingSections.delete(secKey);
           renderSavedOutlines();
-        });
-
-        // Add-link chip
-        linksBar?.querySelector('[data-act="add-link"]')?.addEventListener('click', ()=>{
-          const list = getSavedOutlines() || [];
-          const me   = byId(list, o.id); if(!me) return;
-          const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
-          s.links = s.links || [];
-          const newLink = { id:'l'+Date.now().toString(36), label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
-          s.links.unshift(newLink); // put new link at the front so it’s obvious
-          setSavedOutlines(list); saveAll(); renderSavedOutlines();
-
-          // Re-open same edit card and launch editor for the newly created link
-          const card2 = savedListEl.querySelector(`[data-oid="${escSel(o.id)}"] [data-sid="${escSel(sec.id)}"][data-view="edit"]`);
-          const bar2  = card2?.querySelector('[data-role="links-bar"]');
-          const idx   = 0;
-          openWidgetEditor(newLink, (upd)=>{
-            Object.assign(newLink, upd);
-            setSavedOutlines(getSavedOutlines()); saveAll(); renderSavedOutlines();
-          }, ()=>{
-            // cancel → remove placeholder if still empty (or always remove since it was just created)
-            const list2 = getSavedOutlines() || [];
-            const me2   = byId(list2, o.id); if(!me2) return;
-            const s2    = me2.sections?.find(x=>x.id===sec.id); if(!s2) return;
-            const i = s2.links.findIndex(x=>x.id===newLink.id);
-            if(i>=0){ s2.links.splice(i,1); setSavedOutlines(list2); saveAll(); renderSavedOutlines(); }
-          });
         });
 
         // Links bar DnD
@@ -562,7 +562,11 @@ export function setupSavedOutlines({
               const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
               const i    = Number(pill.dataset.idx);
               const w    = s.links?.[i]; if(!w) return;
-              openWidgetEditor(w, (upd)=>{ Object.assign(w, upd); setSavedOutlines(list); saveAll(); renderSavedOutlines(); });
+              openWidgetEditor(w, (upd)=>{ 
+                upd.url = normalizeUrl(upd.url);
+                Object.assign(w, upd); 
+                setSavedOutlines(list); saveAll(); renderSavedOutlines(); 
+              });
             });
           });
           linksBar.querySelectorAll('[data-act="del-link"]').forEach(bin=>{
@@ -578,9 +582,35 @@ export function setupSavedOutlines({
           });
         }
 
-        // Inline shelf actions (drag & edit & delete)
+        // Inline shelf actions (drag & edit & delete + ADD)
         const shelfWrap = secEl.querySelector('[data-role="inline-shelf"]');
         if(shelfWrap){
+          // Add new shelf widget
+          shelfWrap.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=>{
+            if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
+            const shelf = (getWidgetShelf && getWidgetShelf()) || [];
+            const wid = 'W'+Date.now().toString(36);
+            const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
+            setWidgetShelf([...shelf, placeholder]);
+            const onCancel = ()=>{
+              const s2 = (getWidgetShelf && getWidgetShelf()) || [];
+              const i  = s2.findIndex(x=>x.id===wid);
+              if(i>=0){ s2.splice(i,1); setWidgetShelf([...s2]); }
+              renderSavedOutlines();
+            };
+            openWidgetEditor(placeholder, (upd)=>{
+              const s2 = (getWidgetShelf && getWidgetShelf()) || [];
+              const it = s2.find(x=>x.id===wid);
+              if(it){
+                upd.url = normalizeUrl(upd.url);
+                Object.assign(it, upd);
+                setWidgetShelf([...s2]);
+              }
+              renderSavedOutlines();
+            }, onCancel);
+          });
+
+          // draggable shelf cards
           shelfWrap.querySelectorAll('.draggable-shelf').forEach(card=>{
             card.addEventListener('dragstart', (e)=>{
               const id = card.dataset.wid;
@@ -594,9 +624,15 @@ export function setupSavedOutlines({
               if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
               const shelf = (getWidgetShelf && getWidgetShelf()) || [];
               const w = shelf.find(x=>x.id===card.dataset.wid); if(!w) return;
-              openWidgetEditor(w, (upd)=>{ Object.assign(w, upd); setWidgetShelf([...shelf]); renderSavedOutlines(); });
+              openWidgetEditor(w, (upd)=>{
+                upd.url = normalizeUrl(upd.url);
+                Object.assign(w, upd); 
+                setWidgetShelf([...shelf]); 
+                renderSavedOutlines(); 
+              });
             });
           });
+          // delete shelf item
           shelfWrap.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
             btn.addEventListener('click', (e)=>{
               e.stopPropagation();
