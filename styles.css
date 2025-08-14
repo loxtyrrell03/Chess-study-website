@@ -67,3 +67,113 @@ html,body{background:var(--bg);color:var(--fg)}
 .widget .bin:hover{background:#fee2e2;border-color:#fecaca}
 .section-links-bar{min-height:44px;border:var(--borderW) solid var(--border);border-radius:.75rem;background:#fff;padding:.5rem;display:flex;flex-wrap:wrap;gap:.5rem}
 .section-links-bar.drag-over-outline{outline:2px dashed rgba(14,165,233,.9);outline-offset:4px}
+/* ==== Saved Outlines (compact edit layout) ==== */
+/* ==== Saved Outlines (compact edit layout) ==== */
+.section-preview {
+  padding: .35rem .6rem;
+  margin-left: 18px;
+  background: var(--panel-muted);
+  border: var(--borderW) solid var(--border);
+  border-radius: .5rem;
+  cursor: pointer;
+  user-select: none;
+}
+.section-preview .title { font-weight: 600; font-size: .98rem; }
+.section-preview .mins { min-width: 2.5rem; text-align: right; }
+.section-preview .bin { margin-left: .25rem; }
+
+/* Edit card container (compact) */
+.section-edit {
+  margin-left: 18px;
+  background: var(--panel);
+  border: var(--borderW) solid var(--border);
+  border-radius: .6rem;
+  padding: .5rem .6rem;
+}
+.section-edit.compact-edit .row { display: grid; gap: .35rem; }
+
+/* Header row: Title + Minutes aligned horizontally */
+.section-edit .row.head {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.section-edit .row.head .lbl {
+  font-size: .75rem;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.section-edit .title-input {
+  height: 32px;
+  font-size: .95rem;
+  padding: .35rem .5rem;
+}
+.section-edit .mins-wrap { margin-left: auto; display: flex; align-items: center; gap: .35rem; }
+.section-edit .mins-wrap .mins-input { width: 72px; height: 32px; }
+
+/* Description */
+.section-edit textarea.input { min-height: 70px; padding: .5rem .6rem; }
+
+/* Widget shelf (compact) */
+.section-edit [data-role="inline-shelf"] {
+  padding: .35rem .5rem;
+  border-radius: .6rem;
+  border: var(--borderW) solid var(--border);
+  background: #fff;
+}
+.editor-shelf { display: flex; flex-wrap: wrap; gap: .5rem; }
+.editor-shelf .link-card { min-height: 30px; padding: .28rem .45rem; }
+
+/* Links bar (compact) */
+.section-links-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .4rem;
+  min-height: 36px;
+  background: var(--panel-muted);
+  border: var(--borderW) solid var(--border);
+  border-radius: .6rem;
+  padding: .35rem .45rem;
+}
+.link-card.section-link { padding: .28rem .45rem; min-height: 30px; font-size: .9rem; }
+
+/* Add pill inside Links bar */
+.add-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .25rem .5rem;
+  border-radius: .5rem;
+  border: 1px dashed var(--border);
+  background: #fff;
+  font-size: .9rem;
+  cursor: pointer;
+  user-select: none;
+}
+.add-pill::before { content: '+'; font-weight: 700; }
+.add-pill:hover { background: var(--panel); }
+
+/* Widget card + bin */
+.widget { position: relative; display: inline-flex; align-items: center; gap: .35rem; }
+.widget .bin {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  border-radius: 9999px;
+  border: var(--borderW) solid var(--border);
+  background: #fff;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+
+/* Drag feedback */
+.drag-ghost { opacity: .6; }
+.drag-over-outline { outline: 2px dashed var(--accent); outline-offset: 2px; }
+
+/* Small helpers */
+.input { line-height: 1.2; }
+.btn-xxs, .btn-xs { line-height: 1; }
+

@@ -1,21 +1,16 @@
-// saved-outlines.js — Outline accordion + compact subsections + per-section edit mode
+// saved-outlines.js — compact edit layout + section modal + add-link chip + home navigation
 //
 // Exports: setupSavedOutlines({ getSavedOutlines, setSavedOutlines, saveOutlinesLocal,
 //                              getWidgetShelf, setWidgetShelf, applyOutline,
 //                              touchCloud, renderHomeSavedBar })
 //
-// Changes per request:
-// • Outline card starts COLLAPSED: Title + [+ Section] + Load + Delete + ▶ chevron.
-// • Expanding shows subsections as SMALL, INDENTED rows (title + minutes on the right).
-// • Clicking a subsection opens EDIT MODE with: Title input, Description textarea, Minutes,
-//   inline Widget Shelf (above), and a labeled “Links” drop bar (below the shelf).
-// • Green Save button (bottom-right) saves changes and exits edit mode.
-// • Shelf items: single-click to edit; bin to delete. Links: reorder by drag, click to edit, bin to delete.
-// • Subsections themselves can be REORDERED by drag-and-drop (when not in edit mode).
-// • Preview rows have a right-side bin icon (doesn’t overlap time).
-// • Merge outlines by dragging one outline title onto another card (merge bar UI).
-//
-// Note: remove the “No saved outlines yet” banner — renders empty when list is empty.
+// Highlights:
+// • + Section opens a small modal (Title + Minutes).
+// • Edit mode is compact; Title + Minutes on the same row with inline "Title" label.
+// • Links bar has a leading “+” chip that inserts a new link and opens its editor (cancel removes it).
+// • Load button applies the outline and navigates to the Home view.
+// • Subsection preview rows are small/indented; drag to reorder. Bins on preview rows.
+// • Link/shelf editing & delete preserved. Outline merge by dragging title preserved.
 
 export function setupSavedOutlines({
   getSavedOutlines,
@@ -43,10 +38,10 @@ export function setupSavedOutlines({
   const mergeCancel   = document.getElementById('mergeCancelBtn');
 
   // UI state
-  const expandedOutlines = new Set();      // outline ids that are expanded
-  const editingSections  = new Set();      // keys `${outlineId}|${sectionId}`
-  let draggingOutlineId  = null;           // for merge drag
-  let draggingSec = null;                  // { oid, sid, from } for subsection reordering
+  const expandedOutlines = new Set(); // outline ids expanded
+  const editingSections  = new Set(); // keys `${outlineId}|${sectionId}`
+  let draggingOutlineId  = null;      // for merge drag
+  let draggingSec        = null;      // { oid, sid, from } for subsection reorder
 
   /* ---------- helpers ---------- */
   const escapeHtml = (s)=> (s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -66,9 +61,20 @@ export function setupSavedOutlines({
     if(!str) str = dt.getData('application/json') || dt.getData('Text') || '';
     try{ return JSON.parse(str); }catch{ return null; }
   }
+  function goHome(){
+    // Try common nav selectors; fall back to #home hash/scroll
+    const cand = ['[data-tab="home"]','[data-route="home"]','[data-nav="home"]','a[href="#home"]','#navHome','#homeTab','#tab-home'];
+    for(const sel of cand){
+      const el = document.querySelector(sel);
+      if(el && typeof el.click==='function'){ el.click(); return; }
+    }
+    if(location.hash !== '#home') location.hash = '#home';
+    (document.getElementById('home') || document.querySelector('[data-view="home"]'))?.scrollIntoView({behavior:'smooth', block:'start'});
+  }
 
-  /* ---------- modal editor for a link/shelf widget ---------- */
-  function openWidgetEditor(widget, onSave){
+  /* ---------- modals ---------- */
+  // Link/shelf editor (supports onCancel for newly created items)
+  function openWidgetEditor(widget, onSave, onCancel){
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.innerHTML = `
@@ -117,8 +123,8 @@ export function setupSavedOutlines({
     iconSel.addEventListener('change', syncRows);
 
     const close = ()=>{ modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 140); };
-    modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') close(); });
-    const onEsc = (e)=>{ if(e.key==='Escape'){ close(); document.removeEventListener('keydown', onEsc);} };
+    modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ onCancel && onCancel(); close(); } });
+    const onEsc = (e)=>{ if(e.key==='Escape'){ onCancel && onCancel(); close(); document.removeEventListener('keydown', onEsc);} };
     document.addEventListener('keydown', onEsc);
 
     modal.querySelector('#wSave').onclick = ()=>{
@@ -129,35 +135,77 @@ export function setupSavedOutlines({
       if(icon==='img') img = modal.querySelector('#wImg').value.trim();
       else emoji = modal.querySelector('#wEmoji').value.trim() || '🔗';
       onSave({ label, url, icon, emoji, img });
+      // prevent onCancel after Save:
+      onCancel = null;
+      close();
+    };
+  }
+
+  // + Section modal (Title + Minutes)
+  function openSectionCreateModal(onCreate){
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-backdrop" data-close="1"></div>
+      <div class="modal-panel max-w-[420px]">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-semibold">New section</h3>
+          <button class="btn-xxs" data-close="1">✕</button>
+        </div>
+        <div class="grid gap-2">
+          <label class="text-sm">Title
+            <input id="secTitle" class="input mt-1" placeholder="Opening drills"/>
+          </label>
+          <label class="text-sm">Minutes
+            <input id="secMins" class="input mt-1" type="number" min="0.25" step="0.25" value="5"/>
+          </label>
+        </div>
+        <div class="mt-3 flex items-center justify-end gap-2">
+          <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
+          <button id="secCreate" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Add section</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    const close = ()=>{ modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 140); };
+    modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') close(); });
+    const onEsc = (e)=>{ if(e.key==='Escape'){ close(); document.removeEventListener('keydown', onEsc);} };
+    document.addEventListener('keydown', onEsc);
+
+    const titleEl = modal.querySelector('#secTitle');
+    const minsEl  = modal.querySelector('#secMins');
+    titleEl?.focus();
+
+    modal.querySelector('#secCreate').onclick = ()=>{
+      const title = (titleEl?.value || '').trim() || 'New section';
+      const minutes = Math.max(0.25, Number(minsEl?.value || 5));
+      onCreate({ title, minutes });
       close();
     };
   }
 
   /* ---------- HTML builders ---------- */
 
-  // Subsection PREVIEW row (small, indented) — includes minutes + right bin
+  // Small, indented preview row (title + minutes + bin)
   function sectionPreviewRowHtml(s){
     return `
-      <div class="rounded-lg border border-[var(--border)] bg-[var(--panel-muted)] cursor-pointer select-none"
-           data-sid="${escapeHtml(s.id)}" data-view="preview"
-           style="padding:.35rem .5rem; margin-left:18px;">
+      <div class="section-preview" data-sid="${escapeHtml(s.id)}" data-view="preview" draggable="true">
         <div class="flex items-center gap-2">
-          <div class="truncate flex-1 text-[.98rem] font-semibold">${escapeHtml(s.name || 'Untitled section')}</div>
-          <span class="text-xs muted w-12 text-right">${fmtMins(s.minutes)}m</span>
-          <button class="btn-xxs" data-act="del-sec" title="Delete section"
-                  style="margin-left:.25rem">🗑️</button>
+          <div class="title truncate flex-1">${escapeHtml(s.name || 'Untitled section')}</div>
+          <span class="mins text-xs muted">${fmtMins(s.minutes)}m</span>
+          <button class="btn-xxs bin" data-act="del-sec" title="Delete section">🗑️</button>
         </div>
       </div>`;
   }
 
-  // Link pill inside a section (non-navigating)
+  // Link pill (non-navigating)
   function linkPillHtml(w, i){
     const iconHtml = (w.icon==='img' && w.img)
-      ? `<img src="${escapeHtml(w.img)}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>`
-      : `<span class="link-icon">${escapeHtml(w.emoji || '🔗')}</span>`;
+      ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
+      : `<span style="font-size:16px;line-height:18px">${escapeHtml(w.emoji || '🔗')}</span>`;
     return `
       <div class="widget" data-link-idx="${i}">
-        <div class="link-card section-link" draggable="true" data-idx="${i}" style="padding:.35rem .55rem;font-size:.9rem;">
+        <div class="link-card section-link" draggable="true" data-idx="${i}">
           ${iconHtml}
           <span class="truncate max-w-[12rem]">${escapeHtml(w.label || 'Untitled')}</span>
         </div>
@@ -165,18 +213,25 @@ export function setupSavedOutlines({
       </div>`;
   }
 
-  // Inline Widget Shelf (ABOVE the Links bar)
+  // Links bar inner HTML (leading + chip, then pills)
+  function linksBarInnerHtml(links){
+    const add = `<button class="add-pill" data-act="add-link" title="Add link"> Add</button>`;
+    const pills = (links||[]).map((w,i)=> linkPillHtml(w,i)).join('');
+    return add + pills;
+  }
+
+  // Inline Widget Shelf (ABOVE Links)
   function inlineShelfHtml(shelf){
     const items = (shelf||[]).map(w=>{
       const iconHtml = (w.icon==='img' && w.img)
-        ? `<img src="${escapeHtml(w.img)}" alt="" class="link-icon rounded-[4px] object-cover" draggable="false"/>`
-        : `<span class="link-icon">${escapeHtml(w.emoji || '🔗')}</span>`;
+        ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
+        : `<span style="font-size:16px;line-height:18px">${escapeHtml(w.emoji || '🔗')}</span>`;
       return `
-        <div class="widget" data-wid="${escapeHtml(w.id)}" style="position:relative;">
+        <div class="widget" data-wid="${escapeHtml(w.id)}">
           <div class="link-card draggable-shelf" draggable="true" data-wid="${escapeHtml(w.id)}" title="${escapeHtml(w.url || '')}" style="cursor:grab">
             ${iconHtml}
             <div class="min-w-0">
-              <div class="truncate">${escapeHtml(w.label || 'Untitled')}</div>
+              <div class="truncate" style="font-size:.95rem">${escapeHtml(w.label || 'Untitled')}</div>
               <div class="text-xs muted truncate">${escapeHtml(w.url || '')}</div>
             </div>
           </div>
@@ -184,50 +239,46 @@ export function setupSavedOutlines({
         </div>`;
     }).join('');
     return `
-      <div class="mt-2 p-2 rounded-xl border border-[var(--border)] bg-white" data-role="inline-shelf">
-        <div class="editor-shelf" data-role="shelf-row">
-          ${items || '<div class="text-xs muted">No shelf widgets yet.</div>'}
-        </div>
+      <div data-role="inline-shelf">
+        <div class="text-xs muted mb-1" style="font-weight:600">Widget shelf</div>
+        <div class="editor-shelf" data-role="shelf-row">${items || '<div class="text-xs muted">No shelf widgets yet.</div>'}</div>
         <div class="text-xs muted mt-1">Drag from shelf → drop into the “Links” bar below. Click any shelf item to edit.</div>
       </div>`;
   }
 
-  // Subsection EDIT card (Title + Description + Minutes + Shelf on top + Links bar + Save)
+  // Edit card (Title + Minutes on same row, compact)
   function sectionEditCardHtml(s){
     const desc = escapeHtml(s.desc || '');
     return `
-      <div class="rounded-lg border border-[var(--border)] bg-[var(--panel)]"
-           data-sid="${escapeHtml(s.id)}" data-view="edit"
-           style="padding:.5rem .6rem; margin-left:18px;">
-        <div class="grid gap-2">
-          <label class="text-sm">Title
-            <input class="input mt-1" data-role="edit-title" value="${escapeHtml(s.name || '')}" placeholder="Section title"/>
-          </label>
-          <label class="text-sm">Description</label>
-          <textarea class="input w-full" data-role="edit-desc" style="min-height:80px">${desc}</textarea>
-          <div class="flex items-center gap-2">
-            <label class="text-sm">Minutes
-              <input class="input ml-2 w-24" type="number" min="0.25" step="0.25" data-role="edit-mins" value="${escapeHtml(String(s.minutes || 0))}"/>
-            </label>
+      <div class="section-edit compact-edit" data-sid="${escapeHtml(s.id)}" data-view="edit">
+        <div class="row head">
+          <span class="lbl">Title</span>
+          <input class="input title-input flex-1" data-role="edit-title" value="${escapeHtml(s.name || '')}" placeholder="Section title"/>
+          <div class="mins-wrap">
+            <label class="text-xs muted">Min</label>
+            <input class="input mins-input" type="number" min="0.25" step="0.25" data-role="edit-mins" value="${escapeHtml(String(s.minutes || 0))}"/>
           </div>
+        </div>
 
-          ${inlineShelfHtml((getWidgetShelf && getWidgetShelf()) || [])}
+        <div class="row">
+          <label class="text-sm" style="font-weight:600">Description</label>
+          <textarea class="input w-full" data-role="edit-desc">${desc}</textarea>
+        </div>
 
-          <div class="mt-2">
-            <div class="text-sm font-bold mb-1">Links</div>
-            <div class="section-links-bar" data-role="links-bar">
-              ${(s.links||[]).map((w,i)=>linkPillHtml(w,i)).join('')}
-            </div>
-          </div>
+        ${inlineShelfHtml((getWidgetShelf && getWidgetShelf()) || [])}
 
-          <div class="mt-2 flex justify-end">
-            <button class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-act="save-section">Save</button>
-          </div>
+        <div class="row">
+          <div class="text-sm font-bold">Links</div>
+          <div class="section-links-bar" data-role="links-bar">${linksBarInnerHtml(s.links)}</div>
+        </div>
+
+        <div class="row" style="justify-content:end; display:flex;">
+          <button class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-act="save-section">Save</button>
         </div>
       </div>`;
   }
 
-  // Outline card (collapsed or expanded)
+  // Outline card
   function outlineCardHtml(o, isExpanded){
     const chevron = isExpanded ? '▾' : '▸';
     return `
@@ -253,16 +304,18 @@ export function setupSavedOutlines({
   function renderSavedOutlines(){
     if(!savedListEl) return;
     const outlines = getSavedOutlines() || [];
-    // No placeholder banner when empty — per request
     savedListEl.innerHTML = outlines.map(o => outlineCardHtml(o, expandedOutlines.has(o.id))).join('');
 
-    // Wire up each outline card
+    // Wire each outline card
     outlines.forEach(o=>{
       const card = savedListEl.querySelector(`[data-oid="${escSel(o.id)}"]`);
       if(!card) return;
 
       // Header actions
-      card.querySelector('[data-act="load"]')?.addEventListener('click', ()=> applyOutline && applyOutline(o));
+      card.querySelector('[data-act="load"]')?.addEventListener('click', ()=>{
+        applyOutline && applyOutline(o);
+        goHome();
+      });
       card.querySelector('[data-act="delete"]')?.addEventListener('click', ()=>{
         if(!confirm('Delete this outline?')) return;
         const list = getSavedOutlines() || [];
@@ -275,13 +328,15 @@ export function setupSavedOutlines({
         renderSavedOutlines();
       });
       card.querySelector('[data-act="add-section"]')?.addEventListener('click', ()=>{
-        const list = getSavedOutlines() || [];
-        const me   = byId(list, o.id); if(!me) return;
-        me.sections = me.sections || [];
-        me.sections.push({ id:'S'+Date.now().toString(36), name:'New section', minutes:5, desc:'', links:[] });
-        setSavedOutlines(list); saveAll();
-        expandedOutlines.add(o.id); // auto-expand so user sees the new subsection
-        renderSavedOutlines();
+        openSectionCreateModal(({title, minutes})=>{
+          const list = getSavedOutlines() || [];
+          const me   = byId(list, o.id); if(!me) return;
+          me.sections = me.sections || [];
+          me.sections.push({ id:'S'+Date.now().toString(36), name:title, minutes, desc:'', links:[] });
+          setSavedOutlines(list); saveAll();
+          expandedOutlines.add(o.id);
+          renderSavedOutlines();
+        });
       });
 
       // Drag-to-merge (title draggable onto other outline cards)
@@ -342,10 +397,9 @@ export function setupSavedOutlines({
       const sectionsWrap = card.querySelector('[data-role="sections"]');
       if(!sectionsWrap) return;
 
-      // Enable drag-reorder of subsections (preview rows only)
+      // Drag-reorder subsections (preview rows only)
       const previewRows = Array.from(sectionsWrap.querySelectorAll('[data-view="preview"]'));
       previewRows.forEach((row, idx)=>{
-        row.setAttribute('draggable', 'true');
         row.addEventListener('dragstart', (e)=>{
           draggingSec = { oid:o.id, sid: row.getAttribute('data-sid'), from: idx };
           try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'sec-move', oid:o.id, sid:draggingSec.sid, from: idx})); }catch{}
@@ -361,14 +415,12 @@ export function setupSavedOutlines({
           const payload = parsePayload(e.dataTransfer) || draggingSec;
           if(payload && (payload.type==='sec-move' || draggingSec) && (payload.oid===o.id)){
             e.preventDefault();
-            row.style.outline = '2px dashed var(--accent)';
+            row.classList.add('drag-over-outline');
           }
         });
-        row.addEventListener('dragleave', ()=>{
-          row.style.outline='';
-        });
+        row.addEventListener('dragleave', ()=> row.classList.remove('drag-over-outline'));
         row.addEventListener('drop', (e)=>{
-          row.style.outline='';
+          row.classList.remove('drag-over-outline');
           const payload = parsePayload(e.dataTransfer) || draggingSec;
           if(!payload || (payload.oid!==o.id)) return;
           e.preventDefault();
@@ -383,24 +435,22 @@ export function setupSavedOutlines({
           renderSavedOutlines();
         });
 
-        // Clicking preview -> enter edit (except when clicking the bin)
+        // Click preview -> edit (except bin)
         row.addEventListener('click', (e)=>{
           if(e.target && (e.target.closest('[data-act="del-sec"]'))) return;
           editingSections.add(keyOf(o.id, row.getAttribute('data-sid')));
           renderSavedOutlines();
         });
 
-        // Bin button on preview row
+        // Delete section
         row.querySelector('[data-act="del-sec"]')?.addEventListener('click', (e)=>{
           e.stopPropagation();
           const list = getSavedOutlines() || [];
           const me   = byId(list, o.id); if(!me) return;
           const sidx = me.sections.findIndex(se => se.id === row.getAttribute('data-sid'));
-          if(sidx>=0){
-            if(confirm('Delete this section?')){
-              me.sections.splice(sidx,1);
-              setSavedOutlines(list); saveAll(); renderSavedOutlines();
-            }
+          if(sidx>=0 && confirm('Delete this section?')){
+            me.sections.splice(sidx,1);
+            setSavedOutlines(list); saveAll(); renderSavedOutlines();
           }
         });
       });
@@ -411,6 +461,12 @@ export function setupSavedOutlines({
         if(!editingSections.has(secKey)) return;
         const secEl = sectionsWrap.querySelector(`[data-sid="${escSel(sec.id)}"][data-view="edit"]`);
         if(!secEl) return;
+
+        // Links bar: ensure pills + add chip
+        const linksBar = secEl.querySelector('[data-role="links-bar"]');
+        if (linksBar) {
+          linksBar.innerHTML = linksBarInnerHtml(sec.links);
+        }
 
         // Save button
         secEl.querySelector('[data-act="save-section"]')?.addEventListener('click', (ev)=>{
@@ -429,15 +485,41 @@ export function setupSavedOutlines({
           renderSavedOutlines();
         });
 
+        // Add-link chip
+        linksBar?.querySelector('[data-act="add-link"]')?.addEventListener('click', ()=>{
+          const list = getSavedOutlines() || [];
+          const me   = byId(list, o.id); if(!me) return;
+          const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
+          s.links = s.links || [];
+          const newLink = { id:'l'+Date.now().toString(36), label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
+          s.links.unshift(newLink); // put new link at the front so it’s obvious
+          setSavedOutlines(list); saveAll(); renderSavedOutlines();
+
+          // Re-open same edit card and launch editor for the newly created link
+          const card2 = savedListEl.querySelector(`[data-oid="${escSel(o.id)}"] [data-sid="${escSel(sec.id)}"][data-view="edit"]`);
+          const bar2  = card2?.querySelector('[data-role="links-bar"]');
+          const idx   = 0;
+          openWidgetEditor(newLink, (upd)=>{
+            Object.assign(newLink, upd);
+            setSavedOutlines(getSavedOutlines()); saveAll(); renderSavedOutlines();
+          }, ()=>{
+            // cancel → remove placeholder if still empty (or always remove since it was just created)
+            const list2 = getSavedOutlines() || [];
+            const me2   = byId(list2, o.id); if(!me2) return;
+            const s2    = me2.sections?.find(x=>x.id===sec.id); if(!s2) return;
+            const i = s2.links.findIndex(x=>x.id===newLink.id);
+            if(i>=0){ s2.links.splice(i,1); setSavedOutlines(list2); saveAll(); renderSavedOutlines(); }
+          });
+        });
+
         // Links bar DnD
-        const bar = secEl.querySelector('[data-role="links-bar"]');
-        if(bar){
+        if(linksBar){
           let over=0;
-          bar.addEventListener('dragenter', ()=>{ over++; bar.classList.add('drag-over-outline'); });
-          bar.addEventListener('dragleave', ()=>{ over=Math.max(0,over-1); if(!over) bar.classList.remove('drag-over-outline'); });
-          bar.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
-          bar.addEventListener('drop', (e)=>{
-            e.preventDefault(); over=0; bar.classList.remove('drag-over-outline');
+          linksBar.addEventListener('dragenter', ()=>{ over++; linksBar.classList.add('drag-over-outline'); });
+          linksBar.addEventListener('dragleave', ()=>{ over=Math.max(0,over-1); if(!over) linksBar.classList.remove('drag-over-outline'); });
+          linksBar.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+          linksBar.addEventListener('drop', (e)=>{
+            e.preventDefault(); over=0; linksBar.classList.remove('drag-over-outline');
             const payload = parsePayload(e.dataTransfer);
             const list = getSavedOutlines() || [];
             const me   = byId(list, o.id); if(!me) return;
@@ -451,7 +533,7 @@ export function setupSavedOutlines({
               setSavedOutlines(list); saveAll(); renderSavedOutlines();
             }else if(payload?.type==='reorder'){
               const from = payload.index;
-              const cards = [...bar.querySelectorAll('.section-link')];
+              const cards = [...linksBar.querySelectorAll('.section-link')];
               let to = cards.length;
               for(let i=0;i<cards.length;i++){
                 const r = cards[i].getBoundingClientRect();
@@ -465,7 +547,7 @@ export function setupSavedOutlines({
           });
 
           // link pill: reorder + edit + delete
-          bar.querySelectorAll('.section-link').forEach(pill=>{
+          linksBar.querySelectorAll('.section-link').forEach(pill=>{
             pill.addEventListener('dragstart', (e)=>{
               const index = Number(pill.dataset.idx);
               try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'reorder', index})); }catch{}
@@ -483,7 +565,7 @@ export function setupSavedOutlines({
               openWidgetEditor(w, (upd)=>{ Object.assign(w, upd); setSavedOutlines(list); saveAll(); renderSavedOutlines(); });
             });
           });
-          bar.querySelectorAll('[data-act="del-link"]').forEach(bin=>{
+          linksBar.querySelectorAll('[data-act="del-link"]').forEach(bin=>{
             bin.addEventListener('click', (e)=>{
               e.stopPropagation();
               const list = getSavedOutlines() || [];
@@ -545,7 +627,6 @@ export function setupSavedOutlines({
       list.push({ id:'O'+Date.now().toString(36), title:t, sections:[] });
       setSavedOutlines(list); saveAll();
       createForm?.classList.add('hidden');
-      // New outline stays collapsed by default
       renderSavedOutlines();
     };
   }
