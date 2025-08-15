@@ -8,14 +8,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="./styles.css"/>
   <style id="index-overrides">
-    /* ----- Splitter: darker, no inner line ----- */
-    #splitHandle{
-      background:#334155 !important; /* slate-700 */
-      box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);
-      z-index:5;
-    }
-    #splitHandle::after{ content:none !important; } /* removes the blue translucent line */
-
     /* ----- Progress highlight layering + stronger fill ----- */
     #progressSegments{ z-index:0 !important; }
     #progressFill{
@@ -111,8 +103,8 @@
         <div class="card p-6 section-card">
           <div class="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
             <div>
-              <div class="block-sub">Current Section</div>
-              <h2 id="currentTitle" class="text-2xl font-extrabold mt-1">—</h2>
+              <!-- Removed “Current Section” header per request -->
+              <h2 id="currentTitle" class="text-2xl font-extrabold">—</h2>
             </div>
             <div class="flex items-center gap-2">
               <button id="editSectionBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Edit Section</button>
@@ -136,7 +128,7 @@
           <!-- Links in current -->
           <div id="linksWrap" class="mt-4">
             <div class="flex items-center justify-between">
-              <h3 class="block-title">Links in this section</h3>
+              <h3 class="block-title">Links</h3>
               <button id="clearSectionLinks" class="btn-xs hidden">Clear</button>
             </div>
             <!-- Use the same styling as Saved Outlines -->
@@ -465,14 +457,18 @@
 
   let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, sessionStarted=false, totalSessionSecs=0, awaitingNext=false;
 
+  function isAtVeryStart(){
+    if(!currentSession.length) return true;
+    return elapsedSeconds(currentSession, currentIndex, secondsLeft) === 0;
+  }
   function updateClockColor(){
     clockEl.classList.remove('text-emerald-600','text-rose-600');
     if(sessionStarted){ (running?clockEl.classList.add('text-emerald-600'):clockEl.classList.add('text-rose-600')); }
   }
   function updateStartBtnLabel(){
-    if(!sessionStarted) startBtn.textContent='Start Study Session';
-    else if(running) startBtn.textContent='Pause Session';
-    else startBtn.textContent='Resume Session';
+    if(running){ startBtn.textContent='Pause Session'; }
+    else if(isAtVeryStart()){ startBtn.textContent='Start Study Session'; }
+    else { startBtn.textContent='Resume Session'; }
     startBtn.disabled = !!awaitingNext;
   }
   function setTimerFromState(st){
@@ -561,16 +557,43 @@
     progressFill.style.width = pct + '%';
     progressPctEl.textContent = Math.floor(pct) + '%';
     updateLegendActive();
+    updateStartBtnLabel();
   }
   function pctFromEvent(e){ const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
-  function jumpFromPct(p){ const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0; for(let i=0;i<sched.length;i++){ const dur=minsToSecs(sched[i].minutes||0); if(target<cum+dur){ currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); renderAll(); markTimer(); awaitingNext=false; hideNextGate(); return; } cum+=dur; } currentIndex=sched.length-1; secondsLeft=0; stopTimer(); renderAll(); markTimer(); awaitingNext=false; hideNextGate(); }
+  function jumpFromPct(p){
+    const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0;
+    for(let i=0;i<sched.length;i++){
+      const dur=minsToSecs(sched[i].minutes||0);
+      if(target<cum+dur){
+        currentIndex=i;
+        secondsLeft=Math.max(0,Math.ceil(dur-(target-cum)));
+        if(running) syncEnd();
+        renderAll();
+        markTimer();
+        awaitingNext=false;
+        hideNextGate();
+        updateStartBtnLabel();  // reflect Start vs Resume after manual scrub
+        return;
+      }
+      cum+=dur;
+    }
+    currentIndex=sched.length-1; secondsLeft=0; stopTimer(); renderAll(); markTimer(); awaitingNext=false; hideNextGate(); updateStartBtnLabel();
+  }
   let scrubbing=false;
   scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true;scrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEvent(e));});
   scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing)jumpFromPct(pctFromEvent(e));});
   scrubOverlay.addEventListener('pointerup',()=>{scrubbing=false;});
   scrubOverlay.addEventListener('pointercancel',()=>{scrubbing=false;});
 
-  function jumpToSection(i){ if(!currentSession[i]) return; awaitingNext=false; hideNextGate(); currentIndex=i; secondsLeft=minsToSecs(currentSession[i].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); }
+  function jumpToSection(i){
+    if(!currentSession[i]) return;
+    awaitingNext=false; hideNextGate();
+    currentIndex=i; secondsLeft=minsToSecs(currentSession[i].minutes||0);
+    if(running) syncEnd();
+    renderAll();
+    markTimer();
+    updateStartBtnLabel();
+  }
 
   /*************** Helpers (shared with Saved Outlines parity) ***************/
   function escapeHtml(s){ return (s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
@@ -754,7 +777,7 @@
     });
   }
 
-  // Current section links (same behavior as saved outlines pills)
+  // Current section links (open link in view mode; edit modal in edit mode)
   function renderCurrentLinks(){
     const sec=currentSectionRef(); const arr=sec?.links||[];
     linksDiv.innerHTML = arr.map((w,i)=>`
@@ -780,14 +803,18 @@
       });
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
 
-      // Click pill to edit (modal)
+      // Click: edit in edit-mode; open link in view-mode
       card.addEventListener('click', ()=>{
-        if(!isEditingSection) return;
         const i = Number(card.dataset.idx); const target = sec.links[i]; if(!target) return;
-        openWidgetEditor(target, (upd)=>{
-          upd.url = normalizeUrl(upd.url);
-          Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks();
-        });
+        if(isEditingSection){
+          openWidgetEditor(target, (upd)=>{
+            upd.url = normalizeUrl(upd.url);
+            Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks();
+          });
+        } else {
+          const url = normalizeUrl(target.url||'');
+          if(url) window.open(url, '_blank', 'noopener');
+        }
       });
     });
 
@@ -893,13 +920,20 @@
       });
     });
 
-    // Drag reorder with live placeholder
+    // Drag reorder with live placeholder (shows section title)
     let dragging = null;
-    const makePh = (h)=>{ const ph = document.createElement('li'); ph.className='outline-row drop-placeholder'; ph.style.setProperty('--ph', `${Math.max(36,h)}px`); ph.innerHTML = `<div class="text-xs muted px-2">Drop here</div>`; return ph; };
+    const makePh = (h, titleText)=>{ 
+      const ph = document.createElement('li'); 
+      ph.className='outline-row drop-placeholder'; 
+      ph.style.setProperty('--ph', `${Math.max(36,h)}px`); 
+      ph.innerHTML = `<div class="text-xs muted px-2 truncate">${escapeHtml(titleText||'')}</div>`; 
+      return ph; 
+    };
 
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
       li.addEventListener('dragstart', (e)=>{
-        dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight) };
+        const titleText = (li.querySelector('button')?.textContent || '').trim();
+        dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) };
         li.classList.add('dragging');
         li.after(dragging.placeholder);
         try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'outline-move', from: idx})); }catch{}
