@@ -18,6 +18,16 @@
     #progressTicks{ z-index:3 !important; }
     #scrubOverlay{ z-index:4 !important; }
 
+    /* ----- Focus overlay progress elements ----- */
+    #focusProgressSegments{ z-index:0 !important; }
+    #focusProgressFill{
+      z-index:2 !important;
+      background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
+      border-right:2px solid var(--accent-600) !important;
+    }
+    #focusProgressTicks{ z-index:3 !important; }
+    #focusScrubOverlay{ z-index:4 !important; }
+
     /* ----- Reorder placeholder (Home outline) ----- */
     .drop-placeholder{
       opacity:.6;
@@ -93,6 +103,10 @@
 
       <button id="prevBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">◀ Prev</button>
       <button id="nextBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Next ▶</button>
+
+      <!-- Focus Mode trigger -->
+      <button id="focusModeBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Focus Mode</button>
+
       <button id="resetBtn" class="ml-auto px-3 py-2 rounded-xl border border-[var(--border)]">Reset</button>
       <button id="showOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] hidden">Show Outline ▸</button>
     </section>
@@ -103,12 +117,24 @@
         <div class="card p-6 section-card">
           <div class="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
             <div>
-              <!-- Removed “Current Section” header per request -->
               <h2 id="currentTitle" class="text-2xl font-extrabold">—</h2>
             </div>
             <div class="flex items-center gap-2">
               <button id="editSectionBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Edit Section</button>
               <div id="clock" class="clock-badge text-2xl tabular-nums">00:00</div>
+            </div>
+          </div>
+
+          <!-- NEW: inline meta editor (title & duration) -->
+          <div id="editMetaRow" class="mt-3 hidden">
+            <div class="flex flex-wrap items-center gap-2">
+              <input id="editTitleInput" class="input flex-1" placeholder="Section title"/>
+              <input id="editMinsInput" class="input w-28" type="number" min="0.01" step="0.1" placeholder="Minutes"/>
+              <select id="editUnitInput" class="input h-9 w-24 text-sm">
+                <option value="minutes" selected>min</option>
+                <option value="seconds">sec</option>
+                <option value="hours">hr</option>
+              </select>
             </div>
           </div>
 
@@ -131,7 +157,6 @@
               <h3 class="block-title">Links</h3>
               <button id="clearSectionLinks" class="btn-xs hidden">Clear</button>
             </div>
-            <!-- Use the same styling as Saved Outlines -->
             <div id="links" class="section-links-bar mt-2"></div>
           </div>
 
@@ -234,6 +259,64 @@
       </ol>
     </div>
   </section>
+</div>
+
+<!-- FOCUS MODE OVERLAY -->
+<div id="focusOverlay" class="fixed inset-0 hidden z-[100]">
+  <div class="absolute inset-0 bg-[var(--bg)]"></div>
+  <div class="relative z-10 w-full h-full flex items-center justify-center p-6">
+    <div class="max-w-4xl w-full">
+      <!-- Exit row -->
+      <div class="flex items-center justify-end mb-4">
+        <button id="focusExitBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Exit Focus ✕</button>
+      </div>
+
+      <!-- Centered stack -->
+      <div class="flex flex-col items-center text-center gap-5">
+        <h2 id="focusTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight">—</h2>
+
+        <div id="focusMeta" class="muted text-sm">
+          <!-- e.g., Section 2 of 7 • 10m -->
+        </div>
+
+        <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
+
+        <!-- Progress (focus instance) -->
+        <div class="w-full max-w-3xl">
+          <div class="mb-1 flex items-center justify-between">
+            <div class="block-sub">Progress</div>
+            <div id="focusProgressPct" class="text-xs muted">0%</div>
+          </div>
+          <div id="focusProgressHost" class="relative w-full h-8 rounded-2xl overflow-hidden card">
+            <div id="focusProgressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
+            <div id="focusProgressSegments" class="absolute inset-0 flex"></div>
+            <div id="focusProgressTicks" class="absolute inset-0 pointer-events-none"></div>
+            <div id="focusScrubOverlay" class="absolute inset-0 cursor-pointer"></div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex items-center justify-center gap-3">
+          <button id="focusStartBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm">Start Study Session</button>
+          <button id="focusPauseBtn" class="px-4 py-2 rounded-xl border border-[var(--border)]">Pause</button>
+          <button id="focusReadyNextBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm hidden">
+            I’m ready — start next ▶
+          </button>
+        </div>
+
+        <!-- NEW: Links (focus instance) -->
+        <div id="focusLinksWrap" class="w-full max-w-3xl">
+          <div class="flex items-center justify-between mt-2">
+            <h3 class="block-title">Links</h3>
+          </div>
+          <div id="focusLinks" class="section-links-bar mt-2"></div>
+        </div>
+
+        <!-- Notes / info -->
+        <div id="focusDesc" class="text-sm whitespace-pre-wrap max-w-3xl w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- SETTINGS MODAL -->
@@ -412,12 +495,35 @@
   const linkShelfDiv=$('#linkShelf'); const shelfWrap=$('#shelfWrap'); const editSectionBtn=$('#editSectionBtn'); const clearSectionLinksBtn=$('#clearSectionLinks');
   const addWidgetBtn=$('#addWidgetBtn'); const resetShelfBtn=$('#resetShelfBtn');
 
+  // NEW: inline meta editor elements
+  const editMetaRow = $('#editMetaRow'); const editTitleInput = $('#editTitleInput');
+  const editMinsInput = $('#editMinsInput'); const editUnitInput = $('#editUnitInput');
+
   const outline=$('#outline'); const addOutlineItemBtn=$('#addOutlineItem'); const inlineAddRow=$('#inlineAddRow');
   const addTitleInput=$('#addTitleInput'); const addMinsInput=$('#addMinsInput'); const addConfirmBtn=$('#addConfirmBtn'); const addCancelBtn=$('#addCancelBtn');
   const totalMins=$('#totalMins'); const clockEl=$('#clock');
 
   const progressHost=$('#progressHost'), progressFill=$('#progressFill'), progressSegments=$('#progressSegments'),
         progressTicks=$('#progressTicks'), progressPctEl=$('#progressPct'), legend=$('#legend'), scrubOverlay=$('#scrubOverlay');
+
+  // Focus Mode elements
+  const focusOverlay = $('#focusOverlay');
+  const focusModeBtn = $('#focusModeBtn');
+  const focusExitBtn = $('#focusExitBtn');
+  const focusTitleEl = $('#focusTitle');
+  const focusMetaEl  = $('#focusMeta');
+  const focusDescEl  = $('#focusDesc');
+  const focusClockEl = $('#focusClock');
+  const focusStartBtn= $('#focusStartBtn');
+  const focusPauseBtn= $('#focusPauseBtn');
+  const focusReadyBtn= $('#focusReadyNextBtn');
+
+  const focusProgressHost=$('#focusProgressHost'), focusProgressFill=$('#focusProgressFill'),
+        focusProgressSegments=$('#focusProgressSegments'), focusProgressTicks=$('#focusProgressTicks'),
+        focusProgressPctEl=$('#focusProgressPct'), focusScrubOverlay=$('#focusScrubOverlay');
+
+  // NEW: Focus links container
+  const focusLinksDiv = $('#focusLinks');
 
   // Split panes (drag-to-resize)
   const splitEl = $('#split'), leftPane = $('#leftPane'), rightPane = $('#rightPane'), splitHandle = $('#splitHandle');
@@ -454,6 +560,7 @@
   function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
   function scheduleTotalSecs(s){ return s.reduce((a,b)=>a+minsToSecs(b.minutes||0),0); }
   function elapsedSeconds(sched, idx, secsLeft){ const past=sched.slice(0,idx).reduce((a,b)=>a+minsToSecs(b.minutes||0),0); const cur=sched[idx]?minsToSecs(sched[idx].minutes||0)-secsLeft:0; return past+cur; }
+  function toMinutesValue(value, unit){ const v=Number(value)||0; if(unit==='seconds') return v/60; if(unit==='hours') return v*60; return v; }
 
   let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, sessionStarted=false, totalSessionSecs=0, awaitingNext=false;
 
@@ -461,16 +568,29 @@
     if(!currentSession.length) return true;
     return elapsedSeconds(currentSession, currentIndex, secondsLeft) === 0;
   }
+
+  function setClockText(txt){
+    if(clockEl) clockEl.textContent = txt;
+    if(focusClockEl) focusClockEl.textContent = txt;
+  }
   function updateClockColor(){
-    clockEl.classList.remove('text-emerald-600','text-rose-600');
-    if(sessionStarted){ (running?clockEl.classList.add('text-emerald-600'):clockEl.classList.add('text-rose-600')); }
+    const apply = (el)=>{
+      if(!el) return;
+      el.classList.remove('text-emerald-600','text-rose-600');
+      if(sessionStarted){ (running?el.classList.add('text-emerald-600'):el.classList.add('text-rose-600')); }
+    };
+    apply(clockEl); apply(focusClockEl);
   }
   function updateStartBtnLabel(){
-    if(running){ startBtn.textContent='Pause Session'; }
-    else if(isAtVeryStart()){ startBtn.textContent='Start Study Session'; }
-    else { startBtn.textContent='Resume Session'; }
-    startBtn.disabled = !!awaitingNext;
+    const label = running ? 'Pause Session' : (isAtVeryStart() ? 'Start Study Session' : 'Resume Session');
+    if(startBtn) startBtn.textContent = label;
+    const f = focusStartBtn;
+    if(f) f.textContent = label;
+    const disable = !!awaitingNext;
+    if(startBtn) startBtn.disabled = disable;
+    if(f) f.disabled = disable;
   }
+
   function setTimerFromState(st){
     sessionStarted=!!st.sessionStarted; running=false; currentIndex=st.currentIndex||0; secondsLeft=Math.max(0,Math.round(st.secondsLeft||0));
     awaitingNext = !!st.awaitingNext;
@@ -493,7 +613,7 @@
   function loop(){
     if(!running) return;
     const remaining=Math.max(0,Math.ceil((endTimeMs-performance.now())/1000));
-    if(remaining!==secondsLeft){ secondsLeft=remaining; $('#clock').textContent=secsToClock(secondsLeft); updateProgress(); }
+    if(remaining!==secondsLeft){ secondsLeft=remaining; setClockText(secsToClock(secondsLeft)); updateProgress(); }
     if(secondsLeft<=0){
       // Section finished
       if(currentIndex<currentSession.length-1){
@@ -514,10 +634,8 @@
     saveTimerLocal();
   };
 
-  // Gate controls
-  function showNextGate(){ readyNextBtn.classList.remove('hidden'); updateStartBtnLabel(); }
-  function hideNextGate(){ readyNextBtn.classList.add('hidden'); updateStartBtnLabel(); }
-  readyNextBtn.onclick = ()=>{
+  // Gate controls (shared for normal + focus)
+  function proceedNext(){
     if(!awaitingNext) return;
     awaitingNext=false;
     hideNextGate();
@@ -529,7 +647,11 @@
       renderAll();
       markTimer();
     }
-  };
+  }
+  function showNextGate(){ readyNextBtn.classList.remove('hidden'); if(focusReadyBtn) focusReadyBtn.classList.remove('hidden'); updateStartBtnLabel(); }
+  function hideNextGate(){ readyNextBtn.classList.add('hidden'); if(focusReadyBtn) focusReadyBtn.classList.add('hidden'); updateStartBtnLabel(); }
+  readyNextBtn.onclick = proceedNext;
+  if(focusReadyBtn) focusReadyBtn.onclick = proceedNext;
 
   startBtn.onclick = ()=>{
     if(!currentSession.length) return;
@@ -537,6 +659,9 @@
     if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(currentSession[0].minutes||0); totalSessionSecs=scheduleTotalSecs(currentSession); sessionStarted=true; markTimer(); startTimer(); }
     else{ running?stopTimer():startTimer(); }
   };
+  if(focusStartBtn){ focusStartBtn.onclick = ()=> startBtn.click(); }
+  if(focusPauseBtn){ focusPauseBtn.onclick = ()=>{ if(running) stopTimer(); }; }
+
   prevBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } updateStartBtnLabel(); };
   nextBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } else stopTimer(); updateStartBtnLabel(); };
   resetBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((currentSession[0]||{}).minutes||0); renderAll(); updateStartBtnLabel(); markTimer(); };
@@ -548,7 +673,18 @@
     let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); progressTicks.appendChild(tick); }
     sched.forEach((sec,i)=>{ const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); chip.innerHTML=`${escapeHtml(sec.name||'')} <span class="opacity-80">(${sec.minutes||0}m)</span>`; chip.onclick=()=>jumpToSection(i); legend.appendChild(chip); });
     updateProgress();
+    buildFocusProgress(); // mirror into focus UI
   }
+
+  function buildFocusProgress(){
+    if(!focusProgressHost) return;
+    const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
+    focusProgressSegments.innerHTML=''; focusProgressTicks.innerHTML='';
+    sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; focusProgressSegments.appendChild(seg); });
+    let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); focusProgressTicks.appendChild(tick); }
+    updateFocusProgress();
+  }
+
   function updateLegendActive(){ legend.querySelectorAll('.chip').forEach((el, i)=> el.classList.toggle('chip-active', i===currentIndex)); }
   function updateProgress(){
     const sched=currentSession; const total=scheduleTotalSecs(sched);
@@ -558,8 +694,24 @@
     progressPctEl.textContent = Math.floor(pct) + '%';
     updateLegendActive();
     updateStartBtnLabel();
+    updateFocusProgress();
   }
-  function pctFromEvent(e){ const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
+  function updateFocusProgress(){
+    if(!focusProgressFill || !focusProgressPctEl) return;
+    const sched=currentSession; const total=scheduleTotalSecs(sched);
+    if(!total){ focusProgressFill.style.width='0%'; focusProgressPctEl.textContent='0%'; return; }
+    const pct=Math.min(100,Math.max(0,(elapsedSeconds(sched,currentIndex,secondsLeft)/total)*100));
+    focusProgressFill.style.width = pct + '%';
+    focusProgressPctEl.textContent = Math.floor(pct) + '%';
+  }
+
+  function pctFromEvent(e){
+    const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width));
+  }
+  function pctFromEventFocus(e){
+    const rect=focusProgressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width));
+  }
+
   function jumpFromPct(p){
     const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0;
     for(let i=0;i<sched.length;i++){
@@ -579,11 +731,20 @@
     }
     currentIndex=sched.length-1; secondsLeft=0; stopTimer(); renderAll(); markTimer(); awaitingNext=false; hideNextGate(); updateStartBtnLabel();
   }
+
   let scrubbing=false;
   scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true;scrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEvent(e));});
   scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing)jumpFromPct(pctFromEvent(e));});
   scrubOverlay.addEventListener('pointerup',()=>{scrubbing=false;});
   scrubOverlay.addEventListener('pointercancel',()=>{scrubbing=false;});
+
+  let focusScrubbing=false;
+  if(focusScrubOverlay){
+    focusScrubOverlay.addEventListener('pointerdown',(e)=>{focusScrubbing=true;focusScrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEventFocus(e));});
+    focusScrubOverlay.addEventListener('pointermove',(e)=>{if(focusScrubbing)jumpFromPct(pctFromEventFocus(e));});
+    focusScrubOverlay.addEventListener('pointerup',()=>{focusScrubbing=false;});
+    focusScrubOverlay.addEventListener('pointercancel',()=>{focusScrubbing=false;});
+  }
 
   function jumpToSection(i){
     if(!currentSession[i]) return;
@@ -686,13 +847,72 @@
 
   /*************** Current panel (Home) ***************/
   let isEditingSection=false;
-  editSectionBtn.onclick = ()=>{ isEditingSection=!isEditingSection; updateEditUI(); };
+
+  // Save meta edits (title + duration) when leaving edit mode
+  function saveMetaEdits(){
+    const s = currentSession[currentIndex];
+    if(!s) return;
+
+    // Current values before change
+    const prevMinutes = Number(s.minutes) || 0;
+    const prevTotalSec = minsToSecs(prevMinutes);
+    const elapsedSec = Math.max(0, prevTotalSec - secondsLeft);
+
+    // Read inputs
+    const newTitle = (editTitleInput.value || '').trim() || s.name || 'Untitled';
+    const newMinutes = Math.max(0.01, toMinutesValue(editMinsInput.value, editUnitInput.value));
+
+    // Apply
+    s.name = newTitle;
+    s.minutes = newMinutes;
+
+    // Adjust timer to preserve elapsed time within this section
+    if(currentSession[currentIndex]?.id === s.id){
+      const newTotal = minsToSecs(newMinutes);
+      secondsLeft = Math.max(0, newTotal - elapsedSec);
+      if(running) syncEnd();
+    }
+
+    saveCurrentSession();
+    renderOutline();
+    buildProgress();
+    updateProgress();
+    renderCurrent();
+    updateStartBtnLabel();
+    markTimer();
+  }
+
+  editSectionBtn.onclick = ()=>{
+    if(!isEditingSection){
+      // Entering edit mode
+      isEditingSection = true;
+      updateEditUI();
+    } else {
+      // Leaving edit mode -> save meta edits
+      saveMetaEdits();
+      isEditingSection = false;
+      updateEditUI();
+    }
+  };
+
   function updateEditUI(){
     shelfWrap.classList.toggle('hidden', !isEditingSection);
     clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
     editSectionBtn.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
-    renderCurrentLinks(); renderShelf();
+
+    // Toggle meta editor
+    editMetaRow.classList.toggle('hidden', !isEditingSection);
+    if(isEditingSection){
+      const s = currentSession[currentIndex] || {};
+      editTitleInput.value = s.name || '';
+      editMinsInput.value  = (Number(s.minutes) || 0).toString();
+      editUnitInput.value  = 'minutes';
+    }
+
+    renderCurrentLinks();
+    renderShelf();
   }
+
   function currentSectionRef(){ return currentSession[currentIndex]; }
 
   // Add widget (same UX as saved outlines: create placeholder -> open editor)
@@ -777,7 +997,7 @@
     });
   }
 
-  // Current section links (open link in view mode; edit modal in edit mode)
+  // Current section links (edit/view) — and keep focus links in sync
   function renderCurrentLinks(){
     const sec=currentSectionRef(); const arr=sec?.links||[];
     linksDiv.innerHTML = arr.map((w,i)=>`
@@ -809,7 +1029,7 @@
         if(isEditingSection){
           openWidgetEditor(target, (upd)=>{
             upd.url = normalizeUrl(upd.url);
-            Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks();
+            Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks();
           });
         } else {
           const url = normalizeUrl(target.url||'');
@@ -824,10 +1044,13 @@
           e.stopPropagation();
           const pill = btn.closest('.widget')?.querySelector('.section-link');
           const i = Number(pill?.dataset.idx ?? -1);
-          if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); }
+          if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); }
         });
       });
     }
+
+    // Keep focus links mirrored
+    renderFocusLinks();
   }
 
   // Drop handlers (home links)
@@ -843,11 +1066,11 @@
     if(payload.type==='shelf'){
       const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
       sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
-      saveCurrentSession(); renderCurrentLinks();
+      saveCurrentSession(); renderCurrentLinks(); renderFocusLinks();
     } else if(payload.type==='reorder'){
       const from=payload.index; const cards=[...linksDiv.querySelectorAll('.section-link')];
       let to=cards.length; for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
-      if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks();
+      if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks();
     }
   });
 
@@ -872,7 +1095,7 @@
       li.addEventListener('click', (e)=>{ if(e.target.closest('[data-act]')) return; jumpToSection(idx); });
     });
 
-    // Inline edit
+    // Inline edit inside outline list
     outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
@@ -890,13 +1113,22 @@
             <button class="btn-xxs" id="edtCancel">Cancel</button>
           </div>`;
         const edtTitle=li.querySelector('#edtTitle'), edtValue=li.querySelector('#edtValue'), edtUnit=li.querySelector('#edtUnit');
-        const toMinutes = (value, unit)=>{ const v=Number(value)||0; if(unit==='seconds') return v/60; if(unit==='hours') return v*60; return v; };
         const saveInline = ()=>{
-          cur.name = edtTitle.value.trim() || cur.name;
-          cur.minutes = Math.max(0.01, toMinutes(edtValue.value, edtUnit.value));
+          const prevMin = cur.minutes;
+          const prevTotal = minsToSecs(prevMin);
+          const elapsedSec = currentSession[currentIndex]?.id===cur.id ? Math.max(0, prevTotal - secondsLeft) : 0;
+
+          cur.name = (edtTitle.value.trim() || cur.name);
+          cur.minutes = Math.max(0.01, toMinutesValue(edtValue.value, edtUnit.value));
+
+          if(currentSession[currentIndex]?.id===cur.id){
+            const newTotal = minsToSecs(cur.minutes);
+            secondsLeft = Math.max(0, newTotal - elapsedSec);
+            if(running) syncEnd();
+          }
+
           saveCurrentSession();
-          if(currentSession[currentIndex]?.id===cur.id){ secondsLeft = Math.min(secondsLeft, minsToSecs(cur.minutes)); if(running) syncEnd(); markTimer(); }
-          renderOutline(); buildProgress(); updateProgress(); renderCurrent();
+          renderOutline(); buildProgress(); updateProgress(); renderCurrent(); updateStartBtnLabel(); markTimer();
         };
         li.querySelector('#edtSave').onclick = saveInline; li.querySelector('#edtCancel').onclick = renderOutline;
       });
@@ -993,6 +1225,7 @@
     if(totalMins) totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(currentSession)/60)} minutes`;
   }
 
+  // Inline add
   addOutlineItemBtn.onclick = ()=>{ inlineAddRow.classList.remove('hidden'); addTitleInput.value=''; addMinsInput.value=''; addTitleInput.focus(); };
   addCancelBtn.onclick = ()=> inlineAddRow.classList.add('hidden');
   addConfirmBtn.onclick = ()=>{
@@ -1069,7 +1302,7 @@
   toggleAuthMode.onclick = ()=> setAuthMode(authMode==='signin'?'signup':'signin');
   authOpenBtn.onclick = ()=>{ emailInput.value=''; passInput.value=''; setAuthMode('signin'); showModal(authModal); };
   authModal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') hideModal(authModal); });
-  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ hideModal(authModal); hideModal(settingsModal); } });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ hideModal(authModal); hideModal(settingsModal); if(!focusOverlay.classList.contains('hidden')) hideFocus(); } });
 
   googleBtn.onclick = ()=> signInWithPopup(auth, provider).catch(err=> alert(err.message||'Google sign-in failed'));
   emailSignInBtn.onclick = async ()=>{
@@ -1104,10 +1337,18 @@
           applyTheme(prefs.theme||{});
           applySplitRatio(prefs.splitRatio||56);
           setTimerFromState(timerState); renderAll(); renderHomeSavedBar(); setCloudMode('Saved to cloud ✓');
-        } else { setCloudMode('Cloud sync on'); }
-      }catch{ setLocalMode('Cloud read failed'); }
+          if(prefs.focusDefault) showFocus(); // only if user asked for it
+        } else { 
+          setCloudMode('Cloud sync on'); 
+          if(prefs.focusDefault) showFocus();
+        }
+      }catch{ 
+        setLocalMode('Cloud read failed'); 
+        if(prefs.focusDefault) showFocus();
+      }
     } else {
       authOpenBtn.classList.remove('hidden'); userBadge.classList.add('hidden'); setLocalMode('Local mode');
+      if(prefs.focusDefault) showFocus();
     }
   });
 
@@ -1151,14 +1392,77 @@
   };
   applyTheme(prefs.theme||{});
 
+  /*************** Focus Mode UI helpers ***************/
+  function renderFocusLinks(){
+    const sec = currentSectionRef();
+    const arr = sec?.links || [];
+    focusLinksDiv.innerHTML = arr.length ? arr.map((w,i)=>`
+      <div class="widget" data-flink-idx="${i}">
+        <div class="link-card section-link" data-idx="${i}">
+          ${w.icon==='img' && w.img
+            ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
+            : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`}
+          <span class="truncate max-w-[14rem]">${escapeHtml(w.label||'Untitled')}</span>
+        </div>
+      </div>`).join('') : `<div class="text-xs muted">No links for this section.</div>`;
+
+    // Click to open links (read-only in focus)
+    focusLinksDiv.querySelectorAll('.section-link').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        const i = Number(card.dataset.idx);
+        const target = (sec?.links||[])[i];
+        if(!target) return;
+        const url = normalizeUrl(target.url||'');
+        if(url) window.open(url, '_blank', 'noopener');
+      });
+    });
+  }
+
+  function renderFocusUI(){
+    const sec = currentSession[currentIndex];
+    const count = currentSession.length;
+    if(!sec){
+      focusTitleEl.textContent = '—';
+      focusMetaEl.textContent = '';
+      focusDescEl.textContent = '';
+    }else{
+      focusTitleEl.textContent = sec.name || 'Untitled';
+      focusMetaEl.textContent = `Section ${Math.min(currentIndex+1,count)} of ${count} • ${(sec.minutes||0)}m`;
+      const note = sectionNotes[sec.id] || '';
+      focusDescEl.textContent = note ? note : 'No notes for this section.';
+    }
+    buildFocusProgress();
+    renderFocusLinks();
+    setClockText(secsToClock(secondsLeft));
+    updateClockColor();
+    updateStartBtnLabel();
+  }
+  function showFocus(){
+    if(!focusOverlay) return;
+    renderFocusUI();
+    focusOverlay.classList.remove('hidden');
+  }
+  function hideFocus(){
+    if(!focusOverlay) return;
+    focusOverlay.classList.add('hidden');
+  }
+  if(focusModeBtn) focusModeBtn.onclick = showFocus;
+  if(focusExitBtn) focusExitBtn.onclick = hideFocus;
+
   /*************** Initial render ***************/
   function renderCurrent(){
-    const s=currentSession[currentIndex]; if(!s){ currentTitleEl.textContent='—'; sectionDescEl.value=''; linksDiv.innerHTML=''; return; }
+    const s=currentSession[currentIndex]; 
+    if(!s){ 
+      currentTitleEl.textContent='—'; sectionDescEl.value=''; linksDiv.innerHTML=''; 
+      renderFocusUI();
+      return; 
+    }
     currentTitleEl.textContent = s.name || 'Untitled';
     sectionNotes[s.id] = sectionNotes[s.id] || '';
     sectionDescEl.value = sectionNotes[s.id];
     renderCurrentLinks();
-    $('#clock').textContent = secsToClock(secondsLeft);
+    setClockText(secsToClock(secondsLeft));
+    renderFocusUI();
   }
   function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
 
@@ -1167,6 +1471,7 @@
   function beep(){ try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); osc=ctx.createOscillator(); const g=ctx.createGain(); osc.connect(g); g.connect(ctx.destination); osc.type='square'; osc.frequency.value=880; g.gain.value=.05; osc.start(); setTimeout(()=>{ osc.stop(); }, 120); }catch{} }
 
   setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
+  if(prefs.focusDefault) showFocus();
 </script>
 </body>
 </html>
