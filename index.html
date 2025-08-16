@@ -120,14 +120,14 @@
             <div class="min-w-0 flex items-center gap-3">
               <!-- View title -->
               <h2 id="currentTitle" class="text-2xl font-extrabold truncate">—</h2>
-              <!-- View duration chip -->
-              <span id="currentDurDisp" class="text-xs px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--panel)] whitespace-nowrap">0m</span>
-              <!-- Edit title (inline) -->
-              <input id="editTitleInline" class="input text-2xl font-extrabold w-full hidden" placeholder="Section title"/>
-              <!-- Edit duration (inline) -->
-              <div id="editDurInline" class="hidden items-center gap-1">
-                <input id="editMinsInline" class="input w-24" type="number" min="0.01" step="0.1" placeholder="Minutes"/>
-                <select id="editUnitInline" class="input h-9 w-20 text-sm">
+              <!-- View duration text (no box in view mode) -->
+              <span id="currentDurDisp" class="text-sm muted whitespace-nowrap">0m</span>
+              <!-- Edit title (inline, autosizing) -->
+              <input id="editTitleInline" class="input text-2xl font-extrabold hidden align-middle shrink-0" placeholder="Section title" />
+              <!-- Edit duration (inline, compact side-by-side) -->
+              <div id="editDurInline" class="hidden items-center gap-1 flex-nowrap whitespace-nowrap">
+                <input id="editMinsInline" class="input w-20" type="number" min="0.01" step="0.1" placeholder="Min"/>
+                <select id="editUnitInline" class="input h-9 w-24 text-sm">
                   <option value="minutes" selected>min</option>
                   <option value="seconds">sec</option>
                   <option value="hours">hr</option>
@@ -277,9 +277,7 @@
       <div class="flex flex-col items-center text-center gap-5">
         <h2 id="focusTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight">—</h2>
 
-        <div id="focusMeta" class="muted text-sm">
-          <!-- e.g., Section 2 of 7 • 10m -->
-        </div>
+        <div id="focusMeta" class="muted text-sm"></div>
 
         <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
 
@@ -852,6 +850,20 @@
   /*************** Current panel (Home) ***************/
   let isEditingSection=false;
 
+  // --- Title autosize support (keeps title position, grows slightly wider than text) ---
+  const titleMeasureEl = document.createElement('span');
+  titleMeasureEl.style.cssText = 'position:fixed;top:-9999px;left:-9999px;visibility:hidden;white-space:pre;font-weight:800;font-size:1.5rem;font-family:inherit;padding:0.5rem 0.75rem;';
+  document.body.appendChild(titleMeasureEl);
+
+  function autosizeTitleInput(){
+    if(!editTitleInline) return;
+    const val = editTitleInline.value || ' ';
+    titleMeasureEl.textContent = val;
+    // Add a little breathing room; clamp to viewport
+    const desired = Math.min(titleMeasureEl.offsetWidth + 24, Math.floor(window.innerWidth * 0.7));
+    editTitleInline.style.width = Math.max(desired, 140) + 'px';
+  }
+
   // Save meta edits (title + duration) when leaving edit mode
   function saveMetaEdits(){
     const s = currentSession[currentIndex];
@@ -904,7 +916,7 @@
     clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
     editSectionBtn.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
 
-    // Toggle inline title/duration editors
+    // Toggle inline title/duration editors (keep positions the same)
     const s = currentSession[currentIndex] || {};
     currentTitleEl.classList.toggle('hidden', isEditingSection);
     currentDurDisp.classList.toggle('hidden', isEditingSection);
@@ -913,10 +925,12 @@
 
     if(isEditingSection){
       editTitleInline.value = s.name || '';
-      editMinsInline.value  = (Number(s.minutes) || 0).toString();
-      editUnitInline.value  = 'minutes';
+      autosizeTitleInput();
       editTitleInline.focus();
       editTitleInline.select();
+
+      editMinsInline.value  = (Number(s.minutes) || 0).toString();
+      editUnitInline.value  = 'minutes';
     }
 
     // Description can be edited only in edit mode
@@ -925,6 +939,10 @@
     renderCurrentLinks();
     renderShelf();
   }
+
+  // Keep autosizing as the user types / on resize
+  editTitleInline.addEventListener('input', autosizeTitleInput);
+  window.addEventListener('resize', ()=>{ if(isEditingSection) autosizeTitleInput(); });
 
   function currentSectionRef(){ return currentSession[currentIndex]; }
 
@@ -1159,8 +1177,6 @@
         });
       });
     });
-
-    // Delete: removed from UI while editing behavior changed; keep via separate flows if needed
 
     // Drag reorder with live placeholder (shows section title)
     let dragging = null;
