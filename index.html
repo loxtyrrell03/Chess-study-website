@@ -116,25 +116,28 @@
       <section id="leftPane">
         <div class="card p-6 section-card">
           <div class="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
-            <div>
-              <h2 id="currentTitle" class="text-2xl font-extrabold">—</h2>
+            <!-- LEFT: title + inline duration -->
+            <div class="min-w-0 flex items-center gap-3">
+              <!-- View title -->
+              <h2 id="currentTitle" class="text-2xl font-extrabold truncate">—</h2>
+              <!-- View duration chip -->
+              <span id="currentDurDisp" class="text-xs px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--panel)] whitespace-nowrap">0m</span>
+              <!-- Edit title (inline) -->
+              <input id="editTitleInline" class="input text-2xl font-extrabold w-full hidden" placeholder="Section title"/>
+              <!-- Edit duration (inline) -->
+              <div id="editDurInline" class="hidden items-center gap-1">
+                <input id="editMinsInline" class="input w-24" type="number" min="0.01" step="0.1" placeholder="Minutes"/>
+                <select id="editUnitInline" class="input h-9 w-20 text-sm">
+                  <option value="minutes" selected>min</option>
+                  <option value="seconds">sec</option>
+                  <option value="hours">hr</option>
+                </select>
+              </div>
             </div>
+            <!-- RIGHT: controls -->
             <div class="flex items-center gap-2">
               <button id="editSectionBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Edit Section</button>
               <div id="clock" class="clock-badge text-2xl tabular-nums">00:00</div>
-            </div>
-          </div>
-
-          <!-- NEW: inline meta editor (title & duration) -->
-          <div id="editMetaRow" class="mt-3 hidden">
-            <div class="flex flex-wrap items-center gap-2">
-              <input id="editTitleInput" class="input flex-1" placeholder="Section title"/>
-              <input id="editMinsInput" class="input w-28" type="number" min="0.01" step="0.1" placeholder="Minutes"/>
-              <select id="editUnitInput" class="input h-9 w-24 text-sm">
-                <option value="minutes" selected>min</option>
-                <option value="seconds">sec</option>
-                <option value="hours">hr</option>
-              </select>
             </div>
           </div>
 
@@ -160,10 +163,9 @@
             <div id="links" class="section-links-bar mt-2"></div>
           </div>
 
-          <!-- Notes -->
+          <!-- Description -->
           <div class="mt-4">
-            <label class="block-title">Section notes</label>
-            <p class="text-xs muted -mt-1 mb-1">Optional mini-checklist or reminders.</p>
+            <label class="block-title">Description</label>
             <textarea id="sectionDesc" class="w-full mt-1 input text-sm" placeholder="Add notes, mini-checklist, links…"></textarea>
           </div>
         </div>
@@ -304,7 +306,7 @@
           </button>
         </div>
 
-        <!-- NEW: Links (focus instance) -->
+        <!-- Links (focus instance) -->
         <div id="focusLinksWrap" class="w-full max-w-3xl">
           <div class="flex items-center justify-between mt-2">
             <h3 class="block-title">Links</h3>
@@ -495,9 +497,12 @@
   const linkShelfDiv=$('#linkShelf'); const shelfWrap=$('#shelfWrap'); const editSectionBtn=$('#editSectionBtn'); const clearSectionLinksBtn=$('#clearSectionLinks');
   const addWidgetBtn=$('#addWidgetBtn'); const resetShelfBtn=$('#resetShelfBtn');
 
-  // NEW: inline meta editor elements
-  const editMetaRow = $('#editMetaRow'); const editTitleInput = $('#editTitleInput');
-  const editMinsInput = $('#editMinsInput'); const editUnitInput = $('#editUnitInput');
+  // Inline edit handles (title & duration)
+  const editTitleInline = $('#editTitleInline');
+  const currentDurDisp  = $('#currentDurDisp');
+  const editDurInline   = $('#editDurInline');
+  const editMinsInline  = $('#editMinsInline');
+  const editUnitInline  = $('#editUnitInline');
 
   const outline=$('#outline'); const addOutlineItemBtn=$('#addOutlineItem'); const inlineAddRow=$('#inlineAddRow');
   const addTitleInput=$('#addTitleInput'); const addMinsInput=$('#addMinsInput'); const addConfirmBtn=$('#addConfirmBtn'); const addCancelBtn=$('#addCancelBtn');
@@ -522,7 +527,6 @@
         focusProgressSegments=$('#focusProgressSegments'), focusProgressTicks=$('#focusProgressTicks'),
         focusProgressPctEl=$('#focusProgressPct'), focusScrubOverlay=$('#focusScrubOverlay');
 
-  // NEW: Focus links container
   const focusLinksDiv = $('#focusLinks');
 
   // Split panes (drag-to-resize)
@@ -859,8 +863,8 @@
     const elapsedSec = Math.max(0, prevTotalSec - secondsLeft);
 
     // Read inputs
-    const newTitle = (editTitleInput.value || '').trim() || s.name || 'Untitled';
-    const newMinutes = Math.max(0.01, toMinutesValue(editMinsInput.value, editUnitInput.value));
+    const newTitle = (editTitleInline.value || '').trim() || s.name || 'Untitled';
+    const newMinutes = Math.max(0.01, toMinutesValue(editMinsInline.value, editUnitInline.value));
 
     // Apply
     s.name = newTitle;
@@ -900,14 +904,23 @@
     clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
     editSectionBtn.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
 
-    // Toggle meta editor
-    editMetaRow.classList.toggle('hidden', !isEditingSection);
+    // Toggle inline title/duration editors
+    const s = currentSession[currentIndex] || {};
+    currentTitleEl.classList.toggle('hidden', isEditingSection);
+    currentDurDisp.classList.toggle('hidden', isEditingSection);
+    editTitleInline.classList.toggle('hidden', !isEditingSection);
+    editDurInline.classList.toggle('hidden', !isEditingSection);
+
     if(isEditingSection){
-      const s = currentSession[currentIndex] || {};
-      editTitleInput.value = s.name || '';
-      editMinsInput.value  = (Number(s.minutes) || 0).toString();
-      editUnitInput.value  = 'minutes';
+      editTitleInline.value = s.name || '';
+      editMinsInline.value  = (Number(s.minutes) || 0).toString();
+      editUnitInline.value  = 'minutes';
+      editTitleInline.focus();
+      editTitleInline.select();
     }
+
+    // Description can be edited only in edit mode
+    sectionDescEl.disabled = !isEditingSection;
 
     renderCurrentLinks();
     renderShelf();
@@ -1074,7 +1087,8 @@
     }
   });
 
-  sectionDescEl.addEventListener('input', ()=>{ const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); });
+  // Description: only editable in edit mode (toggle via updateEditUI)
+  sectionDescEl.addEventListener('input', ()=>{ if(sectionDescEl.disabled) return; const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); });
 
   /*************** Outline (Home) with interactive reorder ***************/
   function renderOutline(){
@@ -1085,21 +1099,28 @@
           <div class="flex items-center gap-2 shrink-0">
             <span class="text-xs w-16 text-right">${Number(s.minutes||0)}m</span>
             <button class="btn-xs" data-act="edit">Edit</button>
-            <button class="btn-xs" data-act="delete">Delete</button>
           </div>
         </div>
       </li>`).join('');
 
-    // Jump on click (not when clicking action buttons)
+    // Jump on click (not when clicking action buttons or when row is editing)
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
-      li.addEventListener('click', (e)=>{ if(e.target.closest('[data-act]')) return; jumpToSection(idx); });
+      li.addEventListener('click', (e)=>{
+        if(li.classList.contains('editing')) return;
+        if(e.target.closest('[data-act], input, select, textarea, button')) return;
+        jumpToSection(idx);
+      });
     });
 
-    // Inline edit inside outline list
+    // Inline edit inside outline list — remains in edit mode until Save
     outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
         const cur=currentSession[idx];
+
+        li.classList.add('editing');
+        li.draggable = false;
+
         li.innerHTML = `
           <div class="flex items-center gap-2">
             <input class="input flex-1 text-sm" id="edtTitle" value="${escapeHtml(cur.name||'')}" />
@@ -1110,8 +1131,8 @@
               <option value="hours">hr</option>
             </select>
             <button class="btn-xxs" id="edtSave">Save</button>
-            <button class="btn-xxs" id="edtCancel">Cancel</button>
           </div>`;
+
         const edtTitle=li.querySelector('#edtTitle'), edtValue=li.querySelector('#edtValue'), edtUnit=li.querySelector('#edtUnit');
         const saveInline = ()=>{
           const prevMin = cur.minutes;
@@ -1130,27 +1151,16 @@
           saveCurrentSession();
           renderOutline(); buildProgress(); updateProgress(); renderCurrent(); updateStartBtnLabel(); markTimer();
         };
-        li.querySelector('#edtSave').onclick = saveInline; li.querySelector('#edtCancel').onclick = renderOutline;
+        li.querySelector('#edtSave').onclick = saveInline;
+
+        // Save on Enter (either field)
+        [edtTitle, edtValue].forEach(el=>{
+          el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveInline(); } });
+        });
       });
     });
 
-    // Delete
-    outline.querySelectorAll('[data-act="delete"]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const id = btn.closest('li[data-id]').dataset.id;
-        const delIdx = currentSession.findIndex(s=>s.id===id);
-        if(delIdx<0 || !confirm('Delete this section?')) return;
-        const deletingCurrent = delIdx === currentIndex;
-        currentSession.splice(delIdx,1);
-        awaitingNext=false; hideNextGate();
-        if(currentSession.length===0){ stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=0; }
-        else{
-          if(delIdx < currentIndex) currentIndex--;
-          if(deletingCurrent){ currentIndex = Math.min(currentIndex, currentSession.length-1); secondsLeft = minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); }
-        }
-        saveCurrentSession(); renderAll(); markTimer();
-      });
-    });
+    // Delete: removed from UI while editing behavior changed; keep via separate flows if needed
 
     // Drag reorder with live placeholder (shows section title)
     let dragging = null;
@@ -1164,6 +1174,7 @@
 
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
       li.addEventListener('dragstart', (e)=>{
+        if(li.classList.contains('editing')){ e.preventDefault(); return; }
         const titleText = (li.querySelector('button')?.textContent || '').trim();
         dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) };
         li.classList.add('dragging');
@@ -1453,13 +1464,18 @@
   function renderCurrent(){
     const s=currentSession[currentIndex]; 
     if(!s){ 
-      currentTitleEl.textContent='—'; sectionDescEl.value=''; linksDiv.innerHTML=''; 
+      currentTitleEl.textContent='—'; currentDurDisp.textContent='0m';
+      sectionDescEl.value=''; linksDiv.innerHTML=''; 
       renderFocusUI();
       return; 
     }
     currentTitleEl.textContent = s.name || 'Untitled';
+    currentDurDisp.textContent = `${Number(s.minutes||0)}m`;
     sectionNotes[s.id] = sectionNotes[s.id] || '';
     sectionDescEl.value = sectionNotes[s.id];
+    // Respect editability state for description
+    sectionDescEl.disabled = !isEditingSection;
+
     renderCurrentLinks();
     setClockText(secsToClock(secondsLeft));
     renderFocusUI();
