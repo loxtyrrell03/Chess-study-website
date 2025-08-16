@@ -126,7 +126,8 @@
               <input id="editTitleInline" class="input text-2xl font-extrabold hidden align-middle shrink-0" placeholder="Section title" />
               <!-- Edit duration (inline, compact side-by-side) -->
               <div id="editDurInline" class="hidden items-center gap-1 flex-nowrap whitespace-nowrap">
-                <input id="editMinsInline" class="input w-20" type="number" min="0.01" step="0.1" placeholder="Min"/>
+                <!-- HEIGHT FIXED to match select -->
+                <input id="editMinsInline" class="input h-9 w-24 text-sm" type="number" min="0.01" step="0.1" placeholder="Min"/>
                 <select id="editUnitInline" class="input h-9 w-24 text-sm">
                   <option value="minutes" selected>min</option>
                   <option value="seconds">sec</option>
@@ -946,7 +947,7 @@
 
   function currentSectionRef(){ return currentSession[currentIndex]; }
 
-  // Add widget (same UX as saved outlines: create placeholder -> open editor)
+  // Add widget
   addWidgetBtn.onclick = ()=>{
     if(!isEditingSection) editSectionBtn.click();
     const wid = 'W'+Date.now().toString(36);
@@ -972,7 +973,7 @@
     saveShelf(); renderShelf();
   };
 
-  // Shelf cards (same structure as saved outlines)
+  // Shelf cards…
   function widgetCardHTML(w){
     const iconHtml = (w.icon==='img' && w.img)
       ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
@@ -995,7 +996,7 @@
 
     linkShelfDiv.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=> addWidgetBtn.click());
 
-    // Click to edit shelf item (same modal)
+    // Click to edit shelf item
     linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
       card.addEventListener('click', ()=>{
         if(!isEditingSection) return;
@@ -1028,7 +1029,7 @@
     });
   }
 
-  // Current section links (edit/view) — and keep focus links in sync
+  // Current section links
   function renderCurrentLinks(){
     const sec=currentSectionRef(); const arr=sec?.links||[];
     linksDiv.innerHTML = arr.map((w,i)=>`
@@ -1084,6 +1085,18 @@
     renderFocusLinks();
   }
 
+  // CLEAR LINKS button — now works
+  clearSectionLinksBtn.onclick = ()=>{
+    if(!isEditingSection) return;
+    const sec = currentSectionRef();
+    if(!sec || !sec.links || sec.links.length===0) return;
+    if(!confirm('Clear all links for this section?')) return;
+    sec.links = [];
+    saveCurrentSession();
+    renderCurrentLinks();
+    renderFocusLinks();
+  };
+
   // Drop handlers (home links)
   let overCount = 0;
   linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over-outline'); });
@@ -1105,7 +1118,7 @@
     }
   });
 
-  // Description: only editable in edit mode (toggle via updateEditUI)
+  // Description
   sectionDescEl.addEventListener('input', ()=>{ if(sectionDescEl.disabled) return; const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); });
 
   /*************** Outline (Home) with interactive reorder ***************/
@@ -1121,7 +1134,7 @@
         </div>
       </li>`).join('');
 
-    // Jump on click (not when clicking action buttons or when row is editing)
+    // Jump on click
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
       li.addEventListener('click', (e)=>{
         if(li.classList.contains('editing')) return;
@@ -1130,7 +1143,7 @@
       });
     });
 
-    // Inline edit inside outline list — remains in edit mode until Save
+    // Inline edit inside outline list
     outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
@@ -1171,14 +1184,14 @@
         };
         li.querySelector('#edtSave').onclick = saveInline;
 
-        // Save on Enter (either field)
+        // Save on Enter
         [edtTitle, edtValue].forEach(el=>{
           el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveInline(); } });
         });
       });
     });
 
-    // Drag reorder with live placeholder (shows section title)
+    // Drag reorder with live placeholder
     let dragging = null;
     const makePh = (h, titleText)=>{ 
       const ph = document.createElement('li'); 
@@ -1505,5 +1518,8 @@
   setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
   if(prefs.focusDefault) showFocus();
 </script>
+
+<!-- Pricing tab (attaches a "Pricing" tab & section) -->
+<script src="./pricing-tab.js"></script>
 </body>
 </html>
