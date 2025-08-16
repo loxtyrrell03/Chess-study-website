@@ -38,7 +38,39 @@
       margin:.125rem 0;
     }
     .outline-row.dragging{ opacity:.35; }
+
+    /* ===== Time value + unit fields (both editors) ===== */
+    :root { --sf-editor-field-h: 44px; } /* uniform height */
+
+    /* Make number + select the same height & prevent clipped text on Windows */
+    #editMinsInline, #edtValue,
+    #editUnitInline, #edtUnit {
+      height: var(--sf-editor-field-h) !important;
+      box-sizing: border-box;
+      font-size: 0.95rem;
+      line-height: normal;          /* fixes half-cut text */
+      padding-top: 8px;
+      padding-bottom: 10px;         /* a touch more bottom space */
+      padding-left: 12px;
+      padding-right: 12px;
+      border-radius: 0.75rem;
+      vertical-align: middle;
+    }
+
+    /* Space for spinner/arrow so text stays centered */
+    #editMinsInline, #edtValue { padding-right: .75rem; } /* number spinner */
+    #editUnitInline, #edtUnit  { padding-right: 2rem; }   /* select arrow */
+
+    /* Normalize select rendering across browsers */
+    #editUnitInline, #edtUnit {
+      -webkit-appearance: none;
+        -moz-appearance: none;
+              appearance: none;
+      background-position: right .6rem center;
+      background-repeat: no-repeat;
+    }
   </style>
+
 </head>
 <body class="min-h-screen">
 <div class="max-w-7xl mx-auto px-5 py-6">
@@ -125,7 +157,7 @@
               <!-- Edit title (inline, autosizing) -->
               <input id="editTitleInline" class="input text-2xl font-extrabold hidden align-middle shrink-0" placeholder="Section title" />
               <!-- Edit duration (inline, compact side-by-side) -->
-              <div id="editDurInline" class="hidden items-center gap-1 flex-nowrap whitespace-nowrap">
+              <div id="editDurInline" class="hidden flex items-stretch gap-1 flex-nowrap whitespace-nowrap">
                 <!-- HEIGHT FIXED to match select -->
                 <input id="editMinsInline" class="input h-9 w-24 text-sm" type="number" min="0.01" step="0.1" placeholder="Min"/>
                 <select id="editUnitInline" class="input h-9 w-24 text-sm">
@@ -471,22 +503,37 @@
   const saveOutlinesLocal  = ()=>{ saveJSON('saved_outlines_v1', savedOutlines);  markDirty(); touchCloud(); };
   const saveTimerLocal     = ()=>{ saveJSON('timer_state_v2', timerState);        markDirty(); touchCloud(); };
 
-  /*************** Tabs ***************/
-  const tabButtons=[...document.querySelectorAll('.tab-link')];
+  /*************** Tabs (delegated & dynamic, works with Pricing) ***************/
   const homeTab=$('#homeTab'); const savedTab=$('#savedTab'); const helpTab=$('#helpTab');
-  tabButtons.forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      tabButtons.forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      const id=btn.dataset.tab;
-      homeTab.classList.toggle('hidden', id!=='homeTab');
-      savedTab.classList.toggle('hidden', id!=='savedTab');
-      helpTab.classList.toggle('hidden', id!=='helpTab');
-      if(id==='savedTab') renderSavedOutlines();
-      if(id==='homeTab') renderHomeSavedBar();
+  function showTab(id){
+    // Active button highlight
+    document.querySelectorAll('.tab-link').forEach(b=>b.classList.remove('active'));
+    const btn = document.querySelector(`.tab-link[data-tab="${id}"]`);
+    if(btn) btn.classList.add('active');
+
+    // Known sections; include Pricing if present
+    const ids = ['homeTab','savedTab','helpTab','pricingTab'];
+    ids.forEach(secId=>{
+      const el = document.getElementById(secId);
+      if(el) el.classList.toggle('hidden', secId !== id);
     });
-  });
-  document.querySelectorAll('[data-tab-jump]').forEach(b=> b.onclick = ()=> document.querySelector(`.tab-link[data-tab="${b.dataset.tabJump}"]`)?.click());
+
+    if(id==='savedTab') renderSavedOutlines();
+    if(id==='homeTab') renderHomeSavedBar();
+  }
+
+  // Initial click wiring via event delegation so dynamically-added tabs (Pricing) work
+  const tabsBar = document.querySelector('nav .tabs-bar');
+  if(tabsBar){
+    tabsBar.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.tab-link');
+      if(!btn) return;
+      showTab(btn.dataset.tab);
+    });
+  }
+
+  // Jumps (e.g., "Manage" link)
+  document.querySelectorAll('[data-tab-jump]').forEach(b=> b.onclick = ()=> showTab(b.dataset.tabJump));
 
   /*************** Progress / Timer ***************/
   const startBtn = $('#startBtn'); const prevBtn=$('#prevBtn'); const nextBtn=$('#nextBtn'); const resetBtn=$('#resetBtn');
@@ -851,7 +898,7 @@
   /*************** Current panel (Home) ***************/
   let isEditingSection=false;
 
-  // --- Title autosize support (keeps title position, grows slightly wider than text) ---
+  // --- Title autosize support ---
   const titleMeasureEl = document.createElement('span');
   titleMeasureEl.style.cssText = 'position:fixed;top:-9999px;left:-9999px;visibility:hidden;white-space:pre;font-weight:800;font-size:1.5rem;font-family:inherit;padding:0.5rem 0.75rem;';
   document.body.appendChild(titleMeasureEl);
@@ -860,7 +907,6 @@
     if(!editTitleInline) return;
     const val = editTitleInline.value || ' ';
     titleMeasureEl.textContent = val;
-    // Add a little breathing room; clamp to viewport
     const desired = Math.min(titleMeasureEl.offsetWidth + 24, Math.floor(window.innerWidth * 0.7));
     editTitleInline.style.width = Math.max(desired, 140) + 'px';
   }
@@ -870,20 +916,16 @@
     const s = currentSession[currentIndex];
     if(!s) return;
 
-    // Current values before change
     const prevMinutes = Number(s.minutes) || 0;
     const prevTotalSec = minsToSecs(prevMinutes);
     const elapsedSec = Math.max(0, prevTotalSec - secondsLeft);
 
-    // Read inputs
     const newTitle = (editTitleInline.value || '').trim() || s.name || 'Untitled';
     const newMinutes = Math.max(0.01, toMinutesValue(editMinsInline.value, editUnitInline.value));
 
-    // Apply
     s.name = newTitle;
     s.minutes = newMinutes;
 
-    // Adjust timer to preserve elapsed time within this section
     if(currentSession[currentIndex]?.id === s.id){
       const newTotal = minsToSecs(newMinutes);
       secondsLeft = Math.max(0, newTotal - elapsedSec);
@@ -901,11 +943,9 @@
 
   editSectionBtn.onclick = ()=>{
     if(!isEditingSection){
-      // Entering edit mode
       isEditingSection = true;
       updateEditUI();
     } else {
-      // Leaving edit mode -> save meta edits
       saveMetaEdits();
       isEditingSection = false;
       updateEditUI();
@@ -917,7 +957,6 @@
     clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
     editSectionBtn.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
 
-    // Toggle inline title/duration editors (keep positions the same)
     const s = currentSession[currentIndex] || {};
     currentTitleEl.classList.toggle('hidden', isEditingSection);
     currentDurDisp.classList.toggle('hidden', isEditingSection);
@@ -934,14 +973,12 @@
       editUnitInline.value  = 'minutes';
     }
 
-    // Description can be edited only in edit mode
     sectionDescEl.disabled = !isEditingSection;
 
     renderCurrentLinks();
     renderShelf();
   }
 
-  // Keep autosizing as the user types / on resize
   editTitleInline.addEventListener('input', autosizeTitleInput);
   window.addEventListener('resize', ()=>{ if(isEditingSection) autosizeTitleInput(); });
 
@@ -1502,7 +1539,6 @@
     currentDurDisp.textContent = `${Number(s.minutes||0)}m`;
     sectionNotes[s.id] = sectionNotes[s.id] || '';
     sectionDescEl.value = sectionNotes[s.id];
-    // Respect editability state for description
     sectionDescEl.disabled = !isEditingSection;
 
     renderCurrentLinks();
