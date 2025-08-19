@@ -612,7 +612,7 @@
   function elapsedSeconds(sched, idx, secsLeft){ const past=sched.slice(0,idx).reduce((a,b)=>a+minsToSecs(b.minutes||0),0); const cur=sched[idx]?minsToSecs(sched[idx].minutes||0)-secsLeft:0; return past+cur; }
   function toMinutesValue(value, unit){ const v=Number(value)||0; if(unit==='seconds') return v/60; if(unit==='hours') return v*60; return v; }
 
-  let running=false, rafId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, sessionStarted=false, totalSessionSecs=0, awaitingNext=false;
+  let running=false, rafId=null, bgTickId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, sessionStarted=false, totalSessionSecs=0, awaitingNext=false;
 
   function isAtVeryStart(){
     if(!currentSession.length) return true;
@@ -657,28 +657,81 @@
     if(awaitingNext) showNextGate(); else hideNextGate();
     updateStartBtnLabel();
   }
-  function syncEnd(){ endTimeMs=performance.now()+secondsLeft*1000; }
-  function startTimer(){ if(running) return; running=true; syncEnd(); loop(); updateStartBtnLabel(); updateClockColor(); markTimer(); }
-  function stopTimer(){ running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateStartBtnLabel(); updateClockColor(); markTimer(); }
-  function loop(){
-    if(!running) return;
-    const remaining=Math.max(0,Math.ceil((endTimeMs-performance.now())/1000));
-    if(remaining!==secondsLeft){ secondsLeft=remaining; setClockText(secsToClock(secondsLeft)); updateProgress(); }
-    if(secondsLeft<=0){
-      // Section finished
-      if(currentIndex<currentSession.length-1){
-        stopTimer();
-        awaitingNext = true;
-        showNextGate();
-        beep();
-        markTimer();
-        return;
-      }else{
-        stopTimer(); beep(); sessionStarted=false; updateStartBtnLabel(); markTimer(); alert('Session complete! 🎉'); return;
-      }
-    }
-    rafId=requestAnimationFrame(loop);
+  function syncEnd(){ endTimeMs = performance.now() + secondsLeft * 1000; }
+// Shared tick used by both rAF (foreground) and setInterval (background)
+function tick(){
+  if(!running) return;
+
+  const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
+  if(remaining !== secondsLeft){
+    secondsLeft = remaining;
+    setClockText(secsToClock(secondsLeft));
+    updateProgress();
   }
+
+  if(secondsLeft <= 0){
+    // Section finished
+    if(currentIndex < currentSession.length - 1){
+      stopTimer();
+      awaitingNext = true;
+      showNextGate();
+      beep();
+      markTimer();
+      return;
+    } else {
+      stopTimer();
+      beep();
+      sessionStarted = false;
+      updateStartBtnLabel();
+      markTimer();
+      alert('Session complete! 🎉');
+      return;
+    }
+  }
+}
+
+  
+function startTimer(){
+  if(running) return;
+  running = true;
+  syncEnd();
+
+  // Foreground: smooth UI updates
+  loop();
+
+  // Background: keep ticking even when tab is hidden (clamped but reliable)
+  if(bgTickId) clearInterval(bgTickId);
+  bgTickId = setInterval(tick, 1000);
+
+  updateStartBtnLabel();
+  updateClockColor();
+  markTimer();
+}
+
+  
+function stopTimer(){
+  running = false;
+  if(rafId) cancelAnimationFrame(rafId); rafId = null;
+  if(bgTickId) clearInterval(bgTickId);  bgTickId = null;
+  updateStartBtnLabel();
+  updateClockColor();
+  markTimer();
+}
+
+
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'hidden'){
+    if(running) tick();
+  }
+});
+
+  
+function loop(){
+  if(!running) return;
+  tick();
+  rafId = requestAnimationFrame(loop);
+}
+
   const markTimer = ()=>{
     timerState={ sessionStarted,running,currentIndex,secondsLeft,lastSyncTs:Date.now(), awaitingNext };
     saveTimerLocal();
@@ -1548,8 +1601,39 @@
   function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
 
   // Beep
-  let ctx=null, osc=null;
-  function beep(){ try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); osc=ctx.createOscillator(); const g=ctx.createGain(); osc.connect(g); g.connect(ctx.destination); osc.type='square'; osc.frequency.value=880; g.gain.value=.05; osc.start(); setTimeout(()=>{ osc.stop(); }, 120); }catch{} }
+  
+// --- Audio unlock so autoplay policies don't block the bell ---
+// --- Audio unlock so autoplay policies don't block the bell ---
+let ctx = null, osc = null;
+
+function unlockAudio(){
+  try{
+    if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if(ctx.state === 'suspended') ctx.resume();
+  }catch{}
+}
+['click','keydown','touchstart','pointerdown'].forEach(ev=>{
+  document.addEventListener(ev, unlockAudio, { once:true, passive:true });
+});
+
+// --- Beep (robust) ---
+function beep(){
+  try{
+    if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if(ctx.state === 'suspended') ctx.resume();
+
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.connect(g); g.connect(ctx.destination);
+    osc.type = 'square';
+    osc.frequency.value = 880;
+    g.gain.value = 0.05;
+
+    osc.start();
+    setTimeout(()=>{ try{ osc.stop(); g.disconnect(); }catch{} }, 140);
+  }catch{}
+}
+
 
   setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
   if(prefs.focusDefault) showFocus();
