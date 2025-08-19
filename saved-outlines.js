@@ -1,8 +1,13 @@
 // saved-outlines.js — Saved Outlines manager (mirrors Home right-pane DnD)
 //
-// Exports: setupSavedOutlines({ getSavedOutlines, setSavedOutlines, saveOutlinesLocal,
-//                              getWidgetShelf, setWidgetShelf, applyOutline,
-//                              touchCloud, renderHomeSavedBar })
+// Exports: setupSavedOutlines({
+//   getSavedOutlines, setSavedOutlines, saveOutlinesLocal,
+//   getWidgetShelf, setWidgetShelf, applyOutline,
+//   touchCloud, renderHomeSavedBar,
+//   // NEW (optional, for live two-way sync with Home):
+//   getActiveOutlineId,        // () => active outline id or null
+//   syncCurrentFromSaved       // (outlineObj) => void
+// })
 //
 // What’s inside:
 // • Outline cards with header actions: Load, Duplicate, Delete, Expand.
@@ -14,6 +19,8 @@
 // • Inline edit card for a section (title/minutes/description + links bar + shelf).
 // • Drag shelf item → Links bar (copy), reorder links inside the bar.
 // • Drag outline title onto another card to propose a merge (same UX as before).
+//
+// • NEW: When the edited outline is the active one, all changes push to Home immediately.
 
 export function setupSavedOutlines({
   getSavedOutlines,
@@ -23,7 +30,10 @@ export function setupSavedOutlines({
   setWidgetShelf,
   applyOutline,
   touchCloud,
-  renderHomeSavedBar
+  renderHomeSavedBar,
+  // NEW (optional)
+  getActiveOutlineId,
+  syncCurrentFromSaved
 }) {
   // ---------- DOM ----------
   const savedListEl   = document.getElementById('savedList');
@@ -52,11 +62,26 @@ export function setupSavedOutlines({
   const keyOf = (oId, sId)=> `${oId}|${sId}`;
   const fmtMins = (n)=> String(Number(n || 0)).replace(/\.0+$/,'');
   const escSel = (s)=> (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/([ #;?%&,.+*~':"!^$[\]()=>|/@])/g, '\\$1');
-  const saveAll = ()=>{
-    saveOutlinesLocal && saveOutlinesLocal();
-    renderHomeSavedBar && renderHomeSavedBar();
-    touchCloud && touchCloud();
-  };
+  const debounce = (fn,ms=400)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
+
+  // Small utility to persist + optionally live-sync the active outline to Home
+  const getActiveId = ()=> (typeof getActiveOutlineId === 'function' ? getActiveOutlineId() : null);
+  function persist(changedOutlineId){
+    if (typeof saveOutlinesLocal === 'function') saveOutlinesLocal();
+    if (typeof renderHomeSavedBar === 'function') renderHomeSavedBar();
+    if (typeof touchCloud === 'function') touchCloud();
+
+    const activeId = getActiveId?.();
+    if (activeId && changedOutlineId && activeId === changedOutlineId && typeof syncCurrentFromSaved === 'function') {
+      const list = (getSavedOutlines && getSavedOutlines()) || [];
+      const o = list.find(x => x.id === activeId);
+      if (o) {
+        // Pass a clone so Home can rebuild without mutating our copy
+        syncCurrentFromSaved(structuredClone(o));
+      }
+    }
+  }
+
   function parsePayload(dt){
     let str=''; const types = dt?.types ? Array.from(dt.types) : [];
     if(types.includes('text/plain')) str = dt.getData('text/plain');
@@ -340,13 +365,27 @@ export function setupSavedOutlines({
         copy.title = prompt('Duplicate title:', `Copy of ${src.title || 'Outline'}`)?.trim() || `Copy of ${src.title || 'Outline'}`;
         copy.sections = (copy.sections||[]).map((s, i)=> ({...s, id: 'S'+Date.now().toString(36)+i}));
         list.push(copy);
-        setSavedOutlines(list); saveAll(); renderSavedOutlines();
+        setSavedOutlines(list);
+        // (No sync needed: duplicating doesn't touch the active outline)
+        if (typeof saveOutlinesLocal === 'function') saveOutlinesLocal();
+        if (typeof renderHomeSavedBar === 'function') renderHomeSavedBar();
+        if (typeof touchCloud === 'function') touchCloud();
+        renderSavedOutlines();
       });
       card.querySelector('[data-act="delete"]')?.addEventListener('click', ()=>{
         if(!confirm('Delete this outline?')) return;
         const list = getSavedOutlines() || [];
         const idx = list.findIndex(x=>x.id===o.id);
-        if(idx>=0){ list.splice(idx,1); setSavedOutlines(list); saveAll(); renderSavedOutlines(); }
+        if(idx>=0){
+          const deletingActive = getActiveId?.() === o.id;
+          list.splice(idx,1);
+          setSavedOutlines(list);
+          // If we just deleted the active outline, we still just persist; Home will keep its current session until user loads another.
+          if (typeof saveOutlinesLocal === 'function') saveOutlinesLocal();
+          if (typeof renderHomeSavedBar === 'function') renderHomeSavedBar();
+          if (typeof touchCloud === 'function') touchCloud();
+          renderSavedOutlines();
+        }
       });
       card.querySelector('[data-act="toggle-expand"]')?.addEventListener('click', ()=>{
         if(expandedOutlines.has(o.id)) expandedOutlines.delete(o.id);
@@ -359,7 +398,8 @@ export function setupSavedOutlines({
           const me   = byId(list, o.id); if(!me) return;
           me.sections = me.sections || [];
           me.sections.push({ id:'S'+Date.now().toString(36), name:title, minutes, desc:'', links:[] });
-          setSavedOutlines(list); saveAll();
+          setSavedOutlines(list);
+          persist(o.id); // SYNC if active
           expandedOutlines.add(o.id);
           renderSavedOutlines();
         });
@@ -418,7 +458,10 @@ export function setupSavedOutlines({
                 sections:[...(tgt.sections||[]).map(s=>structuredClone(s)), ...(src.sections||[]).map(s=>structuredClone(s))]
               };
               list.push(merged);
-              setSavedOutlines(list); saveAll();
+              setSavedOutlines(list);
+              if (typeof saveOutlinesLocal === 'function') saveOutlinesLocal();
+              if (typeof renderHomeSavedBar === 'function') renderHomeSavedBar();
+              if (typeof touchCloud === 'function') touchCloud();
               mergeBar.style.display='none';
               renderSavedOutlines();
             };
@@ -464,7 +507,9 @@ export function setupSavedOutlines({
           const sidx = me.sections.findIndex(se => se.id === li.dataset.sid);
           if(sidx>=0 && confirm('Delete this section?')){
             me.sections.splice(sidx,1);
-            setSavedOutlines(list); saveAll(); renderSavedOutlines();
+            setSavedOutlines(list);
+            persist(o.id); // SYNC if active
+            renderSavedOutlines();
           }
         });
 
@@ -527,7 +572,8 @@ export function setupSavedOutlines({
           const [moved] = me.sections.splice(from,1);
           me.sections.splice(finalTo,0,moved);
 
-          setSavedOutlines(list); saveAll();
+          setSavedOutlines(list);
+          persist(o.id); // SYNC if active
         }
 
         dragging?.placeholder?.remove();
@@ -546,7 +592,7 @@ export function setupSavedOutlines({
         const linksBar = secEl?.querySelector('[data-role="links-bar"]');
         if (linksBar) linksBar.innerHTML = linksBarInnerHtml(sec.links || []);
 
-        // Save button
+        // Save button (title, minutes, desc)
         secEl?.querySelector('[data-act="save-section"]')?.addEventListener('click', (ev)=>{
           ev.stopPropagation();
           const list = getSavedOutlines() || [];
@@ -558,10 +604,25 @@ export function setupSavedOutlines({
           s.name    = titleEl ? (titleEl.value || 'Untitled section') : s.name;
           s.desc    = descEl ? descEl.value : s.desc;
           s.minutes = minsEl ? Math.max(0.25, Number(minsEl.value || 0)) : s.minutes;
-          setSavedOutlines(list); saveAll();
+          setSavedOutlines(list);
+          persist(o.id); // SYNC if active
           editingSections.delete(secKey);
           renderSavedOutlines();
         });
+
+        // Debounced description autosave (live sync while editing)
+        const descEl = secEl?.querySelector('[data-role="edit-desc"]');
+        if (descEl) {
+          const autoSaveDesc = debounce(()=>{
+            const list = getSavedOutlines() || [];
+            const me   = byId(list, o.id); if(!me) return;
+            const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
+            s.desc = descEl.value;
+            setSavedOutlines(list);
+            persist(o.id); // SYNC if active
+          }, 400);
+          descEl.addEventListener('input', autoSaveDesc);
+        }
 
         // Links bar DnD (copy from shelf + reorder)
         if(linksBar){
@@ -581,7 +642,9 @@ export function setupSavedOutlines({
               const w = shelf.find(x=>x.id===payload.id);
               if(!w) return;
               s.links.push({ id:'l'+Date.now().toString(36), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
-              setSavedOutlines(list); saveAll(); renderSavedOutlines();
+              setSavedOutlines(list);
+              persist(o.id); // SYNC if active
+              renderSavedOutlines();
             }else if(payload?.type==='reorder'){
               const from = payload.index;
               const cards = [...linksBar.querySelectorAll('.section-link')];
@@ -593,7 +656,9 @@ export function setupSavedOutlines({
               if(from==null || to==null || from===to) return;
               const [moved] = s.links.splice(from,1);
               s.links.splice(to,0,moved);
-              setSavedOutlines(list); saveAll(); renderSavedOutlines();
+              setSavedOutlines(list);
+              persist(o.id); // SYNC if active
+              renderSavedOutlines();
             }
           });
 
@@ -616,7 +681,9 @@ export function setupSavedOutlines({
               openWidgetEditor(w, (upd)=>{ 
                 upd.url = normalizeUrl(upd.url);
                 Object.assign(w, upd); 
-                setSavedOutlines(list); saveAll(); renderSavedOutlines(); 
+                setSavedOutlines(list);
+                persist(o.id); // SYNC if active
+                renderSavedOutlines(); 
               });
             });
           });
@@ -628,7 +695,7 @@ export function setupSavedOutlines({
               const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
               const pill = bin.closest('.widget')?.querySelector('.section-link');
               const i    = Number(pill?.dataset.idx ?? -1);
-              if(i>=0){ s.links.splice(i,1); setSavedOutlines(list); saveAll(); renderSavedOutlines(); }
+              if(i>=0){ s.links.splice(i,1); setSavedOutlines(list); persist(o.id); renderSavedOutlines(); }
             });
           });
         }
@@ -710,7 +777,10 @@ export function setupSavedOutlines({
       const t = (createTitle?.value || '').trim() || 'New outline';
       const list = getSavedOutlines() || [];
       list.push({ id:'O'+Date.now().toString(36), title:t, sections:[] });
-      setSavedOutlines(list); saveAll();
+      setSavedOutlines(list);
+      if (typeof saveOutlinesLocal === 'function') saveOutlinesLocal();
+      if (typeof renderHomeSavedBar === 'function') renderHomeSavedBar();
+      if (typeof touchCloud === 'function') touchCloud();
       createForm?.classList.add('hidden');
       renderSavedOutlines();
     };

@@ -658,79 +658,75 @@
     updateStartBtnLabel();
   }
   function syncEnd(){ endTimeMs = performance.now() + secondsLeft * 1000; }
-// Shared tick used by both rAF (foreground) and setInterval (background)
-function tick(){
-  if(!running) return;
+  // Shared tick used by both rAF (foreground) and setInterval (background)
+  function tick(){
+    if(!running) return;
 
-  const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
-  if(remaining !== secondsLeft){
-    secondsLeft = remaining;
-    setClockText(secsToClock(secondsLeft));
-    updateProgress();
-  }
+    const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
+    if(remaining !== secondsLeft){
+      secondsLeft = remaining;
+      setClockText(secsToClock(secondsLeft));
+      updateProgress();
+    }
 
-  if(secondsLeft <= 0){
-    // Section finished
-    if(currentIndex < currentSession.length - 1){
-      stopTimer();
-      awaitingNext = true;
-      showNextGate();
-      beep();
-      markTimer();
-      return;
-    } else {
-      stopTimer();
-      beep();
-      sessionStarted = false;
-      updateStartBtnLabel();
-      markTimer();
-      alert('Session complete! 🎉');
-      return;
+    if(secondsLeft <= 0){
+      // Section finished
+      if(currentIndex < currentSession.length - 1){
+        stopTimer();
+        awaitingNext = true;
+        showNextGate();
+        beep();
+        markTimer();
+        return;
+      } else {
+        stopTimer();
+        beep();
+        sessionStarted = false;
+        updateStartBtnLabel();
+        markTimer();
+        alert('Session complete! 🎉');
+        return;
+      }
     }
   }
-}
 
-  
-function startTimer(){
-  if(running) return;
-  running = true;
-  syncEnd();
+  function startTimer(){
+    if(running) return;
+    running = true;
+    syncEnd();
 
-  // Foreground: smooth UI updates
-  loop();
+    // Foreground: smooth UI updates
+    loop();
 
-  // Background: keep ticking even when tab is hidden (clamped but reliable)
-  if(bgTickId) clearInterval(bgTickId);
-  bgTickId = setInterval(tick, 1000);
+    // Background: keep ticking even when tab is hidden (clamped but reliable)
+    if(bgTickId) clearInterval(bgTickId);
+    bgTickId = setInterval(tick, 1000);
 
-  updateStartBtnLabel();
-  updateClockColor();
-  markTimer();
-}
-
-  
-function stopTimer(){
-  running = false;
-  if(rafId) cancelAnimationFrame(rafId); rafId = null;
-  if(bgTickId) clearInterval(bgTickId);  bgTickId = null;
-  updateStartBtnLabel();
-  updateClockColor();
-  markTimer();
-}
-
-
-document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'hidden'){
-    if(running) tick();
+    updateStartBtnLabel();
+    updateClockColor();
+    markTimer();
   }
-});
 
-  
-function loop(){
-  if(!running) return;
-  tick();
-  rafId = requestAnimationFrame(loop);
-}
+  function stopTimer(){
+    running = false;
+    if(rafId) cancelAnimationFrame(rafId); rafId = null;
+    if(bgTickId) clearInterval(bgTickId);  bgTickId = null;
+    updateStartBtnLabel();
+    updateClockColor();
+    markTimer();
+  }
+
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'hidden'){
+      if(running) tick();
+    }
+  });
+
+  function loop(){
+    if(!running) return;
+    tick();
+    rafId = requestAnimationFrame(loop);
+  }
 
   const markTimer = ()=>{
     timerState={ sessionStarted,running,currentIndex,secondsLeft,lastSyncTs:Date.now(), awaitingNext };
@@ -992,6 +988,8 @@ function loop(){
     renderCurrent();
     updateStartBtnLabel();
     markTimer();
+    // >>> SYNC to Saved when Home edits <<<
+    syncSavedFromCurrent();
   }
 
   editSectionBtn.onclick = ()=>{
@@ -1152,6 +1150,8 @@ function loop(){
           openWidgetEditor(target, (upd)=>{
             upd.url = normalizeUrl(upd.url);
             Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks();
+            // >>> SYNC after link edit
+            syncSavedFromCurrent();
           });
         } else {
           const url = normalizeUrl(target.url||'');
@@ -1166,7 +1166,7 @@ function loop(){
           e.stopPropagation();
           const pill = btn.closest('.widget')?.querySelector('.section-link');
           const i = Number(pill?.dataset.idx ?? -1);
-          if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); }
+          if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); }
         });
       });
     }
@@ -1185,6 +1185,8 @@ function loop(){
     saveCurrentSession();
     renderCurrentLinks();
     renderFocusLinks();
+    // >>> SYNC after clear
+    syncSavedFromCurrent();
   };
 
   // Drop handlers (home links)
@@ -1200,16 +1202,17 @@ function loop(){
     if(payload.type==='shelf'){
       const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
       sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
-      saveCurrentSession(); renderCurrentLinks(); renderFocusLinks();
+      saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
     } else if(payload.type==='reorder'){
       const from=payload.index; const cards=[...linksDiv.querySelectorAll('.section-link')];
       let to=cards.length; for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
-      if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks();
+      if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
     }
   });
 
   // Description
-  sectionDescEl.addEventListener('input', ()=>{ if(sectionDescEl.disabled) return; const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); });
+  const syncSavedFromCurrentDebounced = debounce(()=>{ try{ syncSavedFromCurrent(); }catch{} }, 400);
+  sectionDescEl.addEventListener('input', ()=>{ if(sectionDescEl.disabled) return; const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); syncSavedFromCurrentDebounced(); });
 
   /*************** Outline (Home) with interactive reorder ***************/
   function renderOutline(){
@@ -1271,6 +1274,8 @@ function loop(){
 
           saveCurrentSession();
           renderOutline(); buildProgress(); updateProgress(); renderCurrent(); updateStartBtnLabel(); markTimer();
+          // >>> SYNC to Saved after inline meta save
+          syncSavedFromCurrent();
         };
         li.querySelector('#edtSave').onclick = saveInline;
 
@@ -1346,6 +1351,8 @@ function loop(){
         else if(currentIndex < from && currentIndex >= finalTo) currentIndex += 1;
 
         saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent();
+        // >>> SYNC to Saved after Home reorder
+        syncSavedFromCurrent();
       }
       dragging.el.classList.remove('dragging');
       dragging.placeholder.remove();
@@ -1362,7 +1369,82 @@ function loop(){
     const title=(addTitleInput.value||'').trim() || 'New section'; const mins=Math.max(0.25, Number(addMinsInput.value)||5);
     currentSession.push({ id:'S'+Date.now(), name:title, minutes:mins, links:[] });
     inlineAddRow.classList.add('hidden'); saveCurrentSession(); renderAll(); markTimer();
+    // >>> SYNC to Saved after Home add
+    syncSavedFromCurrent();
   };
+
+  /*************** Two-way sync glue (Home ↔ Saved Outlines) ***************/
+  function getActiveOutlineId(){ return (timerState && timerState.outlineId) ? timerState.outlineId : null; }
+
+  function syncSavedFromCurrent(){
+    const activeId = getActiveOutlineId();
+    if(!activeId) return;
+    const idx = savedOutlines.findIndex(o=>o.id===activeId);
+    if(idx<0) return;
+    const saved = savedOutlines[idx];
+    const newSections = currentSession.map(sec=>{
+      let sid = sec.id;
+      if(!sid){ sid = 'S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); sec.id = sid; }
+      return {
+        id: sid,
+        name: sec.name,
+        minutes: sec.minutes,
+        links: structuredClone(sec.links || []),
+        desc: sectionNotes[sid] ?? ''
+      };
+    });
+    saved.sections = newSections;
+    saveOutlinesLocal();
+    renderHomeSavedBar();
+    touchCloud();
+  }
+
+  function syncCurrentFromSaved(outlineObj){
+    const activeId = getActiveOutlineId();
+    if(!activeId || !outlineObj || outlineObj.id !== activeId) return;
+
+    const oldActive = currentSession[currentIndex] || null;
+    const oldActiveId = oldActive?.id || null;
+    const oldActiveMins = Number(oldActive?.minutes || 0);
+    const elapsedInActive = oldActiveId ? Math.max(0, minsToSecs(oldActiveMins) - secondsLeft) : 0;
+
+    // Rebuild Home schedule from Saved outline (by id; keep timer state)
+    currentSession = (outlineObj.sections || []).map(s=>({
+      id: s.id || ('S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
+      name: s.name,
+      minutes: s.minutes,
+      links: structuredClone(s.links || [])
+    }));
+
+    // Rebuild notes from saved desc
+    sectionNotes = {};
+    (outlineObj.sections || []).forEach(s=>{ if(s?.id) sectionNotes[s.id] = s.desc || ''; });
+
+    let newIdx = 0, newLeft = 0;
+    if(oldActiveId){
+      const i = currentSession.findIndex(x=>x.id===oldActiveId);
+      if(i>=0){
+        newIdx = i;
+        const newTotal = minsToSecs(currentSession[i].minutes || 0);
+        newLeft = Math.max(0, newTotal - Math.min(elapsedInActive, newTotal));
+      }else{
+        newIdx = Math.min(currentIndex, Math.max(0, currentSession.length-1));
+        newLeft = minsToSecs((currentSession[newIdx]||{}).minutes || 0);
+      }
+    }else{
+      newIdx = Math.min(currentIndex, Math.max(0, currentSession.length-1));
+      newLeft = minsToSecs((currentSession[newIdx]||{}).minutes || 0);
+    }
+
+    currentIndex = newIdx;
+    secondsLeft = newLeft;
+    totalSessionSecs = scheduleTotalSecs(currentSession);
+    if(running) syncEnd();
+
+    saveCurrentSession(); saveNotes();
+    renderAll(); updateStartBtnLabel();
+    markTimer();
+  }
 
   /*************** Saved Outlines module wiring ***************/
   const homeSavedScroller = $('#homeSavedScroller');
@@ -1407,7 +1489,10 @@ function loop(){
     setWidgetShelf: (arr)=>{ widgetShelf = arr; saveShelf(); },
     applyOutline: applyOutlineToCurrent,
     touchCloud,
-    renderHomeSavedBar
+    renderHomeSavedBar,
+    // New sync hooks
+    getActiveOutlineId,
+    syncCurrentFromSaved
   });
 
   /*************** Auth modal UI ***************/
@@ -1601,39 +1686,32 @@ function loop(){
   function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
 
   // Beep
-  
-// --- Audio unlock so autoplay policies don't block the bell ---
-// --- Audio unlock so autoplay policies don't block the bell ---
-let ctx = null, osc = null;
+  let ctx = null;
+  function unlockAudio(){
+    try{
+      if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if(ctx.state === 'suspended') ctx.resume();
+    }catch{}
+  }
+  ['click','keydown','touchstart','pointerdown'].forEach(ev=>{
+    document.addEventListener(ev, unlockAudio, { once:true, passive:true });
+  });
+  function beep(){
+    try{
+      if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if(ctx.state === 'suspended') ctx.resume();
 
-function unlockAudio(){
-  try{
-    if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if(ctx.state === 'suspended') ctx.resume();
-  }catch{}
-}
-['click','keydown','touchstart','pointerdown'].forEach(ev=>{
-  document.addEventListener(ev, unlockAudio, { once:true, passive:true });
-});
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.connect(g); g.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.value = 880;
+      g.gain.value = 0.05;
 
-// --- Beep (robust) ---
-function beep(){
-  try{
-    if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if(ctx.state === 'suspended') ctx.resume();
-
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.connect(g); g.connect(ctx.destination);
-    osc.type = 'square';
-    osc.frequency.value = 880;
-    g.gain.value = 0.05;
-
-    osc.start();
-    setTimeout(()=>{ try{ osc.stop(); g.disconnect(); }catch{} }, 140);
-  }catch{}
-}
-
+      osc.start();
+      setTimeout(()=>{ try{ osc.stop(); g.disconnect(); }catch{} }, 140);
+    }catch{}
+  }
 
   setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
   if(prefs.focusDefault) showFocus();
