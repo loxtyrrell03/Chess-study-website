@@ -1,18 +1,19 @@
-// saved-outlines.js — compact edit layout + section modal + shelf “Add” + URL normalization + outline duplicate
+// saved-outlines.js — Saved Outlines manager (mirrors Home right-pane DnD)
 //
 // Exports: setupSavedOutlines({ getSavedOutlines, setSavedOutlines, saveOutlinesLocal,
 //                              getWidgetShelf, setWidgetShelf, applyOutline,
 //                              touchCloud, renderHomeSavedBar })
 //
-// Highlights:
-// • + Section opens a small modal (Title + Minutes).
-// • Edit mode is compact; Title + Minutes on the same row with inline "Title" label.
-// • Widget shelf shows a leading “+ Add” chip that creates a new shelf widget and opens its editor.
-// • URLs typed like “aimchess.com” are normalized to “https://www.aimchess.com” on save.
-// • Load button applies the outline and navigates to the Home view.
-// • Outline header has a Duplicate button between Load and Delete; user can rename the copy.
-// • Subsection preview rows are small/indented; drag to reorder with live placeholder.
-// • Link/shelf editing & delete preserved. Outline merge by dragging title — drop works anywhere on the target card.
+// What’s inside:
+// • Outline cards with header actions: Load, Duplicate, Delete, Expand.
+// • Inside an expanded card, sections render as <ul>…<li class="outline-row"> rows.
+// • Drag-to-reorder subsections uses the SAME logic as Home (right pane):
+//     - Live <li class="outline-row drop-placeholder"> shows the insertion point.
+//     - Drag over a row inserts placeholder before/after based on pointer half.
+//     - Container accepts drop anywhere (including at the end).
+// • Inline edit card for a section (title/minutes/description + links bar + shelf).
+// • Drag shelf item → Links bar (copy), reorder links inside the bar.
+// • Drag outline title onto another card to propose a merge (same UX as before).
 
 export function setupSavedOutlines({
   getSavedOutlines,
@@ -24,7 +25,7 @@ export function setupSavedOutlines({
   touchCloud,
   renderHomeSavedBar
 }) {
-  // DOM
+  // ---------- DOM ----------
   const savedListEl   = document.getElementById('savedList');
   const createBtn     = document.getElementById('createOutlineBtn');
   const createForm    = document.getElementById('createOutlineForm');
@@ -39,14 +40,13 @@ export function setupSavedOutlines({
   const mergeConfirm  = document.getElementById('mergeConfirmBtn');
   const mergeCancel   = document.getElementById('mergeCancelBtn');
 
-  // UI state
+  // ---------- UI state ----------
   const expandedOutlines = new Set(); // outline ids expanded
   const editingSections  = new Set(); // keys `${outlineId}|${sectionId}`
-  let draggingOutlineId  = null;      // for merge drag
-  let draggingSec        = null;      // { oid, sid, from, placeholder, sourceEl }
+  let draggingOutlineId  = null;      // for outline merge drag
   let isMergeDrag        = false;
 
-  /* ---------- helpers ---------- */
+  // ---------- helpers ----------
   const escapeHtml = (s)=> (s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const byId  = (arr, id)=> (arr || []).find(x => x.id === id);
   const keyOf = (oId, sId)=> `${oId}|${sId}`;
@@ -64,10 +64,23 @@ export function setupSavedOutlines({
     if(!str) str = dt.getData('application/json') || dt.getData('Text') || '';
     try{ return JSON.parse(str); }catch{ return null; }
   }
+  function normalizeUrl(input){
+    let u = (input || '').trim();
+    if(!u) return '';
+    if(/^https?:\/\//i.test(u)) return u;
+    u = u.replace(/^\/\//,'');
+    const slash = u.indexOf('/');
+    let host = slash >= 0 ? u.slice(0, slash) : u;
+    const rest = slash >= 0 ? u.slice(slash) : '';
+    if(!/^www\./i.test(host)){
+      const parts = host.split('.');
+      if(parts.length === 2){ host = 'www.' + host; }
+    }
+    return 'https://' + host + rest;
+  }
   function goHome(){
     const tabBtn = document.querySelector('.tab-link[data-tab="homeTab"]');
     if (tabBtn && typeof tabBtn.click === 'function') { tabBtn.click(); return; }
-
     const cand = ['[data-tab="home"]','[data-route="home"]','[data-nav="home"]','a[href="#home"]','#navHome','#homeTab','#tab-home'];
     for(const sel of cand){
       const el = document.querySelector(sel);
@@ -83,23 +96,8 @@ export function setupSavedOutlines({
     }
     if(location.hash !== '#home') location.hash = '#home';
   }
-  // Normalize "aimchess.com" -> "https://www.aimchess.com", keep http(s) if present
-  function normalizeUrl(input){
-    let u = (input || '').trim();
-    if(!u) return '';
-    if(/^https?:\/\//i.test(u)) return u;
-    u = u.replace(/^\/\//,'');
-    const slash = u.indexOf('/');
-    let host = slash >= 0 ? u.slice(0, slash) : u;
-    const rest = slash >= 0 ? u.slice(slash) : '';
-    if(!/^www\./i.test(host)){
-      const parts = host.split('.');
-      if(parts.length === 2){ host = 'www.' + host; }
-    }
-    return 'https://' + host + rest;
-  }
 
-  /* ---------- modals ---------- */
+  // ---------- small modals ----------
   function openWidgetEditor(widget, onSave, onCancel){
     const modal = document.createElement('div');
     modal.className = 'modal';
@@ -209,35 +207,32 @@ export function setupSavedOutlines({
     };
   }
 
-  /* ---------- HTML builders ---------- */
-
+  // ---------- HTML builders ----------
   function sectionPreviewRowHtml(s){
     return `
-      <div class="section-preview" data-sid="${escapeHtml(s.id)}" data-view="preview" draggable="true">
+      <li class="outline-row section-row" data-sid="${escapeHtml(s.id)}" data-view="preview" draggable="true">
         <div class="flex items-center gap-2">
           <div class="title truncate flex-1">${escapeHtml(s.name || 'Untitled section')}</div>
           <span class="mins text-xs muted">${fmtMins(s.minutes)}m</span>
           <button class="btn-xxs bin" data-act="del-sec" title="Delete section">🗑️</button>
         </div>
-      </div>`;
-  }
-
-  function linkPillHtml(w, i){
-    const iconHtml = (w.icon==='img' && w.img)
-      ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
-      : `<span style="font-size:16px;line-height:18px">${escapeHtml(w.emoji || '🔗')}</span>`;
-    return `
-      <div class="widget" data-link-idx="${i}">
-        <div class="link-card section-link" draggable="true" data-idx="${i}">
-          ${iconHtml}
-          <span class="truncate max-w-[12rem]">${escapeHtml(w.label || 'Untitled')}</span>
-        </div>
-        <button class="bin" data-act="del-link" title="Delete">🗑️</button>
-      </div>`;
+      </li>`;
   }
 
   function linksBarInnerHtml(links){
-    return (links||[]).map((w,i)=> linkPillHtml(w,i)).join('');
+    return (links||[]).map((w,i)=> {
+      const iconHtml = (w.icon==='img' && w.img)
+        ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
+        : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`;
+      return `
+        <div class="widget" data-link-idx="${i}">
+          <div class="link-card section-link" draggable="true" data-idx="${i}">
+            ${iconHtml}
+            <span class="truncate max-w-[12rem]">${escapeHtml(w.label || 'Untitled')}</span>
+          </div>
+          <button class="bin" data-act="del-link" title="Delete">🗑️</button>
+        </div>`;
+    }).join('');
   }
 
   function inlineShelfHtml(shelf){
@@ -245,7 +240,7 @@ export function setupSavedOutlines({
     const items = (shelf||[]).map(w=>{
       const iconHtml = (w.icon==='img' && w.img)
         ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
-        : `<span style="font-size:16px;line-height:18px">${escapeHtml(w.emoji || '🔗')}</span>`;
+        : `<span class="link-icon">${escapeHtml(w.emoji || '🔗')}</span>`;
       return `
         <div class="widget" data-wid="${escapeHtml(w.id)}">
           <div class="link-card draggable-shelf" draggable="true" data-wid="${escapeHtml(w.id)}" title="${escapeHtml(w.url || '')}" style="cursor:grab">
@@ -266,7 +261,7 @@ export function setupSavedOutlines({
       </div>`;
   }
 
-  function sectionEditCardHtml(s){
+  function sectionEditCardInnerHtml(s){
     const desc = escapeHtml(s.desc || '');
     return `
       <div class="section-edit compact-edit" data-sid="${escapeHtml(s.id)}" data-view="edit">
@@ -310,16 +305,18 @@ export function setupSavedOutlines({
           <button class="btn-xxs" data-act="toggle-expand" aria-expanded="${isExpanded ? 'true':'false'}" title="${isExpanded?'Collapse':'Expand'}">${chevron}</button>
         </div>
         ${isExpanded ? `
-          <div class="mt-3 grid gap-2" data-role="sections">
+          <ul class="mt-3" data-role="sections">
             ${(o.sections||[]).map(s=>{
               const k = keyOf(o.id, s.id);
-              return editingSections.has(k) ? sectionEditCardHtml(s) : sectionPreviewRowHtml(s);
+              return editingSections.has(k)
+                ? `<li class="outline-row editing" data-sid="${escapeHtml(s.id)}" data-view="edit">${sectionEditCardInnerHtml(s)}</li>`
+                : sectionPreviewRowHtml(s);
             }).join('')}
-          </div>` : ''}
+          </ul>` : ''}
       </div>`;
   }
 
-  /* ---------- renderer ---------- */
+  // ---------- renderer ----------
   function renderSavedOutlines(){
     if(!savedListEl) return;
     const outlines = getSavedOutlines() || [];
@@ -375,7 +372,7 @@ export function setupSavedOutlines({
         titleEl.addEventListener('dragstart', (e)=>{
           draggingOutlineId = o.id;
           isMergeDrag = true;
-          document.body.classList.add('is-merge-drag'); // disable header button pointer events
+          document.body.classList.add('is-merge-drag');
           try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'merge', id:o.id})); }catch{}
           e.dataTransfer.effectAllowed='move';
           card.classList.add('drag-ghost');
@@ -388,7 +385,7 @@ export function setupSavedOutlines({
           document.querySelectorAll('[data-oid]').forEach(el=>{ el.style.outline=''; el.style.outlineOffset=''; });
         });
 
-        // Capture dragover/drop on the whole card so drops work between/over buttons too
+        // Make the entire card a permissive drop target for merging
         const onDragOverCard = (e)=>{
           const incoming = draggingOutlineId;
           if(incoming && incoming !== o.id){
@@ -437,142 +434,120 @@ export function setupSavedOutlines({
 
       // Sections wiring (only if expanded)
       if(!expandedOutlines.has(o.id)) return;
-      const sectionsWrap = card.querySelector('[data-role="sections"]');
-      if(!sectionsWrap) return;
+      const sectionsList = card.querySelector('[data-role="sections"]');
+      if(!sectionsList) return;
 
-      // ---- Subsection reorder with live placeholder ----
-      const makePlaceholder = (h)=>{
-        const ph = document.createElement('div');
-        ph.className = 'section-preview drop-placeholder';
-        ph.style.setProperty('--ph', `${Math.max(36, h)}px`);
-        ph.innerHTML = `<div class="flex items-center gap-2"><div class="title flex-1 muted">Drop here</div></div>`;
-        return ph;
-      };
-      const cleanupDrag = ()=>{
-        if(draggingSec?.sourceEl) draggingSec.sourceEl.classList.remove('dragging');
-        draggingSec?.placeholder?.remove();
-        draggingSec = null;
+      // --- Subsection reorder (exact Home logic) ---
+      let dragging = null; // { from, el, placeholder }
+      const makePh = (h, titleText)=>{ 
+        const ph = document.createElement('li'); 
+        ph.className='outline-row drop-placeholder'; 
+        ph.style.setProperty('--ph', `${Math.max(36,h)}px`); 
+        ph.innerHTML = `<div class="text-xs muted px-2 truncate">${escapeHtml(titleText||'')}</div>`; 
+        return ph; 
       };
 
-      // Preview rows (draggable list items)
-      const previewRows = Array.from(sectionsWrap.querySelectorAll('[data-view="preview"]'));
-      previewRows.forEach((row, idx)=>{
-        row.addEventListener('dragstart', (e)=>{
-          draggingSec = { oid:o.id, sid: row.getAttribute('data-sid'), from: idx, sourceEl: row, placeholder: null };
-          try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'sec-move', oid:o.id, sid:draggingSec.sid, from: idx})); }catch{}
-          e.dataTransfer.effectAllowed='move';
-          row.classList.add('dragging');
-
-          // create placeholder with same height
-          const ph = makePlaceholder(row.offsetHeight);
-          draggingSec.placeholder = ph;
-          row.after(ph);
+      // Per-row wiring
+      sectionsList.querySelectorAll('li.section-row[data-sid]').forEach((li, idx)=>{
+        // Select row → open inline editor (ignore bin)
+        li.addEventListener('click', (e)=>{
+          if(e.target.closest('[data-act="del-sec"], .link-card, .bin, input, textarea, select, button')) return;
+          editingSections.add(keyOf(o.id, li.dataset.sid));
+          renderSavedOutlines();
         });
-        row.addEventListener('dragend', cleanupDrag);
 
-        // While dragging, moving over another row repositions the placeholder
-        const over = (e)=>{
-          const payload = parsePayload(e.dataTransfer) || draggingSec;
-          if(payload && (payload.type==='sec-move' || draggingSec) && (payload.oid===o.id)){
-            e.preventDefault();
-            const r = row.getBoundingClientRect();
-            const before = e.clientY < (r.top + r.height/2);
-            const ph = draggingSec?.placeholder;
-            if(!ph) return;
-            if(before){
-              if(row.previousSibling !== ph) row.parentElement.insertBefore(ph, row);
-            }else{
-              if(row.nextSibling !== ph) row.after(ph);
-            }
-          }
-        };
-        row.addEventListener('dragover', over);
-        row.addEventListener('dragenter', over);
-
-        // Delete section
-        row.querySelector('[data-act="del-sec"]')?.addEventListener('click', (e)=>{
+        // Delete
+        li.querySelector('[data-act="del-sec"]')?.addEventListener('click', (e)=>{
           e.stopPropagation();
           const list = getSavedOutlines() || [];
           const me   = byId(list, o.id); if(!me) return;
-          const sidx = me.sections.findIndex(se => se.id === row.getAttribute('data-sid'));
+          const sidx = me.sections.findIndex(se => se.id === li.dataset.sid);
           if(sidx>=0 && confirm('Delete this section?')){
             me.sections.splice(sidx,1);
             setSavedOutlines(list); saveAll(); renderSavedOutlines();
           }
         });
 
-        // Click preview -> edit (except bin)
-        row.addEventListener('click', (e)=>{
-          if(e.target && (e.target.closest('[data-act="del-sec"]'))) return;
-          editingSections.add(keyOf(o.id, row.getAttribute('data-sid')));
-          renderSavedOutlines();
+        // DnD: drag the row
+        li.addEventListener('dragstart', (e)=>{
+          if(li.classList.contains('editing')){ e.preventDefault(); return; }
+          const titleText = (li.querySelector('.title')?.textContent || '').trim();
+          dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) };
+          li.classList.add('dragging');
+          li.after(dragging.placeholder);
+          try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'sec-move', from: idx, oid:o.id})); }catch{}
+          e.dataTransfer.effectAllowed='move';
         });
-      });
+        li.addEventListener('dragend', ()=>{
+          li.classList.remove('dragging');
+          dragging?.placeholder?.remove();
+          dragging = null;
+        });
 
-      // Allow dropping into empty space of the list (e.g., to end)
-      sectionsWrap.addEventListener('dragover', (e)=>{
-        const payload = parsePayload(e.dataTransfer) || draggingSec;
-        if(payload && (payload.type==='sec-move' || draggingSec) && (payload.oid===o.id)){
+        // Reposition placeholder when hovering other rows
+        const over = (e)=>{
+          if(!dragging) return;
           e.preventDefault();
-          if(!draggingSec?.placeholder){
-            const ph = document.createElement('div');
-            ph.className = 'section-preview drop-placeholder';
-            ph.style.setProperty('--ph', '44px');
-            ph.innerHTML = `<div class="flex items-center gap-2"><div class="title flex-1 muted">Drop here</div></div>`;
-            draggingSec.placeholder = ph;
-            sectionsWrap.appendChild(ph);
+          const r = li.getBoundingClientRect();
+          const before = e.clientY < (r.top + r.height/2);
+          const ph = dragging.placeholder;
+          if(!ph) return;
+          if(before){
+            if(li.previousSibling !== ph) li.parentElement.insertBefore(ph, li);
           }else{
-            // if not in the DOM, append to end
-            if(!sectionsWrap.contains(draggingSec.placeholder)){
-              sectionsWrap.appendChild(draggingSec.placeholder);
-            }
+            if(li.nextSibling !== ph) li.after(ph);
           }
-        }
+        };
+        li.addEventListener('dragover', over);
+        li.addEventListener('dragenter', over);
       });
-      sectionsWrap.addEventListener('drop', (e)=>{
-        const payload = parsePayload(e.dataTransfer) || draggingSec;
-        if(!payload || payload.oid !== o.id) return;
+
+      // Container allows dropping anywhere (including end)
+      sectionsList.addEventListener('dragover', (e)=>{
+        if(!dragging) return;
         e.preventDefault();
+        if(!sectionsList.contains(dragging.placeholder)) sectionsList.appendChild(dragging.placeholder);
+      });
 
-        const list = getSavedOutlines() || [];
-        const me   = byId(list, o.id); if(!me) return;
-        const from = Number(payload.from);
+      sectionsList.addEventListener('drop', (e)=>{
+        if(!dragging) return;
+        e.preventDefault();
+        const from = dragging.from;
 
-        // figure out target index from placeholder position
-        const children = Array.from(sectionsWrap.querySelectorAll('.section-preview:not(.drop-placeholder)'));
-        const ph = draggingSec?.placeholder;
-        let to = me.sections.length - 1;
-        if(ph){
-          // find position: number of non-placeholder previews before placeholder
-          to = Array.from(sectionsWrap.children)
-            .filter(el => el.matches('.section-preview'))
-            .indexOf(ph);
-        }
-        // compensate "remove then insert": if moving downward and dropping after original position
+        const rows = Array.from(sectionsList.querySelectorAll('li.outline-row'));
+        const phIndex = rows.indexOf(dragging.placeholder);
+        const to = phIndex < 0 ? rows.length-1 : phIndex;
+
         const finalTo = (to > from) ? to - 1 : to;
 
-        if(!isNaN(from) && !isNaN(finalTo) && from !== finalTo){
+        if(from !== finalTo && from >= 0 && finalTo >= 0){
+          const list = getSavedOutlines() || [];
+          const me   = byId(list, o.id); if(!me) return;
+
           const [moved] = me.sections.splice(from,1);
           me.sections.splice(finalTo,0,moved);
+
           setSavedOutlines(list); saveAll();
         }
-        cleanupDrag();
+
+        dragging?.placeholder?.remove();
+        dragging = null;
         renderSavedOutlines();
       });
 
-      // Wire edit cards
+      // ---- Wire edit cards inside <li class="outline-row editing"> ----
       (o.sections || []).forEach(sec=>{
         const secKey = keyOf(o.id, sec.id);
         if(!editingSections.has(secKey)) return;
-        const secEl = sectionsWrap.querySelector(`[data-sid="${escSel(sec.id)}"][data-view="edit"]`);
-        if(!secEl) return;
+        const li = sectionsList.querySelector(`li.editing[data-sid="${escSel(sec.id)}"]`);
+        if(!li) return;
 
-        // Links bar HTML
-        const linksBar = secEl.querySelector('[data-role="links-bar"]');
-        if (linksBar) linksBar.innerHTML = linksBarInnerHtml(sec.links);
+        const secEl = li.querySelector('.section-edit');
+        const linksBar = secEl?.querySelector('[data-role="links-bar"]');
+        if (linksBar) linksBar.innerHTML = linksBarInnerHtml(sec.links || []);
 
         // Save button
-        secEl.querySelector('[data-act="save-section"]')?.addEventListener('click', (ev)=>{
+        secEl?.querySelector('[data-act="save-section"]')?.addEventListener('click', (ev)=>{
           ev.stopPropagation();
           const list = getSavedOutlines() || [];
           const me   = byId(list, o.id); if(!me) return;
@@ -588,7 +563,7 @@ export function setupSavedOutlines({
           renderSavedOutlines();
         });
 
-        // Links bar DnD
+        // Links bar DnD (copy from shelf + reorder)
         if(linksBar){
           let over=0;
           linksBar.addEventListener('dragenter', ()=>{ over++; linksBar.classList.add('drag-over-outline'); });
@@ -659,7 +634,7 @@ export function setupSavedOutlines({
         }
 
         // Inline shelf actions (drag & edit & delete + ADD)
-        const shelfWrap = secEl.querySelector('[data-role="inline-shelf"]');
+        const shelfWrap = secEl?.querySelector('[data-role="inline-shelf"]');
         if(shelfWrap){
           shelfWrap.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=>{
             if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
@@ -722,7 +697,7 @@ export function setupSavedOutlines({
     });
   }
 
-  /* ---------- create outline wiring ---------- */
+  // ---------- create outline wiring ----------
   if(createBtn){
     createBtn.onclick = ()=>{
       createForm?.classList.toggle('hidden');
