@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Skillflow — Structure your training. Master any skill.</title>
+  <title>Skillflow — Plan sessions. Build momentum.</title>
   <meta name="color-scheme" content="light dark"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="./styles.css"/>
+
+  <!-- Page-specific quick fixes/overrides -->
   <style id="index-overrides">
-    /* ----- Progress highlight layering + stronger fill ----- */
+    /* Stronger progress fill + layering */
     #progressSegments{ z-index:0 !important; }
     #progressFill{
       z-index:2 !important;
@@ -18,7 +20,7 @@
     #progressTicks{ z-index:3 !important; }
     #scrubOverlay{ z-index:4 !important; }
 
-    /* ----- Focus overlay progress elements ----- */
+    /* Focus overlay mirroring */
     #focusProgressSegments{ z-index:0 !important; }
     #focusProgressFill{
       z-index:2 !important;
@@ -28,45 +30,26 @@
     #focusProgressTicks{ z-index:3 !important; }
     #focusScrubOverlay{ z-index:4 !important; }
 
-    /* ----- Reorder placeholder (Home outline) ----- */
-    .drop-placeholder{
-      opacity:.6;
-      border:2px dashed var(--accent);
-      background:color-mix(in srgb, var(--accent-100) 60%, transparent);
-      height:var(--ph,44px);
-      border-radius:10px;
-      margin:.125rem 0;
-    }
-    .outline-row.dragging{ opacity:.35; }
+    /* Live reorder: hide the original row so there is NO ghost copy */
+    .outline-row.dragging{ display:none !important; }
 
-    /* ===== Time value + unit fields (both editors) ===== */
-    :root { --sf-editor-field-h: 36px; } /* compact + consistent */
-
+    /* Tight, consistent inline number/select heights */
+    :root { --sf-editor-field-h: 44px; }
     #editMinsInline, #edtValue,
-    #editUnitInline, #edtUnit {
+    #editUnitInline, #edtUnit{
       height: var(--sf-editor-field-h) !important;
       box-sizing: border-box;
       font-size: 0.95rem;
       line-height: normal;
-      padding-top: 6px;
-      padding-bottom: 8px;
-      padding-left: 12px;
-      padding-right: 12px;
-      border-radius: 0.75rem;
+      padding: 8px 12px 10px 12px;
+      border-radius: .75rem;
       vertical-align: middle;
     }
-    #editMinsInline, #edtValue { padding-right: .75rem; }
-    #editUnitInline, #edtUnit  { padding-right: 2rem; }
-    #editUnitInline, #edtUnit {
-      -webkit-appearance: none;
-         -moz-appearance: none;
-              appearance: none;
-      background-position: right .6rem center;
-      background-repeat: no-repeat;
-    }
+    #editMinsInline, #edtValue { padding-right:.75rem; }
+    #editUnitInline, #edtUnit  { padding-right:2rem; appearance:none; background-repeat:no-repeat; background-position:right .6rem center; }
   </style>
-
 </head>
+
 <body class="min-h-screen">
 <div class="max-w-7xl mx-auto px-5 py-6">
 
@@ -93,8 +76,8 @@
 
   <!-- Tabs -->
   <nav class="mb-6">
-    <div class="tabs-bar">
-      <button class="tab-link active" data-tab="landingTab">Overview</button>
+    <div class="tabs-bar overflow-x-auto">
+      <button class="tab-link active" data-tab="overviewTab">Overview</button>
       <div class="tab-sep"></div>
       <button class="tab-link" data-tab="homeTab">Planner</button>
       <div class="tab-sep"></div>
@@ -104,60 +87,57 @@
     </div>
   </nav>
 
-  <!-- LANDING / OVERVIEW -->
-  <section id="landingTab">
-    <div class="landing-hero card p-6 mb-6">
-      <div class="flex flex-col lg:flex-row items-center gap-6">
-        <div class="min-w-0 flex-1">
-          <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Turn a block of time into momentum.</h2>
-          <p class="mt-2 text-[15px] leading-6 text-slate-600">Skillflow structures one focused session into ordered mini‑goals. A live progress bar and quick editing keep you moving.</p>
-          <div class="mt-4 flex gap-2">
-            <button class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm" data-tab-jump="homeTab">Open the Planner</button>
-            <a class="px-4 py-2 rounded-xl border border-[var(--border)]" href="#help">Learn the basics</a>
-          </div>
-        </div>
-        <div class="flex-1 w-full">
-          <div class="demo card p-4">
-            <div class="text-sm muted mb-1">Demo progress</div>
-            <div class="demo-progress">
-              <div id="demoFill"></div>
-              <div class="demo-seg" style="--w:25%"></div>
-              <div class="demo-seg" style="--w:15%"></div>
-              <div class="demo-seg" style="--w:20%"></div>
-              <div class="demo-seg" style="--w:40%"></div>
-            </div>
-            <div class="mt-2 text-xs muted">Watch the bar fill. That’s your session, divided into mini‑goals.</div>
-          </div>
+  <!-- OVERVIEW / Landing -->
+  <section id="overviewTab">
+    <div class="card p-6 md:p-10 relative overflow-hidden">
+      <div class="absolute -inset-1 bg-[radial-gradient(ellipse_at_top_right,rgba(14,165,233,.25),transparent_40%),radial-gradient(ellipse_at_bottom_left,rgba(16,185,129,.25),transparent_40%)] pointer-events-none"></div>
+      <div class="relative z-10">
+        <h2 class="text-3xl md:text-5xl font-extrabold mb-2">Plan one focused session.<br/>Build momentum.</h2>
+        <p class="text-lg text-slate-600 max-w-2xl">
+          Skillflow breaks a work block into mini‑goals with a live progress bar and instant feedback,
+          so you avoid drift and finish strong.
+        </p>
+        <div class="mt-4 flex gap-2">
+          <button class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm" data-tab-jump="homeTab">Open Planner</button>
+          <button class="px-4 py-2 rounded-xl border border-[var(--border)]" data-tab-jump="savedTab">Browse outlines</button>
         </div>
       </div>
-    </div>
 
-    <div class="grid md:grid-cols-3 gap-4">
-      <div class="card p-5">
-        <div class="text-2xl">🎯</div>
-        <h3 class="block-title mt-1">Plan your session</h3>
-        <p class="text-sm mt-1 text-slate-600">Create subsections with times and notes. Load templates for repeatable training.</p>
-      </div>
-      <div class="card p-5">
-        <div class="text-2xl">⏱️</div>
-        <h3 class="block-title mt-1">Stay on track</h3>
-        <p class="text-sm mt-1 text-slate-600">A live timer + progress bar gives instant feedback. Click anywhere to jump.</p>
-      </div>
-      <div class="card p-5">
-        <div class="text-2xl">☁️</div>
-        <h3 class="block-title mt-1">Sync & organize</h3>
-        <p class="text-sm mt-1 text-slate-600">Save outlines, organize them in folders, and sync across devices.</p>
+      <!-- Animated mini-demo -->
+      <div class="mt-8 grid md:grid-cols-2 gap-6 relative z-10">
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-1">
+            <div class="block-sub">Live demo</div>
+            <div id="demoPct" class="text-xs muted">0%</div>
+          </div>
+          <div class="relative w-full h-6 rounded-2xl overflow-hidden card">
+            <div id="demoFill" class="absolute left-0 top-0 bottom-0" style="width:0%;background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent));border-right:2px solid var(--accent-600)"></div>
+          </div>
+          <div class="mt-3 flex gap-2">
+            <button id="demoPlay" class="btn-xs">▶ Play demo</button>
+            <button id="demoReset" class="btn-xs">Reset</button>
+          </div>
+        </div>
+        <ul class="grid gap-3">
+          <li class="section-collapsed"><span><b>Single-session focus</b></span><span>Plan once, then flow.</span></li>
+          <li class="section-collapsed"><span><b>Instant section jumps</b></span><span>Tap chips or the outline.</span></li>
+          <li class="section-collapsed"><span><b>Links & notes</b></span><span>Keep everything at hand.</span></li>
+          <li class="section-collapsed"><span><b>Cloud sync</b></span><span>Pick up where you left off.</span></li>
+        </ul>
       </div>
     </div>
   </section>
 
-  <!-- PLANNER (Home) -->
+  <!-- PLANNER / Home -->
   <section id="homeTab" class="hidden">
     <!-- Progress -->
     <section class="mb-4">
       <div class="flex items-center justify-between mb-1">
-        <div class="block-sub">Progress — click to jump <span id="totalTimeTop" class="ml-2 text-xs muted"></span></div>
-        <div id="progressPct" class="text-xs muted">0%</div>
+        <div class="block-sub">Progress — click to jump</div>
+        <div class="flex items-center gap-3">
+          <div id="progressTotal" class="text-xs muted">Total: 0m</div>
+          <div id="progressPct" class="text-xs muted">0%</div>
+        </div>
       </div>
       <div id="progressHost" class="relative w-full h-6 rounded-2xl overflow-hidden card">
         <div id="progressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
@@ -192,15 +172,10 @@
       <section id="leftPane">
         <div class="card p-6 section-card">
           <div class="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
-            <!-- LEFT: title + inline duration -->
             <div class="min-w-0 flex items-center gap-3">
-              <!-- View title -->
               <h2 id="currentTitle" class="text-2xl font-extrabold truncate">—</h2>
-              <!-- View duration text -->
               <span id="currentDurDisp" class="text-sm muted whitespace-nowrap">0m</span>
-              <!-- Edit title -->
               <input id="editTitleInline" class="input text-2xl font-extrabold hidden align-middle shrink-0" placeholder="Section title" />
-              <!-- Edit duration compact -->
               <div id="editDurInline" class="hidden flex items-stretch gap-1 flex-nowrap whitespace-nowrap">
                 <input id="editMinsInline" class="input h-9 w-24 text-sm" type="number" min="0.01" step="0.1" placeholder="Min"/>
                 <select id="editUnitInline" class="input h-9 w-24 text-sm">
@@ -210,14 +185,13 @@
                 </select>
               </div>
             </div>
-            <!-- RIGHT: controls -->
             <div class="flex items-center gap-2">
               <button id="editSectionBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Edit Section</button>
               <div id="clock" class="clock-badge text-2xl tabular-nums">00:00</div>
             </div>
           </div>
 
-          <!-- Shelf (Home) -->
+          <!-- Shelf -->
           <div id="shelfWrap" class="mt-4 hidden">
             <div class="flex items-center justify-between">
               <h3 class="block-title">Widget shelf</h3>
@@ -230,7 +204,7 @@
             <div class="text-xs muted mt-1">Drag from shelf → links below. Click any item to edit.</div>
           </div>
 
-          <!-- Links in current -->
+          <!-- Links -->
           <div id="linksWrap" class="mt-4">
             <div class="flex items-center justify-between">
               <h3 class="block-title">Links</h3>
@@ -308,7 +282,7 @@
       </div>
     </div>
 
-    <div class="mb-3 flex items-center gap-2">
+    <div class="mb-3 flex flex-wrap items-center gap-2">
       <button id="createOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Create new outline</button>
       <button id="createFolderBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ New folder</button>
       <div id="createOutlineForm" class="card p-4 mb-0 hidden">
@@ -321,7 +295,10 @@
       </div>
     </div>
 
-    <div class="text-sm muted mb-3">Tips: drag an outline onto another to propose a merge, or drag an outline **into a folder**. Drag onto empty space to move it back out.</div>
+    <!-- Breadcrumb path (drag targets) -->
+    <div id="savedPathBar" class="card p-3 mb-3"></div>
+
+    <div class="text-sm muted mb-3">Tip: drag one outline card onto another to propose a merge (only when NOT editing). You can also drag an outline onto a folder or onto a breadcrumb to move it.</div>
     <div id="savedList" class="grid lg:grid-cols-2 gap-4"></div>
   </section>
 
@@ -333,8 +310,8 @@
         <li>Create or load a saved outline on the right.</li>
         <li>Start the session timer, then jump between sections using the progress bar or outline.</li>
         <li>Edit links/notes for the current section with “Edit Section”.</li>
-        <li>In Saved Outlines, drag a plan into a folder to organize, or onto another to merge.</li>
-        <li>Open ⚙️ Settings to tweak theme, sounds and defaults.</li>
+        <li>In Saved Outlines, drag a plan onto another to merge them or into folders to organize.</li>
+        <li>Open ⚙️ Settings to tweak theme, defaults, and alert sound.</li>
       </ol>
     </div>
   </section>
@@ -345,54 +322,49 @@
   <div class="absolute inset-0 bg-[var(--bg)]"></div>
   <div class="relative z-10 w-full h-full flex items-center justify-center p-6">
     <div class="max-w-4xl w-full">
-      <!-- Exit row -->
       <div class="flex items-center justify-end mb-4">
         <button id="focusExitBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Exit Focus ✕</button>
       </div>
 
-      <!-- Centered stack -->
-      <div class="card p-6">
-        <div class="flex flex-col items-center text-center gap-5">
-          <h2 id="focusTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight">—</h2>
+      <!-- Centered card stack -->
+      <div class="card p-6 flex flex-col items-center text-center gap-5">
+        <h2 id="focusTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight">—</h2>
+        <div id="focusMeta" class="muted text-sm"></div>
+        <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
 
-          <div id="focusMeta" class="muted text-sm"></div>
-
-          <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
-
-          <!-- Progress (focus instance) -->
-          <div class="w-full max-w-3xl">
-            <div class="mb-1 flex items-center justify-between">
-              <div class="block-sub">Progress</div>
-              <div id="focusProgressPct" class="text-xs muted">0%</div>
-            </div>
-            <div id="focusProgressHost" class="relative w-full h-8 rounded-2xl overflow-hidden card">
-              <div id="focusProgressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
-              <div id="focusProgressSegments" class="absolute inset-0 flex"></div>
-              <div id="focusProgressTicks" class="absolute inset-0 pointer-events-none"></div>
-              <div id="focusScrubOverlay" class="absolute inset-0 cursor-pointer"></div>
-            </div>
+        <!-- Progress (focus) -->
+        <div class="w-full max-w-3xl">
+          <div class="mb-1 flex items-center justify-between">
+            <div class="block-sub">Progress</div>
+            <div id="focusProgressPct" class="text-xs muted">0%</div>
           </div>
-
-          <!-- Controls -->
-          <div class="flex items-center justify-center gap-3 card p-3">
-            <button id="focusStartBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm">Start Study Session</button>
-            <button id="focusPauseBtn" class="px-4 py-2 rounded-xl border border-[var(--border)]">Pause</button>
-            <button id="focusReadyNextBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm hidden">
-              I’m ready — start next ▶
-            </button>
+          <div id="focusProgressHost" class="relative w-full h-8 rounded-2xl overflow-hidden card">
+            <div id="focusProgressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
+            <div id="focusProgressSegments" class="absolute inset-0 flex"></div>
+            <div id="focusProgressTicks" class="absolute inset-0 pointer-events-none"></div>
+            <div id="focusScrubOverlay" class="absolute inset-0 cursor-pointer"></div>
           </div>
-
-          <!-- Links (focus instance) -->
-          <div id="focusLinksWrap" class="w-full max-w-3xl">
-            <div class="flex items-center justify-between mt-2">
-              <h3 class="block-title">Links</h3>
-            </div>
-            <div id="focusLinks" class="section-links-bar mt-2"></div>
-          </div>
-
-          <!-- Notes / info -->
-          <div id="focusDesc" class="text-sm whitespace-pre-wrap max-w-3xl w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
         </div>
+
+        <!-- Controls -->
+        <div class="flex items-center justify-center gap-3">
+          <button id="focusStartBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm">Start Study Session</button>
+          <button id="focusPauseBtn" class="px-4 py-2 rounded-xl border border-[var(--border)]">Pause</button>
+          <button id="focusReadyNextBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm hidden">
+            I’m ready — start next ▶
+          </button>
+        </div>
+
+        <!-- Links (focus) -->
+        <div id="focusLinksWrap" class="w-full max-w-3xl">
+          <div class="flex items-center justify-between mt-2">
+            <h3 class="block-title">Links</h3>
+          </div>
+          <div id="focusLinks" class="section-links-bar mt-2"></div>
+        </div>
+
+        <!-- Notes -->
+        <div id="focusDesc" class="text-sm whitespace-pre-wrap max-w-3xl w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
       </div>
     </div>
   </div>
@@ -403,11 +375,10 @@
   <div class="modal-backdrop" data-close="1"></div>
   <div class="modal-panel max-w-[720px]" role="dialog" aria-modal="true">
     <div class="flex items-center justify-between mb-3">
-      <h3 class="text-lg font-semibold">Settings</h3>
+      <h3 class="text-lg font-semibold">Appearance & Sound</h3>
       <button class="btn-xxs" data-close="1">✕</button>
     </div>
 
-    <h4 class="block-title mb-2">Appearance</h4>
     <div class="grid grid-cols-2 gap-3">
       <label class="flex flex-col gap-1"><span class="text-sm">Background</span><input id="setBg" type="color" class="input h-10 p-1"/></label>
       <label class="flex flex-col gap-1"><span class="text-sm">Text</span><input id="setFg" type="color" class="input h-10 p-1"/></label>
@@ -419,25 +390,28 @@
       </label>
     </div>
 
-    <h4 class="block-title mt-5 mb-2">Sound</h4>
-    <div class="grid grid-cols-2 gap-3">
-      <label class="flex flex-col gap-1"><span class="text-sm">Ringtone</span>
-        <select id="setTone" class="input">
-          <option value="beep">Beep</option>
-          <option value="chime">Chime</option>
-          <option value="bell">Bell</option>
-        </select>
-      </label>
-      <label class="flex flex-col gap-1"><span class="text-sm">Duration (ms)</span><input id="setToneDur" type="number" min="100" step="100" class="input"/></label>
-      <label class="flex flex-col gap-1"><span class="text-sm">Volume</span><input id="setToneVol" type="range" min="0" max="1" step="0.05"/></label>
-      <div class="flex items-end justify-end gap-2">
-        <button id="toneDefaultBtn" class="btn-xxs">Default</button>
-        <button id="tonePreviewBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Preview</button>
+    <div class="mt-5">
+      <div class="block-title mb-2">Sound</div>
+      <div class="grid md:grid-cols-3 gap-3">
+        <label class="flex flex-col gap-1"><span class="text-sm">Ringtone</span>
+          <select id="ringTone" class="input">
+            <option value="chime">Chime</option>
+            <option value="ping">Ping</option>
+            <option value="bell">Bell</option>
+            <option value="digital">Digital</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1"><span class="text-sm">Duration (ms)</span><input id="ringDur" type="number" min="100" step="50" class="input" /></label>
+        <label class="flex flex-col gap-1"><span class="text-sm">Volume</span><input id="ringVol" type="range" min="0" max="1" step="0.01" class="w-full"/></label>
+      </div>
+      <div class="mt-2 flex items-center gap-2">
+        <button id="ringPreview" class="px-3 py-2 rounded-xl border border-[var(--border)]">Preview</button>
+        <span id="ringVolVal" class="text-xs muted">0.10</span>
       </div>
     </div>
 
-    <div class="mt-4 flex items-center justify-between">
-      <button id="settingsResetBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Reset theme</button>
+    <div class="mt-5 flex items-center justify-between">
+      <button id="settingsDefaultBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Default</button>
       <div class="flex items-center gap-2">
         <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Close</button>
         <button id="settingsSaveBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
@@ -446,7 +420,7 @@
   </div>
 </div>
 
-<!-- AUTH MODAL -->
+<!-- AUTH MODAL (unchanged structure) -->
 <div id="authModal" class="modal hidden" aria-hidden="true">
   <div class="modal-backdrop" data-close="1"></div>
   <div class="modal-panel max-w-[520px]" role="dialog" aria-modal="true">
@@ -527,11 +501,8 @@
   let prefs = loadJSON('prefs_v1') || {
     splitRatio:56, outlineCollapsed:false, focusDefault:false,
     theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 },
-    ring: { type:'beep', duration:700, volume:0.6 }   // NEW sound prefs
+    sound:{ name:'chime', duration:800, volume:0.12 }
   };
-  // Back-fill legacy prefs that may not have ring
-  if(!prefs.ring){ prefs.ring = { type:'beep', duration:700, volume:0.6 }; }
-
   let savedOutlines = loadJSON('saved_outlines_v1') || [];
   let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0, awaitingNext:false };
 
@@ -553,8 +524,9 @@
     if(!currentUser) return;
     try{
       await setDoc(userDocRef(currentUser.uid), {
-        currentSession, notes: sectionNotes, prefs, widgetShelf, savedOutlines,
-        timer: timerState, updatedAt: serverTimestamp(), sessions: deleteField(), activePreset: deleteField()
+        currentSession, notes: sectionNotes, prefs, widgetShelf,
+        savedOutlines, timer: timerState, updatedAt: serverTimestamp(),
+        sessions: deleteField(), activePreset: deleteField()
       }, { merge:true });
       cloudStatus.textContent = 'Saved to cloud ✓';
       dirty = false;
@@ -576,14 +548,15 @@
   const saveOutlinesLocal  = ()=>{ saveJSON('saved_outlines_v1', savedOutlines);  markDirty(); touchCloud(); };
   const saveTimerLocal     = ()=>{ saveJSON('timer_state_v2', timerState);        markDirty(); touchCloud(); };
 
-  /*************** Tabs (delegated & dynamic, works with Pricing) ***************/
-  const homeTab=$('#homeTab'); const savedTab=$('#savedTab'); const helpTab=$('#helpTab'); const landingTab=$('#landingTab');
+  /*************** Tabs ***************/
+  const homeTab=$('#homeTab'); const savedTab=$('#savedTab'); const helpTab=$('#helpTab'); const overviewTab=$('#overviewTab');
+
   function showTab(id){
     document.querySelectorAll('.tab-link').forEach(b=>b.classList.remove('active'));
     const btn = document.querySelector(`.tab-link[data-tab="${id}"]`);
     if(btn) btn.classList.add('active');
 
-    const ids = ['landingTab','homeTab','savedTab','helpTab','pricingTab'];
+    const ids = ['overviewTab','homeTab','savedTab','helpTab','pricingTab'];
     ids.forEach(secId=>{
       const el = document.getElementById(secId);
       if(el) el.classList.toggle('hidden', secId !== id);
@@ -592,22 +565,14 @@
     if(id==='savedTab') renderSavedOutlines();
     if(id==='homeTab') renderHomeSavedBar();
   }
+
   const tabsBar = document.querySelector('nav .tabs-bar');
   if(tabsBar){
     tabsBar.addEventListener('click', (e)=>{
-      const btn = e.target.closest('.tab-link');
-      if(!btn) return;
-      showTab(btn.dataset.tab);
+      const btn = e.target.closest('.tab-link'); if(!btn) return; showTab(btn.dataset.tab);
     });
   }
   document.querySelectorAll('[data-tab-jump]').forEach(b=> b.onclick = ()=> showTab(b.dataset.tabJump));
-
-  /*************** Demo progress (landing) ***************/
-  const demoFill = document.getElementById('demoFill');
-  if(demoFill){
-    let pct = 0;
-    setInterval(()=>{ pct = (pct+2)%102; demoFill.style.width = Math.min(pct,100)+'%'; }, 60);
-  }
 
   /*************** Progress / Timer ***************/
   const startBtn = $('#startBtn'); const prevBtn=$('#prevBtn'); const nextBtn=$('#nextBtn'); const resetBtn=$('#resetBtn');
@@ -617,6 +582,7 @@
   const linkShelfDiv=$('#linkShelf'); const shelfWrap=$('#shelfWrap'); const editSectionBtn=$('#editSectionBtn'); const clearSectionLinksBtn=$('#clearSectionLinks');
   const addWidgetBtn=$('#addWidgetBtn'); const resetShelfBtn=$('#resetShelfBtn');
 
+  // Inline edit handles (title & duration)
   const editTitleInline = $('#editTitleInline');
   const currentDurDisp  = $('#currentDurDisp');
   const editDurInline   = $('#editDurInline');
@@ -625,10 +591,10 @@
 
   const outline=$('#outline'); const addOutlineItemBtn=$('#addOutlineItem'); const inlineAddRow=$('#inlineAddRow');
   const addTitleInput=$('#addTitleInput'); const addMinsInput=$('#addMinsInput'); const addConfirmBtn=$('#addConfirmBtn'); const addCancelBtn=$('#addCancelBtn');
-  const totalMins=$('#totalMins'); const totalTimeTop=$('#totalTimeTop'); const clockEl=$('#clock');
+  const totalMins=$('#totalMins'); const clockEl=$('#clock');
 
   const progressHost=$('#progressHost'), progressFill=$('#progressFill'), progressSegments=$('#progressSegments'),
-        progressTicks=$('#progressTicks'), progressPctEl=$('#progressPct'), legend=$('#legend'), scrubOverlay=$('#scrubOverlay');
+        progressTicks=$('#progressTicks'), progressPctEl=$('#progressPct'), legend=$('#legend'), scrubOverlay=$('#scrubOverlay'), progressTotalEl=$('#progressTotal');
 
   // Focus Mode elements
   const focusOverlay = $('#focusOverlay');
@@ -653,31 +619,19 @@
   function applySplitRatio(r){ splitEl.style.setProperty('--leftRatio', (r||56) + '%'); }
   applySplitRatio(prefs.splitRatio||56);
   let draggingSplit=false, splitLast= prefs.splitRatio||56;
-  splitHandle.addEventListener('pointerdown', (e)=>{
-    draggingSplit=true;
-    splitHandle.setPointerCapture(e.pointerId);
-    document.body.classList.add('no-select');
-    onSplitMove(e);
-  });
+  splitHandle.addEventListener('pointerdown', (e)=>{ draggingSplit=true; splitHandle.setPointerCapture(e.pointerId); document.body.classList.add('no-select'); onSplitMove(e); });
+  splitHandle.addEventListener('pointermove', (e)=>{ if(draggingSplit) onSplitMove(e); });
+  splitHandle.addEventListener('pointerup', ()=>{ if(!draggingSplit) return; draggingSplit=false; document.body.classList.remove('no-select'); prefs.splitRatio = Math.round(splitLast*10)/10; savePrefs(); });
   function onSplitMove(e){
     const rect = splitEl.getBoundingClientRect();
     const x = Math.max(rect.left, Math.min(e.clientX, rect.right));
     const total = rect.width;
-    const minPx = 360;
-    const minPct = (minPx/total)*100;
+    const minPx = 360; const minPct = (minPx/total)*100;
     let pct = ((x - rect.left)/total)*100;
     pct = Math.max(minPct, Math.min(100 - minPct, pct));
     splitLast = pct;
     applySplitRatio(pct);
   }
-  splitHandle.addEventListener('pointermove', (e)=>{ if(draggingSplit) onSplitMove(e); });
-  splitHandle.addEventListener('pointerup', ()=>{
-    if(!draggingSplit) return;
-    draggingSplit=false;
-    document.body.classList.remove('no-select');
-    prefs.splitRatio = Math.round(splitLast*10)/10;
-    savePrefs();
-  });
 
   function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
   function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
@@ -697,21 +651,16 @@
     if(focusClockEl) focusClockEl.textContent = txt;
   }
   function updateClockColor(){
-    const apply = (el)=>{
-      if(!el) return;
-      el.classList.remove('text-emerald-600','text-rose-600');
-      if(sessionStarted){ (running?el.classList.add('text-emerald-600'):el.classList.add('text-rose-600')); }
-    };
+    const apply = (el)=>{ if(!el) return; el.classList.remove('text-emerald-600','text-rose-600'); if(sessionStarted){ (running?el.classList.add('text-emerald-600'):el.classList.add('text-rose-600')); } };
     apply(clockEl); apply(focusClockEl);
   }
   function updateStartBtnLabel(){
     const label = running ? 'Pause Session' : (isAtVeryStart() ? 'Start Study Session' : 'Resume Session');
     if(startBtn) startBtn.textContent = label;
-    const f = focusStartBtn;
-    if(f) f.textContent = label;
+    if(focusStartBtn) focusStartBtn.textContent = label;
     const disable = !!awaitingNext;
     if(startBtn) startBtn.disabled = disable;
-    if(f) f.disabled = disable;
+    if(focusStartBtn) focusStartBtn.disabled = disable;
   }
 
   function setTimerFromState(st){
@@ -731,91 +680,56 @@
     updateStartBtnLabel();
   }
   function syncEnd(){ endTimeMs = performance.now() + secondsLeft * 1000; }
-
   function tick(){
     if(!running) return;
-
     const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
     if(remaining !== secondsLeft){
       secondsLeft = remaining;
       setClockText(secsToClock(secondsLeft));
       updateProgress();
     }
-
     if(secondsLeft <= 0){
       if(currentIndex < currentSession.length - 1){
-        stopTimer();
-        awaitingNext = true;
-        showNextGate();
-        playRingtone();               // use prefs.ring
-        markTimer();
-        return;
+        stopTimer(); awaitingNext = true; showNextGate(); playAlert(); markTimer(); return;
       } else {
-        stopTimer();
-        playRingtone();
-        sessionStarted = false;
-        updateStartBtnLabel();
-        markTimer();
-        alert('Session complete! 🎉');
-        return;
+        stopTimer(); playAlert(); sessionStarted = false; updateStartBtnLabel(); markTimer(); alert('Session complete! 🎉'); return;
       }
     }
   }
-
-  function startTimer(){
-    if(running) return;
-    running = true;
-    syncEnd();
-    loop();
-    if(bgTickId) clearInterval(bgTickId);
-    bgTickId = setInterval(tick, 1000);
-    updateStartBtnLabel();
-    updateClockColor();
-    markTimer();
-  }
-  function stopTimer(){
-    running = false;
-    if(rafId) cancelAnimationFrame(rafId); rafId = null;
-    if(bgTickId) clearInterval(bgTickId);  bgTickId = null;
-    updateStartBtnLabel();
-    updateClockColor();
-    markTimer();
-  }
+  function startTimer(){ if(running) return; running = true; syncEnd(); loop(); if(bgTickId) clearInterval(bgTickId); bgTickId = setInterval(tick, 1000); updateStartBtnLabel(); updateClockColor(); markTimer(); }
+  function stopTimer(){ running = false; if(rafId) cancelAnimationFrame(rafId); rafId = null; if(bgTickId) clearInterval(bgTickId);  bgTickId = null; updateStartBtnLabel(); updateClockColor(); markTimer(); }
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'hidden'){ if(running) tick(); } });
   function loop(){ if(!running) return; tick(); rafId = requestAnimationFrame(loop); }
-
   const markTimer = ()=>{ timerState={ sessionStarted,running,currentIndex,secondsLeft,lastSyncTs:Date.now(), awaitingNext }; saveTimerLocal(); };
 
-  function proceedNext(){
-    if(!awaitingNext) return;
-    awaitingNext=false;
-    hideNextGate();
-    if(currentIndex<currentSession.length-1){
-      currentIndex++;
-      secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0);
-      syncEnd();
-      startTimer();
-      renderAll();
-      markTimer();
-    }
-  }
+  function proceedNext(){ if(!awaitingNext) return; awaitingNext=false; hideNextGate(); if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); syncEnd(); startTimer(); renderAll(); markTimer(); } }
   function showNextGate(){ readyNextBtn.classList.remove('hidden'); if(focusReadyBtn) focusReadyBtn.classList.remove('hidden'); updateStartBtnLabel(); }
   function hideNextGate(){ readyNextBtn.classList.add('hidden'); if(focusReadyBtn) focusReadyBtn.classList.add('hidden'); updateStartBtnLabel(); }
-  readyNextBtn.onclick = proceedNext;
-  if(focusReadyBtn) focusReadyBtn.onclick = proceedNext;
+  readyNextBtn.onclick = proceedNext; if(focusReadyBtn) focusReadyBtn.onclick = proceedNext;
 
-  startBtn.onclick = ()=>{
-    if(!currentSession.length) return;
-    if(awaitingNext) return;
-    if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(currentSession[0].minutes||0); totalSessionSecs=scheduleTotalSecs(currentSession); sessionStarted=true; markTimer(); startTimer(); }
-    else{ running?stopTimer():startTimer(); }
-  };
+  startBtn.onclick = ()=>{ if(!currentSession.length) return; if(awaitingNext) return; if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(currentSession[0].minutes||0); totalSessionSecs=scheduleTotalSecs(currentSession); sessionStarted=true; markTimer(); startTimer(); } else { running?stopTimer():startTimer(); } };
   if(focusStartBtn){ focusStartBtn.onclick = ()=> startBtn.click(); }
   if(focusPauseBtn){ focusPauseBtn.onclick = ()=>{ if(running) stopTimer(); }; }
-
   prevBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } updateStartBtnLabel(); };
   nextBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } else stopTimer(); updateStartBtnLabel(); };
-  resetBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); stopTimer(); sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((currentSession[0]||{}).minutes||0); renderAll(); updateStartBtnLabel(); markTimer(); };
+
+  // Reset now reloads from Saved Outlines (defaults)
+  function findOutlineByIdDeep(id, arr){
+    for(const it of (arr||[])){
+      if(it?.id===id && it?.sections) return it;
+      if(it?.type==='folder' && it?.children){ const r=findOutlineByIdDeep(id, it.children); if(r) return r; }
+    }
+    return null;
+  }
+  resetBtn.onclick = ()=>{
+    awaitingNext=false; hideNextGate(); stopTimer();
+    const activeId = (timerState && timerState.outlineId) || null;
+    if(activeId){
+      const base = findOutlineByIdDeep(activeId, savedOutlines);
+      if(base){ applyOutlineToCurrent(base); return; }
+    }
+    sessionStarted=false; currentIndex=0; secondsLeft=minsToSecs((currentSession[0]||{}).minutes||0); renderAll(); updateStartBtnLabel(); markTimer();
+  };
 
   function buildProgress(){
     const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
@@ -823,10 +737,10 @@
     sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; progressSegments.appendChild(seg); });
     let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); progressTicks.appendChild(tick); }
     sched.forEach((sec,i)=>{ const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); chip.innerHTML=`${escapeHtml(sec.name||'')} <span class="opacity-80">(${sec.minutes||0}m)</span>`; chip.onclick=()=>jumpToSection(i); legend.appendChild(chip); });
+    progressTotalEl.textContent = `Total: ${Math.round(total/60)}m`;
     updateProgress();
     buildFocusProgress();
   }
-
   function buildFocusProgress(){
     if(!focusProgressHost) return;
     const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
@@ -835,18 +749,15 @@
     let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); focusProgressTicks.appendChild(tick); }
     updateFocusProgress();
   }
-
   function updateLegendActive(){ legend.querySelectorAll('.chip').forEach((el, i)=> el.classList.toggle('chip-active', i===currentIndex)); }
   function updateProgress(){
     const sched=currentSession; const total=scheduleTotalSecs(sched);
-    if(!total){ progressFill.style.width='0%'; progressPctEl.textContent='0%'; if(totalTimeTop) totalTimeTop.textContent=''; return; }
+    if(!total){ progressFill.style.width='0%'; progressPctEl.textContent='0%'; progressTotalEl.textContent='Total: 0m'; return; }
     const pct=Math.min(100,Math.max(0,(elapsedSeconds(sched,currentIndex,secondsLeft)/total)*100));
     progressFill.style.width = pct + '%';
     progressPctEl.textContent = Math.floor(pct) + '%';
-    if(totalTimeTop) totalTimeTop.textContent = `• Total: ${Math.round(total/60)}m`;
-    updateLegendActive();
-    updateStartBtnLabel();
-    updateFocusProgress();
+    progressTotalEl.textContent = `Total: ${Math.round(total/60)}m`;
+    updateLegendActive(); updateStartBtnLabel(); updateFocusProgress();
   }
   function updateFocusProgress(){
     if(!focusProgressFill || !focusProgressPctEl) return;
@@ -857,80 +768,42 @@
     focusProgressPctEl.textContent = Math.floor(pct) + '%';
   }
 
-  function pctFromEvent(e){
-    const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width));
-  }
-  function pctFromEventFocus(e){
-    const rect=focusProgressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width));
-  }
-
+  function pctFromEvent(e){ const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
+  function pctFromEventFocus(e){ const rect=focusProgressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width)); }
   function jumpFromPct(p){
     const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0;
     for(let i=0;i<sched.length;i++){
       const dur=minsToSecs(sched[i].minutes||0);
       if(target<cum+dur){
-        currentIndex=i;
-        secondsLeft=Math.max(0,Math.ceil(dur-(target-cum)));
-        if(running) syncEnd();
-        renderAll();
-        markTimer();
-        awaitingNext=false;
-        hideNextGate();
-        updateStartBtnLabel();
-        return;
+        currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum))); if(running) syncEnd(); renderAll(); markTimer(); awaitingNext=false; hideNextGate(); updateStartBtnLabel(); return;
       }
       cum+=dur;
     }
     currentIndex=sched.length-1; secondsLeft=0; stopTimer(); renderAll(); markTimer(); awaitingNext=false; hideNextGate(); updateStartBtnLabel();
   }
+  let scrubbing=false; scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true;scrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEvent(e));}); scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing)jumpFromPct(pctFromEvent(e));}); scrubOverlay.addEventListener('pointerup',()=>{scrubbing=false;}); scrubOverlay.addEventListener('pointercancel',()=>{scrubbing=false;});
+  let focusScrubbing=false; if(focusScrubOverlay){ focusScrubOverlay.addEventListener('pointerdown',(e)=>{focusScrubbing=true;focusScrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEventFocus(e));}); focusScrubOverlay.addEventListener('pointermove',(e)=>{if(focusScrubbing)jumpFromPct(pctFromEventFocus(e));}); focusScrubOverlay.addEventListener('pointerup',()=>{focusScrubbing=false;}); focusScrubOverlay.addEventListener('pointercancel',()=>{focusScrubbing=false;}); }
+  function jumpToSection(i){ if(!currentSession[i]) return; awaitingNext=false; hideNextGate(); currentIndex=i; secondsLeft=minsToSecs(currentSession[i].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); updateStartBtnLabel(); }
 
-  let scrubbing=false;
-  scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true;scrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEvent(e));});
-  scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing)jumpFromPct(pctFromEvent(e));});
-  scrubOverlay.addEventListener('pointerup',()=>{scrubbing=false;});
-  scrubOverlay.addEventListener('pointercancel',()=>{scrubbing=false;});
-
-  let focusScrubbing=false;
-  if(focusScrubOverlay){
-    focusScrubOverlay.addEventListener('pointerdown',(e)=>{focusScrubbing=true;focusScrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEventFocus(e));});
-    focusScrubOverlay.addEventListener('pointermove',(e)=>{if(focusScrubbing)jumpFromPct(pctFromEventFocus(e));});
-    focusScrubOverlay.addEventListener('pointerup',()=>{focusScrubbing=false;});
-    focusScrubOverlay.addEventListener('pointercancel',()=>{focusScrubbing=false;});
-  }
-
-  function jumpToSection(i){
-    if(!currentSession[i]) return;
-    awaitingNext=false; hideNextGate();
-    currentIndex=i; secondsLeft=minsToSecs(currentSession[i].minutes||0);
-    if(running) syncEnd();
-    renderAll();
-    markTimer();
-    updateStartBtnLabel();
-  }
-
-  /*************** Helpers (shared with Saved Outlines parity) ***************/
+  /*************** Helpers ***************/
   function escapeHtml(s){ return (s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
   function parseDropPayload(dt){
-    let data = ''; const types = dt?.types ? Array.from(dt.types) : [];
+    let data=''; const types = dt?.types ? Array.from(dt.types) : [];
     if(types.includes('text/plain')) data = dt.getData('text/plain');
     if(!data && types.includes('text')) data = dt.getData('text');
     if(!data) data = dt.getData('application/json') || dt.getData('Text') || '';
     try{ return JSON.parse(data); }catch{ return null; }
   }
   function normalizeUrl(input){
-    let u = (input || '').trim();
-    if(!u) return '';
+    let u = (input || '').trim(); if(!u) return '';
     if(/^https?:\/\//i.test(u)) return u;
     u = u.replace(/^\/\//,'');
-    const slash = u.indexOf('/');
-    let host = slash >= 0 ? u.slice(0, slash) : u;
-    const rest = slash >= 0 ? u.slice(slash) : '';
-    if(!/^www\./i.test(host)){
-      const parts = host.split('.');
-      if(parts.length === 2){ host = 'www.' + host; }
-    }
+    const slash = u.indexOf('/'); let host = slash >= 0 ? u.slice(0, slash) : u; const rest = slash >= 0 ? u.slice(slash) : '';
+    if(!/^www\./i.test(host)){ const parts = host.split('.'); if(parts.length === 2){ host = 'www.' + host; } }
     return 'https://' + host + rest;
   }
+
+  // Open a small link editor (shared with Saved)
   function openWidgetEditor(widget, onSave, onCancel){
     const modal = document.createElement('div');
     modal.className = 'modal';
@@ -967,152 +840,68 @@
         </div>
       </div>`;
     document.body.appendChild(modal);
-
-    const iconSel = modal.querySelector('#wIcon');
-    const emojiRow = modal.querySelector('#emojiRow');
-    const imgRow   = modal.querySelector('#imgRow');
+    const iconSel = modal.querySelector('#wIcon'); const emojiRow = modal.querySelector('#emojiRow'); const imgRow   = modal.querySelector('#imgRow');
     const syncRows = ()=>{ const useImg = iconSel.value==='img'; emojiRow.classList.toggle('hidden', useImg); imgRow.classList.toggle('hidden', !useImg); };
     syncRows(); iconSel.addEventListener('change', syncRows);
-
     const close = ()=>{ modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 140); };
     modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ onCancel && onCancel(); close(); } });
-    const onEsc = (e)=>{ if(e.key==='Escape'){ onCancel && onCancel(); close(); document.removeEventListener('keydown', onEsc);} };
-    document.addEventListener('keydown', onEsc);
-
-    modal.querySelector('#wSave').onclick = ()=>{
-      const label = modal.querySelector('#wLabel').value.trim() || 'Untitled';
-      let url     = modal.querySelector('#wUrl').value.trim() || '';
-      url = normalizeUrl(url);
-      const icon  = iconSel.value==='img' ? 'img' : 'emoji';
-      let emoji='', img='';
-      if(icon==='img') img = modal.querySelector('#wImg').value.trim();
-      else emoji = modal.querySelector('#wEmoji').value.trim() || '🔗';
-      onSave({ label, url, icon, emoji, img });
-      onCancel = null;
-      close();
-    };
+    const onEsc = (e)=>{ if(e.key==='Escape'){ onCancel && onCancel(); close(); document.removeEventListener('keydown', onEsc);} }; document.addEventListener('keydown', onEsc);
+    modal.querySelector('#wSave').onclick = ()=>{ const label = modal.querySelector('#wLabel').value.trim() || 'Untitled'; let url = modal.querySelector('#wUrl').value.trim() || ''; url = normalizeUrl(url); const icon  = iconSel.value==='img' ? 'img' : 'emoji'; let emoji='', img=''; if(icon==='img') img = modal.querySelector('#wImg').value.trim(); else emoji = modal.querySelector('#wEmoji').value.trim() || '🔗'; onSave({ label, url, icon, emoji, img }); onCancel = null; close(); };
   }
 
-  /*************** Current panel (Home) ***************/
+  /*************** Current panel ***************/
   let isEditingSection=false;
 
-  // --- Title autosize support ---
+  // Autosize title input
   const titleMeasureEl = document.createElement('span');
   titleMeasureEl.style.cssText = 'position:fixed;top:-9999px;left:-9999px;visibility:hidden;white-space:pre;font-weight:800;font-size:1.5rem;font-family:inherit;padding:0.5rem 0.75rem;';
   document.body.appendChild(titleMeasureEl);
-
-  function autosizeTitleInput(){
-    if(!editTitleInline) return;
-    const val = editTitleInline.value || ' ';
-    titleMeasureEl.textContent = val;
-    const desired = Math.min(titleMeasureEl.offsetWidth + 24, Math.floor(window.innerWidth * 0.7));
-    editTitleInline.style.width = Math.max(desired, 140) + 'px';
-  }
+  function autosizeTitleInput(){ if(!editTitleInline) return; const val = editTitleInline.value || ' '; titleMeasureEl.textContent = val; const desired = Math.min(titleMeasureEl.offsetWidth + 24, Math.floor(window.innerWidth * 0.7)); editTitleInline.style.width = Math.max(desired, 140) + 'px'; }
 
   function saveMetaEdits(){
-    const s = currentSession[currentIndex];
-    if(!s) return;
-
-    const prevMinutes = Number(s.minutes) || 0;
-    const prevTotalSec = minsToSecs(prevMinutes);
+    const s = currentSession[currentIndex]; if(!s) return;
+    const prevMinutes = Number(s.minutes) || 0; const prevTotalSec = minsToSecs(prevMinutes);
     const elapsedSec = Math.max(0, prevTotalSec - secondsLeft);
-
     const newTitle = (editTitleInline.value || '').trim() || s.name || 'Untitled';
     const newMinutes = Math.max(0.01, toMinutesValue(editMinsInline.value, editUnitInline.value));
-
-    s.name = newTitle;
-    s.minutes = newMinutes;
-
+    s.name = newTitle; s.minutes = newMinutes;
     if(currentSession[currentIndex]?.id === s.id){
-      const newTotal = minsToSecs(newMinutes);
-      secondsLeft = Math.max(0, newTotal - elapsedSec);
-      if(running) syncEnd();
+      const newTotal = minsToSecs(newMinutes); secondsLeft = Math.max(0, newTotal - elapsedSec); if(running) syncEnd();
     }
-
-    saveCurrentSession();
-    renderOutline();
-    buildProgress();
-    updateProgress();
-    renderCurrent();
-    updateStartBtnLabel();
-    markTimer();
-    // >>> SYNC to Saved when Home edits <<<
-    syncSavedFromCurrent();
+    saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent(); updateStartBtnLabel(); markTimer(); syncSavedFromCurrent();
   }
-
-  editSectionBtn.onclick = ()=>{
-    if(!isEditingSection){
-      isEditingSection = true;
-      updateEditUI();
-    } else {
-      saveMetaEdits();
-      isEditingSection = false;
-      updateEditUI();
-    }
-  };
-
+  editSectionBtn.onclick = ()=>{ if(!isEditingSection){ isEditingSection = true; updateEditUI(); } else { saveMetaEdits(); isEditingSection = false; updateEditUI(); } };
   function updateEditUI(){
     shelfWrap.classList.toggle('hidden', !isEditingSection);
     clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
     editSectionBtn.textContent = isEditingSection ? 'Save Changes' : 'Edit Section';
-
     const s = currentSession[currentIndex] || {};
     currentTitleEl.classList.toggle('hidden', isEditingSection);
     currentDurDisp.classList.toggle('hidden', isEditingSection);
     editTitleInline.classList.toggle('hidden', !isEditingSection);
     editDurInline.classList.toggle('hidden', !isEditingSection);
-
     if(isEditingSection){
-      editTitleInline.value = s.name || '';
-      autosizeTitleInput();
-      editTitleInline.focus();
-      editTitleInline.select();
-
-      editMinsInline.value  = (Number(s.minutes) || 0).toString();
-      editUnitInline.value  = 'minutes';
+      editTitleInline.value = s.name || ''; autosizeTitleInput(); editTitleInline.focus(); editTitleInline.select();
+      editMinsInline.value  = (Number(s.minutes) || 0).toString(); editUnitInline.value  = 'minutes';
     }
-
     sectionDescEl.disabled = !isEditingSection;
-
-    renderCurrentLinks();
-    renderShelf();
+    renderCurrentLinks(); renderShelf();
   }
-
   editTitleInline.addEventListener('input', autosizeTitleInput);
   window.addEventListener('resize', ()=>{ if(isEditingSection) autosizeTitleInput(); });
 
-  function currentSectionRef(){ return currentSession[currentIndex]; }
+  const currentSectionRef = ()=> currentSession[currentIndex];
 
-  // Add widget
-  addWidgetBtn.onclick = ()=>{
-    if(!isEditingSection) editSectionBtn.click();
-    const wid = 'W'+Date.now().toString(36);
-    const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
-    widgetShelf = [...widgetShelf, placeholder]; saveShelf(); renderShelf();
-    const onCancel = ()=>{
-      const idx = widgetShelf.findIndex(x=>x.id===wid);
-      if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); }
-    };
-    openWidgetEditor(placeholder, (upd)=>{
-      upd.url = normalizeUrl(upd.url);
-      const it = widgetShelf.find(x=>x.id===wid);
-      if(it){ Object.assign(it, upd); saveShelf(); renderShelf(); }
-    }, onCancel);
-  };
-  resetShelfBtn.onclick = ()=>{
-    if(!confirm('Reset link shelf to defaults?')) return;
-    widgetShelf = [
+  // Shelf controls …
+  addWidgetBtn.onclick = ()=>{ if(!isEditingSection) editSectionBtn.click(); const wid = 'W'+Date.now().toString(36); const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' }; widgetShelf = [...widgetShelf, placeholder]; saveShelf(); renderShelf(); const onCancel = ()=>{ const idx = widgetShelf.findIndex(x=>x.id===wid); if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); } }; openWidgetEditor(placeholder, (upd)=>{ upd.url = normalizeUrl(upd.url); const it = widgetShelf.find(x=>x.id===wid); if(it){ Object.assign(it, upd); saveShelf(); renderShelf(); } }, onCancel); };
+  resetShelfBtn.onclick = ()=>{ if(!confirm('Reset link shelf to defaults?')) return; widgetShelf = [
       { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',          icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
       { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
       { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
-    ];
-    saveShelf(); renderShelf();
-  };
+    ]; saveShelf(); renderShelf(); };
 
   function widgetCardHTML(w){
-    const iconHtml = (w.icon==='img' && w.img)
-      ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
-      : `<span class="link-icon">${escapeHtml(w.emoji || '🔗')}</span>`;
+    const iconHtml = (w.icon==='img' && w.img) ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>` : `<span class="link-icon">${escapeHtml(w.emoji || '🔗')}</span>`;
     return `
       <div class="widget" data-wid="${escapeHtml(w.id)}">
         <div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${escapeHtml(w.id)}" title="${escapeHtml(w.url || '')}" style="cursor:${isEditingSection?'grab':'default'}">
@@ -1128,123 +917,50 @@
   function renderShelf(){
     linkShelfDiv.innerHTML = (isEditingSection ? `<button class="add-pill" data-act="add-shelf"> Add</button>` : '')
       + widgetShelf.map(widgetCardHTML).join('');
-
     linkShelfDiv.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=> addWidgetBtn.click());
-
     linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
-      card.addEventListener('click', ()=>{
-        if(!isEditingSection) return;
-        const w = widgetShelf.find(x=>x.id===card.dataset.wid); if(!w) return;
-        openWidgetEditor(w, (upd)=>{
-          upd.url = normalizeUrl(upd.url);
-          Object.assign(w, upd); saveShelf(); renderShelf();
-        });
-      });
-      card.addEventListener('dragstart', e=>{
-        if(!isEditingSection){ e.preventDefault(); return; }
-        const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid});
-        try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
-        e.dataTransfer.effectAllowed='copy';
-        card.classList.add('drag-ghost');
-      });
+      card.addEventListener('click', ()=>{ if(!isEditingSection) return; const w = widgetShelf.find(x=>x.id===card.dataset.wid); if(!w) return; openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); saveShelf(); renderShelf(); }); });
+      card.addEventListener('dragstart', e=>{ if(!isEditingSection){ e.preventDefault(); return; } const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid}); try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{} e.dataTransfer.effectAllowed='copy'; card.classList.add('drag-ghost'); });
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
     });
-
     linkShelfDiv.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
-      btn.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        if(!isEditingSection) return;
-        const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid;
-        const idx = widgetShelf.findIndex(x=>x.id===wid);
-        if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); }
-      });
+      btn.addEventListener('click', (e)=>{ e.stopPropagation(); if(!isEditingSection) return; const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid; const idx = widgetShelf.findIndex(x=>x.id===wid); if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); } });
     });
   }
 
+  // Links
   function renderCurrentLinks(){
     const sec=currentSectionRef(); const arr=sec?.links||[];
     linksDiv.innerHTML = arr.map((w,i)=>`
       <div class="widget" data-link-idx="${i}">
         <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
-          ${w.icon==='img' && w.img
-              ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
-              : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`}
+          ${w.icon==='img' && w.img ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>` : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`}
           <span class="truncate max-w-[14rem]">${escapeHtml(w.label||'Untitled')}</span>
         </div>
         ${isEditingSection ? `<button class="bin" data-act="del-link" title="Delete">🗑️</button>` : ''}
       </div>`).join('');
 
     linksDiv.querySelectorAll('.section-link').forEach(card=>{
-      card.addEventListener('dragstart', e=>{
-        if(!isEditingSection){ e.preventDefault(); return; }
-        const index=Number(card.dataset.idx);
-        const payloadStr = JSON.stringify({type:'reorder', index});
-        try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{}
-        e.dataTransfer.effectAllowed='move';
-        card.classList.add('drag-ghost');
-      });
+      card.addEventListener('dragstart', e=>{ if(!isEditingSection){ e.preventDefault(); return; } const index=Number(card.dataset.idx); const payloadStr = JSON.stringify({type:'reorder', index}); try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{} e.dataTransfer.effectAllowed='move'; card.classList.add('drag-ghost'); });
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-
-      card.addEventListener('click', ()=>{
-        const i = Number(card.dataset.idx); const target = sec.links[i]; if(!target) return;
-        if(isEditingSection){
-          openWidgetEditor(target, (upd)=>{
-            upd.url = normalizeUrl(upd.url);
-            Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks();
-            syncSavedFromCurrent();
-          });
-        } else {
-          const url = normalizeUrl(target.url||'');
-          if(url) window.open(url, '_blank', 'noopener');
-        }
-      });
+      card.addEventListener('click', ()=>{ const i = Number(card.dataset.idx); const target = sec.links[i]; if(!target) return; if(isEditingSection){ openWidgetEditor(target, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); }); } else { const url = normalizeUrl(target.url||''); if(url) window.open(url, '_blank', 'noopener'); } });
     });
 
     if(isEditingSection){
       linksDiv.querySelectorAll('[data-act="del-link"]').forEach(btn=>{
-        btn.addEventListener('click', (e)=>{
-          e.stopPropagation();
-          const pill = btn.closest('.widget')?.querySelector('.section-link');
-          const i = Number(pill?.dataset.idx ?? -1);
-          if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); }
-        });
+        btn.addEventListener('click', (e)=>{ e.stopPropagation(); const pill = btn.closest('.widget')?.querySelector('.section-link'); const i = Number(pill?.dataset.idx ?? -1); if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); } });
       });
     }
     renderFocusLinks();
   }
 
-  clearSectionLinksBtn.onclick = ()=>{
-    if(!isEditingSection) return;
-    const sec = currentSectionRef();
-    if(!sec || !sec.links || sec.links.length===0) return;
-    if(!confirm('Clear all links for this section?')) return;
-    sec.links = [];
-    saveCurrentSession();
-    renderCurrentLinks();
-    renderFocusLinks();
-    syncSavedFromCurrent();
-  };
-
-  let overCount = 0;
-  linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over-outline'); });
+  clearSectionLinksBtn.onclick = ()=>{ if(!isEditingSection) return; const sec = currentSectionRef(); if(!sec || !sec.links || sec.links.length===0) return; if(!confirm('Clear all links for this section?')) return; sec.links = []; saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); };
+  let overCount = 0; linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over-outline'); });
   linksDiv.addEventListener('dragleave', e=>{ if(!isEditingSection) return; overCount=Math.max(0, overCount-1); if(overCount===0) linksDiv.classList.remove('drag-over-outline'); });
   linksDiv.addEventListener('dragover', e=>{ if(!isEditingSection) return; e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
-  linksDiv.addEventListener('drop', e=>{
-    if(!isEditingSection) return; e.preventDefault(); overCount=0; linksDiv.classList.remove('drag-over-outline');
-    const payload = parseDropPayload(e.dataTransfer);
-    if(!payload) return;
-    const sec=currentSectionRef(); if(!sec) return;
-    if(payload.type==='shelf'){
-      const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
-      sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
-      saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
-    } else if(payload.type==='reorder'){
-      const from=payload.index; const cards=[...linksDiv.querySelectorAll('.section-link')];
-      let to=cards.length; for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
-      if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
-    }
-  });
+  linksDiv.addEventListener('drop', e=>{ if(!isEditingSection) return; e.preventDefault(); overCount=0; linksDiv.classList.remove('drag-over-outline'); const payload = parseDropPayload(e.dataTransfer); if(!payload) return; const sec=currentSectionRef(); if(!sec) return; if(payload.type==='shelf'){ const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return; sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' }); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); } else if(payload.type==='reorder'){ const from=payload.index; const cards=[...linksDiv.querySelectorAll('.section-link')]; let to=cards.length; for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } } if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); } });
 
+  // Description (debounced sync)
   const syncSavedFromCurrentDebounced = debounce(()=>{ try{ syncSavedFromCurrent(); }catch{} }, 400);
   sectionDescEl.addEventListener('input', ()=>{ if(sectionDescEl.disabled) return; const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); syncSavedFromCurrentDebounced(); });
 
@@ -1257,29 +973,24 @@
           <div class="flex items-center gap-2 shrink-0">
             <span class="text-xs w-16 text-right">${Number(s.minutes||0)}m</span>
             <button class="btn-xs" data-act="edit">Edit</button>
+            <button class="btn-xs" data-act="delete">Delete</button>
           </div>
         </div>
       </li>`).join('');
 
+    // Jump on row click
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
-      li.addEventListener('click', (e)=>{
-        if(li.classList.contains('editing')) return;
-        if(e.target.closest('[data-act], input, select, textarea, button')) return;
-        jumpToSection(idx);
-      });
+      li.addEventListener('click', (e)=>{ if(li.classList.contains('editing')) return; if(e.target.closest('[data-act], input, select, textarea, button')) return; jumpToSection(idx); });
     });
 
+    // Inline edit
     outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
-        const cur=currentSession[idx];
-
-        li.classList.add('editing');
-        li.draggable = false;
-
+        const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return; const cur=currentSession[idx];
+        li.classList.add('editing'); li.draggable = false;
         li.innerHTML = `
           <div class="flex items-center gap-2">
-            <input class="input flex-1 text-sm" id="edtTitle" value="${escapeHtml(cur.name||'')}" />
+            <input class="input w-56 md:w-72 text-sm" id="edtTitle" value="${escapeHtml(cur.name||'')}" />
             <input class="input w-24 text-sm" id="edtValue" type="number" step="0.1" min="0.01" value="${(+cur.minutes||0).toFixed(2).replace(/\.00$/,'')}" />
             <select id="edtUnit" class="input h-9 w-20 text-sm">
               <option value="minutes" selected>min</option>
@@ -1288,224 +999,118 @@
             </select>
             <button class="btn-xxs" id="edtSave">Save</button>
           </div>`;
-
         const edtTitle=li.querySelector('#edtTitle'), edtValue=li.querySelector('#edtValue'), edtUnit=li.querySelector('#edtUnit');
-        const saveInline = ()=>{
-          const prevMin = cur.minutes;
-          const prevTotal = minsToSecs(prevMin);
-          const elapsedSec = currentSession[currentIndex]?.id===cur.id ? Math.max(0, prevTotal - secondsLeft) : 0;
-
-          cur.name = (edtTitle.value.trim() || cur.name);
-          cur.minutes = Math.max(0.01, toMinutesValue(edtValue.value, edtUnit.value));
-
-          if(currentSession[currentIndex]?.id===cur.id){
-            const newTotal = minsToSecs(cur.minutes);
-            secondsLeft = Math.max(0, newTotal - elapsedSec);
-            if(running) syncEnd();
-          }
-
-          saveCurrentSession();
-          renderOutline(); buildProgress(); updateProgress(); renderCurrent(); updateStartBtnLabel(); markTimer();
-          syncSavedFromCurrent();
-        };
+        const saveInline = ()=>{ const prevMin = cur.minutes; const prevTotal = minsToSecs(prevMin); const elapsedSec = currentSession[currentIndex]?.id===cur.id ? Math.max(0, prevTotal - secondsLeft) : 0;
+          cur.name = (edtTitle.value.trim() || cur.name); cur.minutes = Math.max(0.01, toMinutesValue(edtValue.value, edtUnit.value));
+          if(currentSession[currentIndex]?.id===cur.id){ const newTotal = minsToSecs(cur.minutes); secondsLeft = Math.max(0, newTotal - elapsedSec); if(running) syncEnd(); }
+          saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent(); updateStartBtnLabel(); markTimer(); syncSavedFromCurrent(); };
         li.querySelector('#edtSave').onclick = saveInline;
-
-        [edtTitle, edtValue].forEach(el=>{
-          el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveInline(); } });
-        });
+        [edtTitle, edtValue].forEach(el=> el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveInline(); } }));
       });
     });
 
+    // Delete
+    outline.querySelectorAll('[data-act="delete"]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const li = btn.closest('li[data-id]'); const id = li.dataset.id;
+        const idx = currentSession.findIndex(x=>x.id===id); if(idx<0) return;
+        if(!confirm('Delete this section?')) return;
+        currentSession.splice(idx,1);
+        if(currentIndex>=currentSession.length) currentIndex=Math.max(0,currentSession.length-1);
+        secondsLeft=minsToSecs((currentSession[currentIndex]||{}).minutes||0);
+        saveCurrentSession(); renderAll(); markTimer(); syncSavedFromCurrent();
+      });
+    });
+
+    // Drag reorder with live placeholder
     let dragging = null;
-    const makePh = (h, titleText)=>{ 
-      const ph = document.createElement('li'); 
-      ph.className='outline-row drop-placeholder'; 
-      ph.style.setProperty('--ph', `${Math.max(36,h)}px`); 
-      ph.innerHTML = `<div class="text-xs muted px-2 truncate">${escapeHtml(titleText||'')}</div>`; 
-      return ph; 
-    };
-
+    const makePh = (h, titleText)=>{ const ph = document.createElement('li'); ph.className='outline-row drop-placeholder'; ph.style.setProperty('--ph', `${Math.max(36,h)}px`); ph.innerHTML = `<div class="text-xs muted px-2 truncate">${escapeHtml(titleText||'')}</div>`; return ph; };
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
-      li.addEventListener('dragstart', (e)=>{
-        if(li.classList.contains('editing')){ e.preventDefault(); return; }
-        const titleText = (li.querySelector('button')?.textContent || '').trim();
-        dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) };
-        li.classList.add('dragging');
-        li.after(dragging.placeholder);
-        try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'outline-move', from: idx})); }catch{}
-        e.dataTransfer.effectAllowed='move';
-      });
-      li.addEventListener('dragend', ()=>{
-        li.classList.remove('dragging');
-        dragging?.placeholder?.remove();
-        dragging = null;
-      });
-
-      const onOver = (e)=>{
-        if(!dragging) return;
-        e.preventDefault();
-        const r = li.getBoundingClientRect();
-        const before = e.clientY < (r.top + r.height/2);
-        const ph = dragging.placeholder;
-        if(before){
-          if(li.previousSibling !== ph) outline.insertBefore(ph, li);
-        }else{
-          if(li.nextSibling !== ph) li.after(ph);
-        }
-      };
-      li.addEventListener('dragover', onOver);
-      li.addEventListener('dragenter', onOver);
+      li.addEventListener('dragstart', (e)=>{ if(li.classList.contains('editing')){ e.preventDefault(); return; } const titleText = (li.querySelector('button')?.textContent || '').trim(); dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) }; li.classList.add('dragging'); li.after(dragging.placeholder); try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'outline-move', from: idx})); }catch{} e.dataTransfer.effectAllowed='move'; });
+      li.addEventListener('dragend', ()=>{ li.classList.remove('dragging'); dragging?.placeholder?.remove(); dragging = null; });
+      const onOver = (e)=>{ if(!dragging) return; e.preventDefault(); const r = li.getBoundingClientRect(); const before = e.clientY < (r.top + r.height/2); const ph = dragging.placeholder; if(before){ if(li.previousSibling !== ph) outline.insertBefore(ph, li); }else{ if(li.nextSibling !== ph) li.after(ph); } };
+      li.addEventListener('dragover', onOver); li.addEventListener('dragenter', onOver);
     });
-
-    outline.addEventListener('dragover', (e)=>{
-      if(!dragging) return; e.preventDefault();
-      if(!outline.contains(dragging.placeholder)) outline.appendChild(dragging.placeholder);
-    });
-    outline.addEventListener('drop', (e)=>{
-      if(!dragging) return; e.preventDefault();
-      const from = dragging.from;
-
-      const rows = Array.from(outline.querySelectorAll('li.outline-row'));
-      const phIndex = rows.indexOf(dragging.placeholder);
-      const to = phIndex < 0 ? rows.length-1 : phIndex;
-
-      const finalTo = (to > from) ? to - 1 : to;
-
+    outline.addEventListener('dragover', (e)=>{ if(!dragging) return; e.preventDefault(); if(!outline.contains(dragging.placeholder)) outline.appendChild(dragging.placeholder); });
+    outline.addEventListener('drop', (e)=>{ if(!dragging) return; e.preventDefault(); const from = dragging.from; const rows = Array.from(outline.querySelectorAll('li.outline-row')); const phIndex = rows.indexOf(dragging.placeholder); const to = phIndex < 0 ? rows.length-1 : phIndex; const finalTo = (to > from) ? to - 1 : to;
       if(from !== finalTo && from >= 0 && finalTo >= 0){
-        const [moved] = currentSession.splice(from,1);
-        currentSession.splice(finalTo,0,moved);
-
-        if(currentIndex === from) currentIndex = finalTo;
-        else if(currentIndex > from && currentIndex <= finalTo) currentIndex -= 1;
-        else if(currentIndex < from && currentIndex >= finalTo) currentIndex += 1;
-
-        saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent();
-        syncSavedFromCurrent();
+        const [moved] = currentSession.splice(from,1); currentSession.splice(finalTo,0,moved);
+        if(currentIndex === from) currentIndex = finalTo; else if(currentIndex > from && currentIndex <= finalTo) currentIndex -= 1; else if(currentIndex < from && currentIndex >= finalTo) currentIndex += 1;
+        saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent(); syncSavedFromCurrent();
       }
-      dragging.el.classList.remove('dragging');
-      dragging.placeholder.remove();
-      dragging = null;
+      dragging.el.classList.remove('dragging'); dragging.placeholder.remove(); dragging = null;
     });
 
     if(totalMins) totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(currentSession)/60)} minutes`;
-    if(totalTimeTop) totalTimeTop.textContent = `• Total: ${Math.round(scheduleTotalSecs(currentSession)/60)}m`;
   }
 
+  // Inline add
   addOutlineItemBtn.onclick = ()=>{ inlineAddRow.classList.remove('hidden'); addTitleInput.value=''; addMinsInput.value=''; addTitleInput.focus(); };
   addCancelBtn.onclick = ()=> inlineAddRow.classList.add('hidden');
-  addConfirmBtn.onclick = ()=>{
-    const title=(addTitleInput.value||'').trim() || 'New section'; const mins=Math.max(0.25, Number(addMinsInput.value)||5);
-    currentSession.push({ id:'S'+Date.now(), name:title, minutes:mins, links:[] });
-    inlineAddRow.classList.add('hidden'); saveCurrentSession(); renderAll(); markTimer();
-    syncSavedFromCurrent();
-  };
+  addConfirmBtn.onclick = ()=>{ const title=(addTitleInput.value||'').trim() || 'New section'; const mins=Math.max(0.25, Number(addMinsInput.value)||5); currentSession.push({ id:'S'+Date.now(), name:title, minutes:mins, links:[] }); inlineAddRow.classList.add('hidden'); saveCurrentSession(); renderAll(); markTimer(); syncSavedFromCurrent(); };
 
-  /*************** Two-way sync glue (Home ↔ Saved Outlines) ***************/
-  function getActiveOutlineId(){ return (timerState && timerState.outlineId) ? timerState.outlineId : null; }
-
+  /*************** Two-way sync glue (Home ↔ Saved) ***************/
+  const getActiveOutlineId = ()=> (timerState && timerState.outlineId) ? timerState.outlineId : null;
   function syncSavedFromCurrent(){
-    const activeId = getActiveOutlineId();
-    if(!activeId) return;
-    const idx = savedOutlines.findIndex(o=>o.id===activeId);
-    if(idx<0) return;
-    const saved = savedOutlines[idx];
+    const activeId = getActiveOutlineId(); if(!activeId) return;
+
+    // Find the outline object anywhere in the (possibly nested) structure
+    function findDeep(id, arr){ for(const it of (arr||[])){ if(it?.id===id && it.sections) return it; if(it?.type==='folder' && it.children){ const r=findDeep(id, it.children); if(r) return r; } } return null; }
+    const saved = findDeep(activeId, savedOutlines); if(!saved) return;
+
     const newSections = currentSession.map(sec=>{
-      let sid = sec.id;
-      if(!sid){ sid = 'S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); sec.id = sid; }
-      return {
-        id: sid,
-        name: sec.name,
-        minutes: sec.minutes,
-        links: structuredClone(sec.links || []),
-        desc: sectionNotes[sid] ?? ''
-      };
+      let sid = sec.id; if(!sid){ sid = 'S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); sec.id = sid; }
+      return { id: sid, name: sec.name, minutes: sec.minutes, links: structuredClone(sec.links || []), desc: sectionNotes[sid] ?? '' };
     });
     saved.sections = newSections;
-    saveOutlinesLocal();
-    renderHomeSavedBar();
-    touchCloud();
+    saveOutlinesLocal(); renderHomeSavedBar(); touchCloud();
   }
-
   function syncCurrentFromSaved(outlineObj){
-    const activeId = getActiveOutlineId();
-    if(!activeId || !outlineObj || outlineObj.id !== activeId) return;
+    const activeId = getActiveOutlineId(); if(!activeId || !outlineObj || outlineObj.id !== activeId) return;
+    const oldActive = currentSession[currentIndex] || null; const oldActiveId = oldActive?.id || null; const oldActiveMins = Number(oldActive?.minutes || 0); const elapsedInActive = oldActiveId ? Math.max(0, minsToSecs(oldActiveMins) - secondsLeft) : 0;
 
-    const oldActive = currentSession[currentIndex] || null;
-    const oldActiveId = oldActive?.id || null;
-    const oldActiveMins = Number(oldActive?.minutes || 0);
-    const elapsedInActive = oldActiveId ? Math.max(0, minsToSecs(oldActiveMins) - secondsLeft) : 0;
-
-    currentSession = (outlineObj.sections || []).map(s=>({
-      id: s.id || ('S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
-      name: s.name,
-      minutes: s.minutes,
-      links: structuredClone(s.links || [])
-    }));
-
-    sectionNotes = {};
-    (outlineObj.sections || []).forEach(s=>{ if(s?.id) sectionNotes[s.id] = s.desc || ''; });
+    currentSession = (outlineObj.sections || []).map(s=>({ id: s.id || ('S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)), name: s.name, minutes: s.minutes, links: structuredClone(s.links || []) }));
+    sectionNotes = {}; (outlineObj.sections || []).forEach(s=>{ if(s?.id) sectionNotes[s.id] = s.desc || ''; });
 
     let newIdx = 0, newLeft = 0;
-    if(oldActiveId){
-      const i = currentSession.findIndex(x=>x.id===oldActiveId);
-      if(i>=0){
-        newIdx = i;
-        const newTotal = minsToSecs(currentSession[i].minutes || 0);
-        newLeft = Math.max(0, newTotal - Math.min(elapsedInActive, newTotal));
-      }else{
-        newIdx = Math.min(currentIndex, Math.max(0, currentSession.length-1));
-        newLeft = minsToSecs((currentSession[newIdx]||{}).minutes || 0);
-      }
-    }else{
-      newIdx = Math.min(currentIndex, Math.max(0, currentSession.length-1));
-      newLeft = minsToSecs((currentSession[newIdx]||{}).minutes || 0);
-    }
+    if(oldActiveId){ const i = currentSession.findIndex(x=>x.id===oldActiveId); if(i>=0){ newIdx = i; const newTotal = minsToSecs(currentSession[i].minutes || 0); newLeft = Math.max(0, newTotal - Math.min(elapsedInActive, newTotal)); } else { newIdx = Math.min(currentIndex, Math.max(0, currentSession.length-1)); newLeft = minsToSecs((currentSession[newIdx]||{}).minutes || 0); } }
+    else { newIdx = Math.min(currentIndex, Math.max(0, currentSession.length-1)); newLeft = minsToSecs((currentSession[newIdx]||{}).minutes || 0); }
 
-    currentIndex = newIdx;
-    secondsLeft = newLeft;
-    totalSessionSecs = scheduleTotalSecs(currentSession);
-    if(running) syncEnd();
-
-    saveCurrentSession(); saveNotes();
-    renderAll(); updateStartBtnLabel();
-    markTimer();
+    currentIndex = newIdx; secondsLeft = newLeft; totalSessionSecs = scheduleTotalSecs(currentSession); if(running) syncEnd();
+    saveCurrentSession(); saveNotes(); renderAll(); updateStartBtnLabel(); markTimer();
   }
 
   /*************** Saved Outlines module wiring ***************/
   const homeSavedScroller = $('#homeSavedScroller');
+  function flattenOutlines(arr, out=[]){
+    (arr||[]).forEach(it=>{
+      if(it?.type==='folder'){ flattenOutlines(it.children||[], out); }
+      else if(it?.sections) out.push(it);
+    });
+    return out;
+  }
   function renderHomeSavedBar(){
     const activeId = (timerState && timerState.outlineId) || null;
+    const flat = flattenOutlines(savedOutlines, []);
     homeSavedScroller.innerHTML =
-      (savedOutlines.length
-        ? savedOutlines
-            .filter(o=>!o.type) /* outlines only at root */
-            .map(o=>`
-                <button type="button"
-                        class="chip ${o.id===activeId ? 'chip-active' : ''}"
-                        data-oid="${escapeHtml(o.id)}"
-                        title="${escapeHtml(o.title || 'Outline')}">
-                  ${escapeHtml(o.title || 'Untitled')}
-                </button>`).join('')
+      (flat.length
+        ? flat.map(o=>`
+            <button type="button"
+                    class="chip ${o.id===activeId ? 'chip-active' : ''}"
+                    data-oid="${escapeHtml(o.id)}"
+                    title="${escapeHtml(o.title || 'Outline')}">
+              ${escapeHtml(o.title || 'Untitled')}
+            </button>`).join('')
         : `<div class="text-xs muted">No saved outlines yet.</div>`);
-
     homeSavedScroller.querySelectorAll('[data-oid]').forEach(btn=>{
-      btn.onclick = ()=>{
-        const o = savedOutlines.find(x=>x.id===btn.dataset.oid);
-        if(o){
-          applyOutlineToCurrent(o);
-          requestAnimationFrame(renderHomeSavedBar);
-        }
-      };
+      btn.onclick = ()=>{ const o = flat.find(x=>x.id===btn.dataset.oid); if(o){ applyOutlineToCurrent(o); requestAnimationFrame(renderHomeSavedBar); } };
     });
   }
   function applyOutlineToCurrent(outlineObj){
     const clone = outlineObj.sections.map(s=>({ id:s.id||('S'+Math.random().toString(16).slice(2)), name:s.name, minutes:s.minutes, links:structuredClone(s.links||[]) }));
-    currentSession = clone;
-    sectionNotes = {};
-    clone.forEach(sec=>{ const src = outlineObj.sections.find(ss=>ss.id===sec.id); if(src && src.desc!=null) sectionNotes[sec.id] = src.desc; });
+    currentSession = clone; sectionNotes = {}; clone.forEach(sec=>{ const src = outlineObj.sections.find(ss=>ss.id===sec.id); if(src && src.desc!=null) sectionNotes[sec.id] = src.desc; });
     timerState = { sessionStarted:false, running:false, currentIndex:0, secondsLeft:minsToSecs((clone[0]||{}).minutes||0), outlineId: outlineObj.id, lastSyncTs: Date.now(), awaitingNext:false };
-    awaitingNext=false; hideNextGate();
-    saveCurrentSession(); saveNotes(); saveTimerLocal(); renderAll(); updateStartBtnLabel();
+    awaitingNext=false; hideNextGate(); saveCurrentSession(); saveNotes(); saveTimerLocal(); renderAll(); updateStartBtnLabel();
   }
 
   const { renderSavedOutlines } = setupSavedOutlines({
@@ -1517,12 +1122,11 @@
     applyOutline: applyOutlineToCurrent,
     touchCloud,
     renderHomeSavedBar,
-    // New sync hooks
     getActiveOutlineId,
     syncCurrentFromSaved
   });
 
-  /*************** Auth modal UI ***************/
+  /*************** Auth modal ***************/
   const authOpenBtn = $('#authOpenBtn'); const userBadge = $('#userBadge'); const userEmail = $('#userEmail'); const signOutBtn = $('#signOutBtn');
   const authModal = $('#authModal'); const authTitle=$('#authTitle'); const authSubtitle=$('#authSubtitle');
   const emailInput=$('#emailInput'); const passInput=$('#passInput');
@@ -1533,8 +1137,7 @@
   function showModal(modal){ modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false'); }
   function hideModal(modal){ modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
   function setAuthMode(mode){
-    authMode=mode;
-    const isSignUp = mode==='signup';
+    authMode=mode; const isSignUp = mode==='signup';
     signinRow.classList.toggle('hidden', isSignUp);
     signupRow.classList.toggle('hidden', !isSignUp);
     toggleAuthMode.textContent = isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account';
@@ -1547,60 +1150,52 @@
   document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ hideModal(authModal); hideModal(settingsModal); if(!focusOverlay.classList.contains('hidden')) hideFocus(); } });
 
   googleBtn.onclick = ()=> signInWithPopup(auth, provider).catch(err=> alert(err.message||'Google sign-in failed'));
-  emailSignInBtn.onclick = async ()=>{
-    try{ await signInWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); }
-    catch(e){ alert(e.message||'Sign-in failed'); }
-  };
-  emailSignUpBtn.onclick = async ()=>{
-    try{ await createUserWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); }
-    catch(e){ alert(e.message||'Sign-up failed'); }
-  };
-  emailResetBtn.onclick = async ()=>{
-    try{ if(!emailInput.value.trim()) return alert('Enter your email first.'); await sendPasswordResetEmail(auth, emailInput.value.trim()); alert('Reset email sent.'); }
-    catch(e){ alert(e.message||'Reset failed'); }
-  };
+  emailSignInBtn.onclick = async ()=>{ try{ await signInWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); } catch(e){ alert(e.message||'Sign-in failed'); } };
+  const emailSignUpBtnEl = document.getElementById('emailSignUpBtn'); if(emailSignUpBtnEl){ emailSignUpBtnEl.onclick = async ()=>{ try{ await createUserWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); } catch(e){ alert(e.message||'Sign-up failed'); } }; }
+  emailResetBtn.onclick = async ()=>{ try{ if(!emailInput.value.trim()) return alert('Enter your email first.'); await sendPasswordResetEmail(auth, emailInput.value.trim()); alert('Reset email sent.'); } catch(e){ alert(e.message||'Reset failed'); } };
   signOutBtn.onclick = ()=> signOut(auth);
+
+  async function pushLocalToCloudIfMissing(user){
+    try{
+      const snap = await getDoc(userDocRef(user.uid));
+      if(!snap.exists()){
+        await setDoc(userDocRef(user.uid), {
+          currentSession, notes: sectionNotes, prefs, widgetShelf, savedOutlines, timer: timerState, updatedAt: serverTimestamp()
+        }, { merge:true });
+      }
+    }catch{}
+  }
 
   onAuthStateChanged(auth, async (user)=>{
     currentUser = user || null;
     if(user){
-      authOpenBtn.classList.add('hidden'); userBadge.classList.remove('hidden'); userEmail.textContent = user.email || user.uid; setCloudMode('Syncing…');
-      hideModal(authModal);
+      authOpenBtn.classList.add('hidden'); userBadge.classList.remove('hidden'); userEmail.textContent = user.email || user.uid; setCloudMode('Syncing…'); hideModal(authModal);
       try{
+        await pushLocalToCloudIfMissing(user);
         const snap = await getDoc(userDocRef(user.uid));
         if(snap.exists()){
           const d = snap.data()||{};
           if(d.currentSession) currentSession = d.currentSession;
           if(d.notes) sectionNotes = d.notes;
           if(d.prefs) prefs = d.prefs;
-          if(!prefs.ring) prefs.ring = { type:'beep', duration:700, volume:0.6 };
           if(d.widgetShelf) widgetShelf = d.widgetShelf;
           if(d.savedOutlines) savedOutlines = d.savedOutlines;
           if(d.timer) timerState = d.timer;
-          applyTheme(prefs.theme||{});
-          applySplitRatio(prefs.splitRatio||56);
+          applyTheme(prefs.theme||{}); applySplitRatio(prefs.splitRatio||56);
           setTimerFromState(timerState); renderAll(); renderHomeSavedBar(); setCloudMode('Saved to cloud ✓');
           if(prefs.focusDefault) showFocus();
-        } else { 
-          setCloudMode('Cloud sync on'); 
-          if(prefs.focusDefault) showFocus();
-        }
-      }catch{ 
-        setLocalMode('Cloud read failed'); 
-        if(prefs.focusDefault) showFocus();
-      }
+        } else { setCloudMode('Cloud sync on'); if(prefs.focusDefault) showFocus(); }
+      }catch{ setLocalMode('Cloud read failed'); if(prefs.focusDefault) showFocus(); }
     } else {
-      authOpenBtn.classList.remove('hidden'); userBadge.classList.add('hidden'); setLocalMode('Local mode');
-      if(prefs.focusDefault) showFocus();
+      authOpenBtn.classList.remove('hidden'); userBadge.classList.add('hidden'); setLocalMode('Local mode'); if(prefs.focusDefault) showFocus();
     }
   });
 
-  /*************** Settings modal UI ***************/
+  /*************** Settings modal ***************/
   const settingsModal = $('#settingsModal');
   const setBg=$('#setBg'), setFg=$('#setFg'), setAccent=$('#setAccent'), setBorder=$('#setBorder'), setBorderW=$('#setBorderW'), setFocusDefault=$('#setFocusDefault');
-  const toneSel=$('#setTone'), toneDur=$('#setToneDur'), toneVol=$('#setToneVol');
-  const tonePreviewBtn=$('#tonePreviewBtn'), toneDefaultBtn=$('#toneDefaultBtn');
-  const settingsSaveBtn=$('#settingsSaveBtn'), settingsResetBtn=$('#settingsResetBtn');
+  const settingsSaveBtn=$('#settingsSaveBtn'); const settingsDefaultBtn=$('#settingsDefaultBtn');
+  const ringToneSel=$('#ringTone'), ringDur=$('#ringDur'), ringVol=$('#ringVol'), ringPreview=$('#ringPreview'), ringVolVal=$('#ringVolVal');
 
   function applyTheme(t){
     document.documentElement.style.setProperty('--bg', t.bg || '#ffffff');
@@ -1619,9 +1214,10 @@
     setBorderW.value = String(prefs.theme?.borderW ?? 2);
     setFocusDefault.checked = !!prefs.focusDefault;
 
-    toneSel.value = prefs.ring?.type || 'beep';
-    toneDur.value = String(prefs.ring?.duration ?? 700);
-    toneVol.value = String(prefs.ring?.volume ?? 0.6);
+    ringToneSel.value = prefs.sound?.name || 'chime';
+    ringDur.value = String(prefs.sound?.duration ?? 800);
+    ringVol.value = String(prefs.sound?.volume ?? 0.12);
+    ringVolVal.textContent = Number(ringVol.value).toFixed(2);
 
     showModal(settingsModal);
   }
@@ -1630,101 +1226,61 @@
   settingsModal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') closeSettings(); });
   $('#settingsBtn').onclick = openSettings;
 
-  // Live theme preview + save as user tweaks
-  function commitThemeFromInputs(){
-    prefs.theme = {
-      bg:setBg.value, fg:setFg.value, accent:setAccent.value, border:setBorder.value, borderW:Math.max(0, Number(setBorderW.value)||2)
-    };
-    applyTheme(prefs.theme);
-    savePrefs();
-  }
-  [setBg,setFg,setAccent,setBorder].forEach(inp=>{
-    inp.addEventListener('input', commitThemeFromInputs);
-    // Clicking anywhere else should close the color panel
-    inp.addEventListener('focus', ()=>{ settingsModal.classList.add('color-open'); });
+  // Live theme preview + autosave
+  [setBg,setFg,setAccent,setBorder,setBorderW].forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      prefs.theme = { bg:setBg.value, fg:setFg.value, accent:setAccent.value, border:setBorder.value, borderW:Math.max(0, Number(setBorderW.value)||2) };
+      applyTheme(prefs.theme); savePrefs();
+    });
   });
-  document.addEventListener('pointerdown', (e)=>{
-    if(!settingsModal || settingsModal.classList.contains('hidden')) return;
-    // If a color input is focused and you click outside any of them, blur it
-    const focused = document.activeElement;
-    if(focused && focused.type==='color' && !focused.contains(e.target)){
-      focused.blur();
-      settingsModal.classList.remove('color-open');
-    }
-  }, true);
+  setFocusDefault.addEventListener('change', ()=>{ prefs.focusDefault = !!setFocusDefault.checked; savePrefs(); });
 
-  // Sound settings
-  function commitSoundFromInputs(){
-    prefs.ring = {
-      type: toneSel.value || 'beep',
-      duration: Math.max(100, Number(toneDur.value)||700),
-      volume: Math.max(0, Math.min(1, Number(toneVol.value)||0.6))
-    };
-    savePrefs();
-  }
-  [toneSel,toneDur,toneVol].forEach(el=> el.addEventListener('input', commitSoundFromInputs));
-  toneDefaultBtn.onclick = ()=>{
-    toneSel.value='beep'; toneDur.value='700'; toneVol.value='0.6';
-    commitSoundFromInputs();
-  };
-  tonePreviewBtn.onclick = ()=>{
-    // Preview with the live control values (fixes “duration doesn’t change”)
-    const cfg = {
-      type: toneSel.value, duration: Math.max(100, Number(toneDur.value)||700), volume: Math.max(0, Math.min(1, Number(toneVol.value)||0.6))
-    };
-    playRingtone(cfg);
-  };
+  // Color picker: close when clicking anywhere else in the modal
+  let activeColor = null;
+  [setBg,setFg,setAccent,setBorder].forEach(inp=>{
+    inp.addEventListener('focus', ()=> activeColor=inp);
+  });
+  settingsModal.addEventListener('mousedown', (e)=>{
+    if(activeColor && e.target !== activeColor && !activeColor.contains(e.target)){ activeColor.blur(); activeColor=null; }
+  });
 
-  settingsSaveBtn.onclick = ()=>{ commitThemeFromInputs(); commitSoundFromInputs(); closeSettings(); };
-  settingsResetBtn.onclick = ()=>{
+  // Sound preferences (live)
+  ringToneSel.addEventListener('change', ()=>{ prefs.sound.name = ringToneSel.value; savePrefs(); });
+  ringDur.addEventListener('input', ()=>{ prefs.sound.duration = Math.max(100, Number(ringDur.value)||800); savePrefs(); });
+  ringVol.addEventListener('input', ()=>{ prefs.sound.volume = Math.max(0, Math.min(1, Number(ringVol.value)||0.12)); ringVolVal.textContent = Number(prefs.sound.volume).toFixed(2); savePrefs(); });
+  ringPreview.addEventListener('click', ()=> playAlert({ name:ringToneSel.value, duration:Number(ringDur.value), volume:Number(ringVol.value) }) );
+
+  // Default button
+  settingsDefaultBtn.onclick = ()=>{
     prefs.theme = { bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 };
+    prefs.sound = { name:'chime', duration:800, volume:0.12 };
+    prefs.focusDefault = false;
     applyTheme(prefs.theme); savePrefs(); openSettings();
   };
+
+  // Save (kept for completeness)
+  settingsSaveBtn.onclick = ()=>{ savePrefs(); closeSettings(); };
   applyTheme(prefs.theme||{});
 
-  /*************** Focus Mode UI helpers ***************/
+  /*************** Focus helpers ***************/
   function renderFocusLinks(){
-    const sec = currentSectionRef();
-    const arr = sec?.links || [];
+    const sec = currentSectionRef(); const arr = sec?.links || [];
     focusLinksDiv.innerHTML = arr.length ? arr.map((w,i)=>`
       <div class="widget" data-flink-idx="${i}">
         <div class="link-card section-link" data-idx="${i}">
-          ${w.icon==='img' && w.img
-            ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
-            : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`}
+          ${w.icon==='img' && w.img ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>` : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`}
           <span class="truncate max-w-[14rem]">${escapeHtml(w.label||'Untitled')}</span>
         </div>
       </div>`).join('') : `<div class="text-xs muted">No links for this section.</div>`;
-
     focusLinksDiv.querySelectorAll('.section-link').forEach(card=>{
-      card.addEventListener('click', ()=>{
-        const i = Number(card.dataset.idx);
-        const target = (sec?.links||[])[i];
-        if(!target) return;
-        const url = normalizeUrl(target.url||'');
-        if(url) window.open(url, '_blank', 'noopener');
-      });
+      card.addEventListener('click', ()=>{ const i = Number(card.dataset.idx); const target = (sec?.links||[])[i]; if(!target) return; const url = normalizeUrl(target.url||''); if(url) window.open(url, '_blank', 'noopener'); });
     });
   }
-
   function renderFocusUI(){
-    const sec = currentSession[currentIndex];
-    const count = currentSession.length;
-    if(!sec){
-      focusTitleEl.textContent = '—';
-      focusMetaEl.textContent = '';
-      focusDescEl.textContent = '';
-    }else{
-      focusTitleEl.textContent = sec.name || 'Untitled';
-      focusMetaEl.textContent = `Section ${Math.min(currentIndex+1,count)} of ${count} • ${(sec.minutes||0)}m`;
-      const note = sectionNotes[sec.id] || '';
-      focusDescEl.textContent = note ? note : 'No notes for this section.';
-    }
-    buildFocusProgress();
-    renderFocusLinks();
-    setClockText(secsToClock(secondsLeft));
-    updateClockColor();
-    updateStartBtnLabel();
+    const sec = currentSession[currentIndex]; const count = currentSession.length;
+    if(!sec){ focusTitleEl.textContent = '—'; focusMetaEl.textContent = ''; focusDescEl.textContent = ''; }
+    else{ focusTitleEl.textContent = sec.name || 'Untitled'; focusMetaEl.textContent = `Section ${Math.min(currentIndex+1,count)} of ${count} • ${(sec.minutes||0)}m`; const note = sectionNotes[sec.id] || ''; focusDescEl.textContent = note ? note : 'No notes for this section.'; }
+    buildFocusProgress(); renderFocusLinks(); setClockText(secsToClock(secondsLeft)); updateClockColor(); updateStartBtnLabel();
   }
   function showFocus(){ renderFocusUI(); focusOverlay.classList.remove('hidden'); }
   function hideFocus(){ focusOverlay.classList.add('hidden'); }
@@ -1734,77 +1290,74 @@
   /*************** Initial render ***************/
   function renderCurrent(){
     const s=currentSession[currentIndex]; 
-    if(!s){ 
-      currentTitleEl.textContent='—'; currentDurDisp.textContent='0m';
-      sectionDescEl.value=''; linksDiv.innerHTML=''; 
-      renderFocusUI();
-      return; 
-    }
+    if(!s){ currentTitleEl.textContent='—'; currentDurDisp.textContent='0m'; sectionDescEl.value=''; linksDiv.innerHTML=''; renderFocusUI(); return; }
     currentTitleEl.textContent = s.name || 'Untitled';
     currentDurDisp.textContent = `${Number(s.minutes||0)}m`;
     sectionNotes[s.id] = sectionNotes[s.id] || '';
     sectionDescEl.value = sectionNotes[s.id];
     sectionDescEl.disabled = !isEditingSection;
-
-    renderCurrentLinks();
-    setClockText(secsToClock(secondsLeft));
-    renderFocusUI();
+    renderCurrentLinks(); setClockText(secsToClock(secondsLeft)); renderFocusUI();
   }
   function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
 
-  // ------- Ringtone / Audio --------
+  /*************** Ringtone (WebAudio) ***************/
   let ctx = null;
-  function ensureAudio(){
-    try{
-      if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if(ctx.state === 'suspended') ctx.resume();
-    }catch{}
+  function unlockAudio(){ try{ if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if(ctx.state === 'suspended') ctx.resume(); }catch{} }
+  ['click','keydown','touchstart','pointerdown'].forEach(ev=>{ document.addEventListener(ev, unlockAudio, { once:true, passive:true }); });
+
+  function tone(freq, durMs, type='sine', volume=0.12, startAt=0){
+    if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const t0 = ctx.currentTime + startAt;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.00001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00002, volume), t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.00001, t0 + (durMs/1000));
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0 + (durMs/1000) + 0.02);
+    return { osc, g };
   }
-  ['click','keydown','touchstart','pointerdown'].forEach(ev=>{
-    document.addEventListener(ev, ensureAudio, { once:true, passive:true });
-  });
+  function playAlert(opts){
+    const name = (opts?.name) || (prefs.sound?.name || 'chime');
+    const dur  = Math.max(100, (opts?.duration ?? prefs.sound?.duration ?? 800));
+    const vol  = Math.max(0, Math.min(1, (opts?.volume ?? prefs.sound?.volume ?? 0.12)));
+    unlockAudio();
 
-  function playRingtone(override){
-    try{
-      ensureAudio();
-      const cfg = Object.assign({ type:'beep', duration:700, volume:0.6 }, prefs?.ring||{}, override||{});
-      const vol = Math.max(0, Math.min(1, cfg.volume));
-      const dur = Math.max(100, Math.min(6000, Math.floor(cfg.duration)));
-      const endAt = (sec)=> setTimeout(()=>{ try{ g.disconnect(); }catch{} }, Math.ceil(sec*1000)+10);
-
-      const g = ctx.createGain(); g.gain.value = vol; g.connect(ctx.destination);
-
-      if(cfg.type === 'chime'){
-        // Two quick sines (do + mi)
-        const o1 = ctx.createOscillator(); o1.type='sine'; o1.frequency.value=784; o1.connect(g);
-        const o2 = ctx.createOscillator(); o2.type='sine'; o2.frequency.value=988; o2.connect(g);
-        o1.start(); setTimeout(()=>o2.start(), Math.max(60, dur*0.35));
-        setTimeout(()=>{ try{o1.stop();o2.stop();}catch{}; endAt(dur/1000); }, dur);
-      } else if(cfg.type === 'bell'){
-        // Soft decaying bell (AM + decay)
-        const o = ctx.createOscillator(); o.type='triangle'; o.frequency.value=880; o.connect(g);
-        const decay = ctx.createGain(); decay.gain.value = vol;
-        o.connect(decay); decay.connect(ctx.destination);
-        o.start();
-        decay.gain.setTargetAtTime(0.0001, ctx.currentTime + 0.05, Math.max(0.05, dur/1000/3));
-        setTimeout(()=>{ try{o.stop();}catch{}; endAt(dur/1000); }, dur);
-      } else {
-        // Default: short square beep with gain ramp
-        const o = ctx.createOscillator(); o.type='square'; o.frequency.value=880; o.connect(g);
-        o.start();
-        setTimeout(()=>{ try{o.stop();}catch{}; endAt(dur/1000); }, dur);
-      }
-    }catch{}
+    // Simple voicings (keep CPU/lightweight)
+    if(name==='ping'){
+      tone(1200, dur, 'sine', vol*0.8);
+    }else if(name==='bell'){
+      tone(880, dur,   'sine',  vol*0.45);
+      tone(1320, dur,  'sine',  vol*0.25);
+      tone(1760, dur,  'sine',  vol*0.12);
+    }else if(name==='digital'){
+      tone(880, dur*0.5, 'square', vol*0.5, 0);
+      tone(660, dur*0.5, 'square', vol*0.5, dur*0.5/1000);
+    }else { // chime (default)
+      const seg = dur/3;
+      tone(880, seg, 'sine', vol*0.7, 0);
+      tone(660, seg, 'sine', vol*0.7, seg/1000);
+      tone(990, seg, 'sine', vol*0.6, 2*seg/1000);
+    }
   }
 
-  // Default landing view
-  showTab('landingTab');
+  // Demo progress on Overview tab
+  const demoPlay = document.getElementById('demoPlay');
+  const demoReset = document.getElementById('demoReset');
+  const demoFill = document.getElementById('demoFill');
+  const demoPct = document.getElementById('demoPct');
+  let demoId=null, demoVal=0;
+  if(demoPlay){
+    demoPlay.onclick = ()=>{ if(demoId) return; demoId = setInterval(()=>{ demoVal=Math.min(100, demoVal+2); demoFill.style.width=demoVal+'%'; demoPct.textContent=demoVal+'%'; if(demoVal>=100){ clearInterval(demoId); demoId=null; playAlert(); } }, 60); };
+    demoReset.onclick = ()=>{ if(demoId){ clearInterval(demoId); demoId=null; } demoVal=0; demoFill.style.width='0%'; demoPct.textContent='0%'; };
+  }
 
   setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
-  if(prefs.focusDefault) showFocus();
+  showTab('overviewTab'); // default landing
 </script>
 
-<!-- Pricing tab (attaches a "Pricing" tab & section) -->
+<!-- Optional Pricing tab (unchanged) -->
 <script src="./pricing-tab.js"></script>
 </body>
 </html>
