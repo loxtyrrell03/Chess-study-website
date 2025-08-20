@@ -190,7 +190,7 @@ html,body{background:var(--bg);color:var(--fg)}
 .section-edit .mins-wrap .mins-input { width: 72px; height: 32px; }
 
 /* Description */
-.section-edit textarea.input { min-height: 70px; padding: .5rem .6rem; }
+.section-edit textarea.input { min-height: 70px; padding: .5rem .6rem; resize: vertical; }
 
 /* Widget shelf wrapper */
 .section-edit [data-role="inline-shelf"] {
@@ -286,7 +286,6 @@ html,body{background:var(--bg);color:var(--fg)}
 .draggable-shelf{ min-width:0; }
 
 /* ===== Outline merge improvements ===== */
-/* While dragging an outline title, prevent header buttons from stealing pointer events */
 .is-merge-drag [data-oid] [data-role="outline-head"] [data-act]{
   pointer-events: none !important;
 }
@@ -304,3 +303,16 @@ html,body{background:var(--bg);color:var(--fg)}
 
 /* Utilities */
 .no-select{ user-select:none; }
+
+/* ===== Folders ===== */
+.folder-card{ position: relative; }
+.folder-card::after{
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 10px;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent-100) 28%, transparent));
+  opacity: .6;
+}
+.folder-card [data-role="folder-body"] .card{ margin-bottom: .75rem; }

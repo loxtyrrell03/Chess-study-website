@@ -1,26 +1,17 @@
-// saved-outlines.js — Saved Outlines manager (mirrors Home right-pane DnD)
+// saved-outlines.js — Saved Outlines manager (with Folders + DnD)
+// Exports: setupSavedOutlines({...})
 //
-// Exports: setupSavedOutlines({
-//   getSavedOutlines, setSavedOutlines, saveOutlinesLocal,
-//   getWidgetShelf, setWidgetShelf, applyOutline,
-//   touchCloud, renderHomeSavedBar,
-//   // NEW (optional, for live two-way sync with Home):
-//   getActiveOutlineId,        // () => active outline id or null
-//   syncCurrentFromSaved       // (outlineObj) => void
-// })
+// New in this version:
+// • Folders: Create, rename, delete, and drag outlines into/out of folders.
+// • Saved Outlines are the source of defaults. Home edits DO NOT push back.
+// • If the edited outline is the active one, updates live-sync to Home.
 //
-// What’s inside:
-// • Outline cards with header actions: Load, Duplicate, Delete, Expand.
-// • Inside an expanded card, sections render as <ul>…<li class="outline-row"> rows.
-// • Drag-to-reorder subsections uses the SAME logic as Home (right pane):
-//     - Live <li class="outline-row drop-placeholder"> shows the insertion point.
-//     - Drag over a row inserts placeholder before/after based on pointer half.
-//     - Container accepts drop anywhere (including at the end).
-// • Inline edit card for a section (title/minutes/description + links bar + shelf).
-// • Drag shelf item → Links bar (copy), reorder links inside the bar.
-// • Drag outline title onto another card to propose a merge (same UX as before).
+// Structure in local storage / cloud:
+// savedOutlines: Array of either
+//   { id:'O...', title:'...', sections:[...] }                       // outline
+//   { id:'F...', type:'folder', title:'...', children:[outline,...]} // folder
 //
-// • NEW: When the edited outline is the active one, all changes push to Home immediately.
+// NOTE: index.html flattens outlines (root + folders) when showing chips.
 
 export function setupSavedOutlines({
   getSavedOutlines,
@@ -31,7 +22,7 @@ export function setupSavedOutlines({
   applyOutline,
   touchCloud,
   renderHomeSavedBar,
-  // NEW (optional)
+  // Live two-way for Saved → Home only:
   getActiveOutlineId,
   syncCurrentFromSaved
 }) {
@@ -43,6 +34,8 @@ export function setupSavedOutlines({
   const createOk      = document.getElementById('createOutlineConfirm');
   const createCancel  = document.getElementById('createOutlineCancel');
 
+  const createFolderBtn = document.getElementById('createFolderBtn');
+
   const mergeBar      = document.getElementById('mergeBar');
   const mergeSrcName  = document.getElementById('mergeSourceName');
   const mergeTgtName  = document.getElementById('mergeTargetName');
@@ -52,43 +45,52 @@ export function setupSavedOutlines({
 
   // ---------- UI state ----------
   const expandedOutlines = new Set(); // outline ids expanded
+  const expandedFolders  = new Set(); // folder ids expanded
   const editingSections  = new Set(); // keys `${outlineId}|${sectionId}`
-  let draggingOutlineId  = null;      // for outline merge drag
+  let draggingOutlineId  = null;      // for outline merge or folder move
   let isMergeDrag        = false;
 
   // ---------- helpers ----------
   const escapeHtml = (s)=> (s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const byId  = (arr, id)=> (arr || []).find(x => x.id === id);
-  const keyOf = (oId, sId)=> `${oId}|${sId}`;
   const fmtMins = (n)=> String(Number(n || 0)).replace(/\.0+$/,'');
   const escSel = (s)=> (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/([ #;?%&,.+*~':"!^$[\]()=>|/@])/g, '\\$1');
   const debounce = (fn,ms=400)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
 
-  // Small utility to persist + optionally live-sync the active outline to Home
-  const getActiveId = ()=> (typeof getActiveOutlineId === 'function' ? getActiveOutlineId() : null);
-  function persist(changedOutlineId){
+  const isFolder = (it)=> it && it.type === 'folder';
+  const byIdDeep = (list, id)=>{
+    for(let i=0;i<(list||[]).length;i++){
+      const item = list[i];
+      if(!item) continue;
+      if(!isFolder(item) && item.id===id) return { type:'outline', parent:list, index:i, item };
+      if(isFolder(item)){
+        // a folder could also have same id, but we only search outlines here
+        const children = item.children || [];
+        for(let j=0;j<children.length;j++){
+          if(children[j]?.id===id) return { type:'outline', parent:children, index:j, item:children[j], folder:item };
+        }
+      }
+    }
+    return null;
+  };
+  const getList = ()=> (getSavedOutlines && getSavedOutlines()) || [];
+
+  const persist = (changedOutlineId)=>{
     if (typeof saveOutlinesLocal === 'function') saveOutlinesLocal();
     if (typeof renderHomeSavedBar === 'function') renderHomeSavedBar();
     if (typeof touchCloud === 'function') touchCloud();
 
-    const activeId = getActiveId?.();
+    // Live sync Saved → Home if the active outline changed
+    const activeId = (typeof getActiveOutlineId === 'function') ? getActiveOutlineId() : null;
     if (activeId && changedOutlineId && activeId === changedOutlineId && typeof syncCurrentFromSaved === 'function') {
-      const list = (getSavedOutlines && getSavedOutlines()) || [];
-      const o = list.find(x => x.id === activeId);
-      if (o) {
-        // Pass a clone so Home can rebuild without mutating our copy
-        syncCurrentFromSaved(structuredClone(o));
+      const list = getList();
+      // locate outline (possibly in folder)
+      const ref = byIdDeep(list, activeId);
+      if (ref?.item) {
+        syncCurrentFromSaved(structuredClone(ref.item));
       }
     }
-  }
+  };
 
-  function parsePayload(dt){
-    let str=''; const types = dt?.types ? Array.from(dt.types) : [];
-    if(types.includes('text/plain')) str = dt.getData('text/plain');
-    if(!str && types.includes('text')) str = dt.getData('text');
-    if(!str) str = dt.getData('application/json') || dt.getData('Text') || '';
-    try{ return JSON.parse(str); }catch{ return null; }
-  }
   function normalizeUrl(input){
     let u = (input || '').trim();
     if(!u) return '';
@@ -103,23 +105,12 @@ export function setupSavedOutlines({
     }
     return 'https://' + host + rest;
   }
-  function goHome(){
-    const tabBtn = document.querySelector('.tab-link[data-tab="homeTab"]');
-    if (tabBtn && typeof tabBtn.click === 'function') { tabBtn.click(); return; }
-    const cand = ['[data-tab="home"]','[data-route="home"]','[data-nav="home"]','a[href="#home"]','#navHome','#homeTab','#tab-home'];
-    for(const sel of cand){
-      const el = document.querySelector(sel);
-      if(el && typeof el.click==='function'){ el.click(); return; }
-    }
-    const home = document.getElementById('homeTab');
-    if (home) {
-      document.getElementById('savedTab')?.classList.add('hidden');
-      document.getElementById('helpTab')?.classList.add('hidden');
-      home.classList.remove('hidden');
-      home.scrollIntoView({ behavior:'smooth', block:'start' });
-      return;
-    }
-    if(location.hash !== '#home') location.hash = '#home';
+  function parsePayload(dt){
+    let str=''; const types = dt?.types ? Array.from(dt.types) : [];
+    if(types.includes('text/plain')) str = dt.getData('text/plain');
+    if(!str && types.includes('text')) str = dt.getData('text');
+    if(!str) str = dt.getData('application/json') || dt.getData('Text') || '';
+    try{ return JSON.parse(str); }catch{ return null; }
   }
 
   // ---------- small modals ----------
@@ -332,7 +323,7 @@ export function setupSavedOutlines({
         ${isExpanded ? `
           <ul class="mt-3" data-role="sections">
             ${(o.sections||[]).map(s=>{
-              const k = keyOf(o.id, s.id);
+              const k = o.id + '|' + s.id;
               return editingSections.has(k)
                 ? `<li class="outline-row editing" data-sid="${escapeHtml(s.id)}" data-view="edit">${sectionEditCardInnerHtml(s)}</li>`
                 : sectionPreviewRowHtml(s);
@@ -341,427 +332,565 @@ export function setupSavedOutlines({
       </div>`;
   }
 
+  function folderCardHtml(f, isExpanded){
+    const chevron = isExpanded ? '▾' : '▸';
+    return `
+      <div class="card p-4 folder-card" data-fid="${escapeHtml(f.id)}">
+        <div class="flex items-center gap-2" data-role="folder-head">
+          <div class="flex-1 font-bold text-lg truncate" data-role="folder-title">${escapeHtml(f.title || 'New folder')}</div>
+          <button class="btn-xs" data-act="add-outline">+ Outline</button>
+          <button class="btn-xs" data-act="rename-folder">Rename</button>
+          <button class="btn-xs" data-act="delete-folder">Delete</button>
+          <button class="btn-xxs" data-act="toggle-folder" aria-expanded="${isExpanded ? 'true':'false'}" title="${isExpanded?'Collapse':'Expand'}">${chevron}</button>
+        </div>
+        <div class="text-xs muted mt-1">Drag outlines onto this card to move them into the folder.</div>
+        ${isExpanded ? `
+          <div class="mt-3" data-role="folder-body">
+            ${(f.children||[]).map(child=> outlineCardHtml(child, expandedOutlines.has(child.id))).join('')}
+          </div>` : ''}
+      </div>`;
+  }
+
   // ---------- renderer ----------
   function renderSavedOutlines(){
     if(!savedListEl) return;
-    const outlines = getSavedOutlines() || [];
-    savedListEl.innerHTML = outlines.map(o => outlineCardHtml(o, expandedOutlines.has(o.id))).join('');
+    const outlinesOrFolders = getList();
+    savedListEl.innerHTML = (outlinesOrFolders||[]).map(item=>{
+      if(isFolder(item)){
+        return folderCardHtml(item, expandedFolders.has(item.id));
+      } else {
+        return outlineCardHtml(item, expandedOutlines.has(item.id));
+      }
+    }).join('');
 
-    // Wire each outline card
-    outlines.forEach(o=>{
-      const card = savedListEl.querySelector(`[data-oid="${escSel(o.id)}"]`);
+    // Wire folder cards
+    (outlinesOrFolders||[]).forEach(item=>{
+      if(!isFolder(item)) return;
+      const card = savedListEl.querySelector(`[data-fid="${escSel(item.id)}"]`);
       if(!card) return;
 
       // Header actions
-      card.querySelector('[data-act="load"]')?.addEventListener('click', ()=>{
-        applyOutline && applyOutline(o);
-        goHome();
-      });
-      card.querySelector('[data-act="duplicate"]')?.addEventListener('click', ()=>{
-        const list = getSavedOutlines() || [];
-        const src  = byId(list, o.id); if(!src) return;
-        const copy = structuredClone(src);
-        copy.id = 'O'+Date.now().toString(36);
-        copy.title = prompt('Duplicate title:', `Copy of ${src.title || 'Outline'}`)?.trim() || `Copy of ${src.title || 'Outline'}`;
-        copy.sections = (copy.sections||[]).map((s, i)=> ({...s, id: 'S'+Date.now().toString(36)+i}));
-        list.push(copy);
-        setSavedOutlines(list);
-        // (No sync needed: duplicating doesn't touch the active outline)
-        if (typeof saveOutlinesLocal === 'function') saveOutlinesLocal();
-        if (typeof renderHomeSavedBar === 'function') renderHomeSavedBar();
-        if (typeof touchCloud === 'function') touchCloud();
+      card.querySelector('[data-act="toggle-folder"]')?.addEventListener('click', ()=>{
+        if(expandedFolders.has(item.id)) expandedFolders.delete(item.id);
+        else expandedFolders.add(item.id);
         renderSavedOutlines();
       });
-      card.querySelector('[data-act="delete"]')?.addEventListener('click', ()=>{
-        if(!confirm('Delete this outline?')) return;
-        const list = getSavedOutlines() || [];
-        const idx = list.findIndex(x=>x.id===o.id);
+      card.querySelector('[data-act="rename-folder"]')?.addEventListener('click', ()=>{
+        const t = prompt('Folder name:', item.title||'New folder');
+        if(t==null) return;
+        item.title = t.trim() || 'Untitled folder';
+        setSavedOutlines(outlinesOrFolders);
+        saveOutlinesLocal?.(); renderHomeSavedBar?.(); touchCloud?.();
+        renderSavedOutlines();
+      });
+      card.querySelector('[data-act="delete-folder"]')?.addEventListener('click', ()=>{
+        if(!confirm('Delete this folder? (Outlines inside will move to root.)')) return;
+        const idx = outlinesOrFolders.findIndex(x=>x?.id===item.id);
         if(idx>=0){
-          const deletingActive = getActiveId?.() === o.id;
-          list.splice(idx,1);
-          setSavedOutlines(list);
-          // If we just deleted the active outline, we still just persist; Home will keep its current session until user loads another.
-          if (typeof saveOutlinesLocal === 'function') saveOutlinesLocal();
-          if (typeof renderHomeSavedBar === 'function') renderHomeSavedBar();
-          if (typeof touchCloud === 'function') touchCloud();
+          // move children to root
+          const children = (item.children||[]);
+          outlinesOrFolders.splice(idx,1);
+          children.forEach(c=> outlinesOrFolders.push(c));
+          setSavedOutlines(outlinesOrFolders);
+          saveOutlinesLocal?.(); renderHomeSavedBar?.(); touchCloud?.();
           renderSavedOutlines();
         }
       });
-      card.querySelector('[data-act="toggle-expand"]')?.addEventListener('click', ()=>{
-        if(expandedOutlines.has(o.id)) expandedOutlines.delete(o.id);
-        else expandedOutlines.add(o.id);
+      card.querySelector('[data-act="add-outline"]')?.addEventListener('click', ()=>{
+        const t = prompt('Outline title:', 'New outline');
+        const child = { id:'O'+Date.now().toString(36), title:(t||'New outline'), sections:[] };
+        item.children = item.children || [];
+        item.children.push(child);
+        setSavedOutlines(outlinesOrFolders);
+        saveOutlinesLocal?.(); renderHomeSavedBar?.(); touchCloud?.();
+        expandedFolders.add(item.id);
         renderSavedOutlines();
       });
-      card.querySelector('[data-act="add-section"]')?.addEventListener('click', ()=>{
-        openSectionCreateModal(({title, minutes})=>{
-          const list = getSavedOutlines() || [];
-          const me   = byId(list, o.id); if(!me) return;
-          me.sections = me.sections || [];
-          me.sections.push({ id:'S'+Date.now().toString(36), name:title, minutes, desc:'', links:[] });
-          setSavedOutlines(list);
-          persist(o.id); // SYNC if active
-          expandedOutlines.add(o.id);
-          renderSavedOutlines();
-        });
+
+      // Card is a drop target for moving outlines into folder
+      const onOverCard = (e)=>{
+        if(draggingOutlineId){ e.preventDefault(); card.style.outline='2px dashed var(--accent)'; card.style.outlineOffset='4px'; }
+      };
+      const onLeaveCard = ()=>{ card.style.outline=''; card.style.outlineOffset=''; };
+      const onDropCard = (e)=>{
+        card.style.outline=''; card.style.outlineOffset='';
+        if(!draggingOutlineId) return;
+        e.preventDefault();
+        const list = getList();
+        const ref = byIdDeep(list, draggingOutlineId);
+        if(!ref?.item) return;
+        // remove from old parent
+        ref.parent.splice(ref.index,1);
+        // add to folder
+        item.children = item.children || [];
+        item.children.push(ref.item);
+        setSavedOutlines(list);
+        saveOutlinesLocal?.(); renderHomeSavedBar?.(); touchCloud?.();
+        expandedFolders.add(item.id);
+        renderSavedOutlines();
+      };
+      card.addEventListener('dragover', onOverCard, true);
+      card.addEventListener('dragleave', onLeaveCard, true);
+      card.addEventListener('drop', onDropCard, true);
+
+      // Wire nested outline cards inside folder (if expanded)
+      if(!expandedFolders.has(item.id)) return;
+      const body = card.querySelector('[data-role="folder-body"]');
+      if(!body) return;
+      (item.children||[]).forEach(child=>{
+        wireOutlineCard(body, child, item);
+      });
+    });
+
+    // Wire root-level outline cards
+    (outlinesOrFolders||[]).forEach(item=>{
+      if(isFolder(item)) return;
+      wireOutlineCard(savedListEl, item, null);
+    });
+  }
+
+  function wireOutlineCard(container, o, parentFolder){
+    const card = container.querySelector(`[data-oid="${escSel(o.id)}"]`);
+    if(!card) return;
+
+    // Header actions
+    card.querySelector('[data-act="load"]')?.addEventListener('click', ()=>{
+      applyOutline && applyOutline(o);
+      goHome();
+    });
+    card.querySelector('[data-act="duplicate"]')?.addEventListener('click', ()=>{
+      const list = getList();
+      const copy = structuredClone(o);
+      copy.id = 'O'+Date.now().toString(36);
+      copy.title = prompt('Duplicate title:', `Copy of ${o.title || 'Outline'}`)?.trim() || `Copy of ${o.title || 'Outline'}`;
+      copy.sections = (copy.sections||[]).map((s, i)=> ({...s, id: 'S'+Date.now().toString(36)+i}));
+      if(parentFolder){
+        parentFolder.children = parentFolder.children || [];
+        parentFolder.children.push(copy);
+      }else{
+        list.push(copy);
+      }
+      setSavedOutlines(list);
+      saveOutlinesLocal?.(); renderHomeSavedBar?.(); touchCloud?.();
+      renderSavedOutlines();
+    });
+    card.querySelector('[data-act="delete"]')?.addEventListener('click', ()=>{
+      if(!confirm('Delete this outline?')) return;
+      const list = getList();
+      if(parentFolder){
+        const idx = (parentFolder.children||[]).findIndex(x=>x.id===o.id);
+        if(idx>=0) parentFolder.children.splice(idx,1);
+      }else{
+        const idx = list.findIndex(x=>x?.id===o.id);
+        if(idx>=0) list.splice(idx,1);
+      }
+      setSavedOutlines(list);
+      saveOutlinesLocal?.(); renderHomeSavedBar?.(); touchCloud?.();
+      renderSavedOutlines();
+    });
+    card.querySelector('[data-act="toggle-expand"]')?.addEventListener('click', ()=>{
+      if(expandedOutlines.has(o.id)) expandedOutlines.delete(o.id);
+      else expandedOutlines.add(o.id);
+      renderSavedOutlines();
+    });
+    card.querySelector('[data-act="add-section"]')?.addEventListener('click', ()=>{
+      openSectionCreateModal(({title, minutes})=>{
+        const list = getList();
+        const ref = byIdDeep(list, o.id);
+        if(!ref?.item) return;
+        ref.item.sections = ref.item.sections || [];
+        ref.item.sections.push({ id:'S'+Date.now().toString(36), name:title, minutes, desc:'', links:[] });
+        setSavedOutlines(list);
+        persist(o.id); // sync to Home if active
+        expandedOutlines.add(o.id);
+        renderSavedOutlines();
+      });
+    });
+
+    // Drag-to-merge using outline title drag
+    const titleEl = card.querySelector('[data-role="outline-title"]');
+    if(titleEl){
+      titleEl.setAttribute('draggable','true');
+      titleEl.addEventListener('dragstart', (e)=>{
+        draggingOutlineId = o.id;
+        isMergeDrag = true;
+        document.body.classList.add('is-merge-drag');
+        try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'merge', id:o.id})); }catch{}
+        e.dataTransfer.effectAllowed='move';
+        card.classList.add('drag-ghost');
+      });
+      titleEl.addEventListener('dragend', ()=>{
+        draggingOutlineId = null;
+        isMergeDrag = false;
+        document.body.classList.remove('is-merge-drag');
+        card.classList.remove('drag-ghost');
+        document.querySelectorAll('[data-oid]').forEach(el=>{ el.style.outline=''; el.style.outlineOffset=''; });
       });
 
-      // Drag-to-merge (title draggable; drop anywhere on another card)
-      const titleEl = card.querySelector('[data-role="outline-title"]');
-      if(titleEl){
-        titleEl.setAttribute('draggable','true');
-        titleEl.addEventListener('dragstart', (e)=>{
-          draggingOutlineId = o.id;
-          isMergeDrag = true;
-          document.body.classList.add('is-merge-drag');
-          try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'merge', id:o.id})); }catch{}
-          e.dataTransfer.effectAllowed='move';
-          card.classList.add('drag-ghost');
-        });
-        titleEl.addEventListener('dragend', ()=>{
-          draggingOutlineId = null;
-          isMergeDrag = false;
-          document.body.classList.remove('is-merge-drag');
-          card.classList.remove('drag-ghost');
-          document.querySelectorAll('[data-oid]').forEach(el=>{ el.style.outline=''; el.style.outlineOffset=''; });
-        });
+      const onDragOverCard = (e)=>{
+        const incoming = draggingOutlineId;
+        if(incoming && incoming !== o.id){
+          e.preventDefault(); // allow drop for merge
+          card.style.outline='2px dashed var(--accent)'; card.style.outlineOffset='4px';
+        }
+      };
+      const onDragLeaveCard = ()=>{
+        card.style.outline=''; card.style.outlineOffset='';
+      };
+      const onDropCard = (e)=>{
+        card.style.outline=''; card.style.outlineOffset='';
+        if(!draggingOutlineId || draggingOutlineId===o.id) return;
+        e.preventDefault();
 
-        // Make the entire card a permissive drop target for merging
-        const onDragOverCard = (e)=>{
-          const incoming = draggingOutlineId;
-          if(incoming && incoming !== o.id){
-            e.preventDefault(); // allow drop
-            card.style.outline='2px dashed var(--accent)'; card.style.outlineOffset='4px';
-          }
-        };
-        const onDragLeaveCard = ()=>{
-          card.style.outline=''; card.style.outlineOffset='';
-        };
-        const onDropCard = (e)=>{
-          card.style.outline=''; card.style.outlineOffset='';
-          if(!draggingOutlineId || draggingOutlineId===o.id) return;
-          e.preventDefault();
+        const list = getList();
+        const srcRef = byIdDeep(list, draggingOutlineId);
+        const tgtRef = byIdDeep(list, o.id);
+        const src = srcRef?.item, tgt = tgtRef?.item;
+        if(!src || !tgt) return;
 
-          const list = getSavedOutlines() || [];
-          const src = byId(list, draggingOutlineId);
-          const tgt = o;
-          if(!src || !tgt) return;
-
-          if(mergeBar){
-            mergeBar.style.display='block';
-            if(mergeSrcName)  mergeSrcName.textContent  = src.title || 'Untitled';
-            if(mergeTgtName)  mergeTgtName.textContent  = tgt.title || 'Untitled';
-            if(mergeTitleInp) mergeTitleInp.value = `${tgt.title||'Untitled'} + ${src.title||'Untitled'}`;
-            mergeConfirm.onclick = ()=>{
-              const merged = {
-                id:'O'+Date.now().toString(36),
-                title:(mergeTitleInp?.value || '').trim() || `${tgt.title||''} + ${src.title||''}`,
-                sections:[...(tgt.sections||[]).map(s=>structuredClone(s)), ...(src.sections||[]).map(s=>structuredClone(s))]
-              };
-              list.push(merged);
-              setSavedOutlines(list);
-              if (typeof saveOutlinesLocal === 'function') saveOutlinesLocal();
-              if (typeof renderHomeSavedBar === 'function') renderHomeSavedBar();
-              if (typeof touchCloud === 'function') touchCloud();
-              mergeBar.style.display='none';
-              renderSavedOutlines();
+        if(mergeBar){
+          mergeBar.style.display='block';
+          if(mergeSrcName)  mergeSrcName.textContent  = src.title || 'Untitled';
+          if(mergeTgtName)  mergeTgtName.textContent  = tgt.title || 'Untitled';
+          if(mergeTitleInp) mergeTitleInp.value = `${tgt.title||'Untitled'} + ${src.title||'Untitled'}`;
+          mergeConfirm.onclick = ()=>{
+            const merged = {
+              id:'O'+Date.now().toString(36),
+              title:(mergeTitleInp?.value || '').trim() || `${tgt.title||''} + ${src.title||''}`,
+              sections:[...(tgt.sections||[]).map(s=>structuredClone(s)), ...(src.sections||[]).map(s=>structuredClone(s))]
             };
-            mergeCancel.onclick = ()=>{ mergeBar.style.display='none'; };
-          }
-        };
-
-        // Use capture = true so children (buttons) can’t swallow the events
-        card.addEventListener('dragover', onDragOverCard, true);
-        card.addEventListener('dragleave', onDragLeaveCard, true);
-        card.addEventListener('drop', onDropCard, true);
-      }
-
-      // Sections wiring (only if expanded)
-      if(!expandedOutlines.has(o.id)) return;
-      const sectionsList = card.querySelector('[data-role="sections"]');
-      if(!sectionsList) return;
-
-      // --- Subsection reorder (exact Home logic) ---
-      let dragging = null; // { from, el, placeholder }
-      const makePh = (h, titleText)=>{ 
-        const ph = document.createElement('li'); 
-        ph.className='outline-row drop-placeholder'; 
-        ph.style.setProperty('--ph', `${Math.max(36,h)}px`); 
-        ph.innerHTML = `<div class="text-xs muted px-2 truncate">${escapeHtml(titleText||'')}</div>`; 
-        return ph; 
+            if(tgtRef.folder){
+              tgtRef.folder.children = tgtRef.folder.children || [];
+              tgtRef.folder.children.push(merged);
+            }else{
+              list.push(merged);
+            }
+            setSavedOutlines(list);
+            saveOutlinesLocal?.(); renderHomeSavedBar?.(); touchCloud?.();
+            mergeBar.style.display='none';
+            renderSavedOutlines();
+          };
+          mergeCancel.onclick = ()=>{ mergeBar.style.display='none'; };
+        }
       };
 
-      // Per-row wiring
-      sectionsList.querySelectorAll('li.section-row[data-sid]').forEach((li, idx)=>{
-        // Select row → open inline editor (ignore bin)
-        li.addEventListener('click', (e)=>{
-          if(e.target.closest('[data-act="del-sec"], .link-card, .bin, input, textarea, select, button')) return;
-          editingSections.add(keyOf(o.id, li.dataset.sid));
-          renderSavedOutlines();
-        });
+      // Use capture = true so children (buttons) can’t swallow the events
+      card.addEventListener('dragover', onDragOverCard, true);
+      card.addEventListener('dragleave', onDragLeaveCard, true);
+      card.addEventListener('drop', onDropCard, true);
+    }
 
-        // Delete
-        li.querySelector('[data-act="del-sec"]')?.addEventListener('click', (e)=>{
-          e.stopPropagation();
-          const list = getSavedOutlines() || [];
-          const me   = byId(list, o.id); if(!me) return;
-          const sidx = me.sections.findIndex(se => se.id === li.dataset.sid);
-          if(sidx>=0 && confirm('Delete this section?')){
-            me.sections.splice(sidx,1);
+    // Sections wiring (only if expanded)
+    if(!expandedOutlines.has(o.id)) return;
+    const sectionsList = card.querySelector('[data-role="sections"]');
+    if(!sectionsList) return;
+
+    // --- Subsection reorder (Home-like) ---
+    let dragging = null; // { from, el, placeholder }
+    const makePh = (h, titleText)=>{ 
+      const ph = document.createElement('li'); 
+      ph.className='outline-row drop-placeholder'; 
+      ph.style.setProperty('--ph', `${Math.max(36,h)}px`); 
+      ph.innerHTML = `<div class="text-xs muted px-2 truncate">${escapeHtml(titleText||'')}</div>`; 
+      return ph; 
+    };
+
+    // Per-row wiring
+    sectionsList.querySelectorAll('li.section-row[data-sid]').forEach((li, idx)=>{
+      // Select row → open inline editor (ignore bin)
+      li.addEventListener('click', (e)=>{
+        if(e.target.closest('[data-act="del-sec"], .link-card, .bin, input, textarea, select, button')) return;
+        editingSections.add(o.id + '|' + li.dataset.sid);
+        renderSavedOutlines();
+      });
+
+      // Delete
+      li.querySelector('[data-act="del-sec"]')?.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const list = getList();
+        const ref  = byIdDeep(list, o.id); if(!ref?.item) return;
+        const sidx = ref.item.sections.findIndex(se => se.id === li.dataset.sid);
+        if(sidx>=0 && confirm('Delete this section?')){
+          ref.item.sections.splice(sidx,1);
+          setSavedOutlines(list);
+          persist(o.id); // sync to Home if active
+          renderSavedOutlines();
+        }
+      });
+
+      // DnD: drag the row
+      li.addEventListener('dragstart', (e)=>{
+        if(li.classList.contains('editing')){ e.preventDefault(); return; }
+        const titleText = (li.querySelector('.title')?.textContent || '').trim();
+        dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) };
+        li.classList.add('dragging');
+        li.after(dragging.placeholder);
+        try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'sec-move', from: idx, oid:o.id})); }catch{}
+        e.dataTransfer.effectAllowed='move';
+      });
+      li.addEventListener('dragend', ()=>{
+        li.classList.remove('dragging');
+        dragging?.placeholder?.remove();
+        dragging = null;
+      });
+
+      // Reposition placeholder when hovering other rows
+      const over = (e)=>{
+        if(!dragging) return;
+        e.preventDefault();
+        const r = li.getBoundingClientRect();
+        const before = e.clientY < (r.top + r.height/2);
+        const ph = dragging.placeholder;
+        if(!ph) return;
+        if(before){
+          if(li.previousSibling !== ph) li.parentElement.insertBefore(ph, li);
+        }else{
+          if(li.nextSibling !== ph) li.after(ph);
+        }
+      };
+      li.addEventListener('dragover', over);
+      li.addEventListener('dragenter', over);
+    });
+
+    // Container allows dropping anywhere (including end)
+    sectionsList.addEventListener('dragover', (e)=>{
+      if(!dragging) return;
+      e.preventDefault();
+      if(!sectionsList.contains(dragging.placeholder)) sectionsList.appendChild(dragging.placeholder);
+    });
+
+    sectionsList.addEventListener('drop', (e)=>{
+      if(!dragging) return;
+      e.preventDefault();
+      const from = dragging.from;
+
+      const rows = Array.from(sectionsList.querySelectorAll('li.outline-row'));
+      const phIndex = rows.indexOf(dragging.placeholder);
+      const to = phIndex < 0 ? rows.length-1 : phIndex;
+
+      const finalTo = (to > from) ? to - 1 : to;
+
+      if(from !== finalTo && from >= 0 && finalTo >= 0){
+        const list = getList();
+        const ref  = byIdDeep(list, o.id); if(!ref?.item) return;
+
+        const [moved] = ref.item.sections.splice(from,1);
+        ref.item.sections.splice(finalTo,0,moved);
+
+        setSavedOutlines(list);
+        persist(o.id); // sync to Home if active
+      }
+
+      dragging?.placeholder?.remove();
+      dragging = null;
+      renderSavedOutlines();
+    });
+
+    // ---- Wire edit cards inside <li class="outline-row editing"> ----
+    (o.sections || []).forEach(sec=>{
+      const secKey = o.id + '|' + sec.id;
+      if(!editingSections.has(secKey)) return;
+      const li = sectionsList.querySelector(`li.editing[data-sid="${escSel(sec.id)}"]`);
+      if(!li) return;
+
+      const secEl = li.querySelector('.section-edit');
+      const linksBar = secEl?.querySelector('[data-role="links-bar"]');
+      if (linksBar) linksBar.innerHTML = linksBarInnerHtml(sec.links || []);
+
+      // Save button (title, minutes, desc)
+      secEl?.querySelector('[data-act="save-section"]')?.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        const list = getList();
+        const ref  = byIdDeep(list, o.id); if(!ref?.item) return;
+        const s    = ref.item.sections?.find(x=>x.id===sec.id); if(!s) return;
+        const titleEl = secEl.querySelector('[data-role="edit-title"]');
+        const descEl  = secEl.querySelector('[data-role="edit-desc"]');
+        const minsEl  = secEl.querySelector('[data-role="edit-mins"]');
+        s.name    = titleEl ? (titleEl.value || 'Untitled section') : s.name;
+        s.desc    = descEl ? descEl.value : s.desc;
+        s.minutes = minsEl ? Math.max(0.25, Number(minsEl.value || 0)) : s.minutes;
+        setSavedOutlines(list);
+        persist(o.id); // SYNC if active
+        editingSections.delete(secKey);
+        renderSavedOutlines();
+      });
+
+      // Debounced description autosave (live sync while editing) + auto-grow
+      const descEl = secEl?.querySelector('[data-role="edit-desc"]');
+      const autoGrow = (ta)=>{
+        if(!ta) return;
+        ta.style.height='auto';
+        ta.style.height=Math.min(240, ta.scrollHeight) + 'px';
+      };
+      if (descEl) {
+        autoGrow(descEl);
+        const autoSaveDesc = debounce(()=>{
+          const list = getList();
+          const ref  = byIdDeep(list, o.id); if(!ref?.item) return;
+          const s    = ref.item.sections?.find(x=>x.id===sec.id); if(!s) return;
+          s.desc = descEl.value;
+          setSavedOutlines(list);
+          persist(o.id); // SYNC if active
+        }, 400);
+        descEl.addEventListener('input', ()=>{ autoGrow(descEl); autoSaveDesc(); });
+      }
+
+      // Links bar DnD (copy from shelf + reorder)
+      if(linksBar){
+        let over=0;
+        linksBar.addEventListener('dragenter', ()=>{ over++; linksBar.classList.add('drag-over-outline'); });
+        linksBar.addEventListener('dragleave', ()=>{ over=Math.max(0,over-1); if(!over) linksBar.classList.remove('drag-over-outline'); });
+        linksBar.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+        linksBar.addEventListener('drop', (e)=>{
+          e.preventDefault(); over=0; linksBar.classList.remove('drag-over-outline');
+          const payload = parsePayload(e.dataTransfer);
+          const list = getList();
+          const ref  = byIdDeep(list, o.id); if(!ref?.item) return;
+          const s    = ref.item.sections?.find(x=>x.id===sec.id); if(!s) return;
+          s.links = s.links || [];
+          if(payload?.type==='shelf'){
+            const shelf = (getWidgetShelf && getWidgetShelf()) || [];
+            const w = shelf.find(x=>x.id===payload.id);
+            if(!w) return;
+            s.links.push({ id:'l'+Date.now().toString(36), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
+            setSavedOutlines(list);
+            persist(o.id); // SYNC if active
+            renderSavedOutlines();
+          }else if(payload?.type==='reorder'){
+            const from = payload.index;
+            const cards = [...linksBar.querySelectorAll('.section-link')];
+            let to = cards.length;
+            for(let i=0;i<cards.length;i++){
+              const r = cards[i].getBoundingClientRect();
+              if(e.clientY < r.top + r.height/2){ to=i; break; }
+            }
+            if(from==null || to==null || from===to) return;
+            const [moved] = s.links.splice(from,1);
+            s.links.splice(to,0,moved);
             setSavedOutlines(list);
             persist(o.id); // SYNC if active
             renderSavedOutlines();
           }
         });
 
-        // DnD: drag the row
-        li.addEventListener('dragstart', (e)=>{
-          if(li.classList.contains('editing')){ e.preventDefault(); return; }
-          const titleText = (li.querySelector('.title')?.textContent || '').trim();
-          dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) };
-          li.classList.add('dragging');
-          li.after(dragging.placeholder);
-          try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'sec-move', from: idx, oid:o.id})); }catch{}
-          e.dataTransfer.effectAllowed='move';
-        });
-        li.addEventListener('dragend', ()=>{
-          li.classList.remove('dragging');
-          dragging?.placeholder?.remove();
-          dragging = null;
-        });
-
-        // Reposition placeholder when hovering other rows
-        const over = (e)=>{
-          if(!dragging) return;
-          e.preventDefault();
-          const r = li.getBoundingClientRect();
-          const before = e.clientY < (r.top + r.height/2);
-          const ph = dragging.placeholder;
-          if(!ph) return;
-          if(before){
-            if(li.previousSibling !== ph) li.parentElement.insertBefore(ph, li);
-          }else{
-            if(li.nextSibling !== ph) li.after(ph);
-          }
-        };
-        li.addEventListener('dragover', over);
-        li.addEventListener('dragenter', over);
-      });
-
-      // Container allows dropping anywhere (including end)
-      sectionsList.addEventListener('dragover', (e)=>{
-        if(!dragging) return;
-        e.preventDefault();
-        if(!sectionsList.contains(dragging.placeholder)) sectionsList.appendChild(dragging.placeholder);
-      });
-
-      sectionsList.addEventListener('drop', (e)=>{
-        if(!dragging) return;
-        e.preventDefault();
-        const from = dragging.from;
-
-        const rows = Array.from(sectionsList.querySelectorAll('li.outline-row'));
-        const phIndex = rows.indexOf(dragging.placeholder);
-        const to = phIndex < 0 ? rows.length-1 : phIndex;
-
-        const finalTo = (to > from) ? to - 1 : to;
-
-        if(from !== finalTo && from >= 0 && finalTo >= 0){
-          const list = getSavedOutlines() || [];
-          const me   = byId(list, o.id); if(!me) return;
-
-          const [moved] = me.sections.splice(from,1);
-          me.sections.splice(finalTo,0,moved);
-
-          setSavedOutlines(list);
-          persist(o.id); // SYNC if active
-        }
-
-        dragging?.placeholder?.remove();
-        dragging = null;
-        renderSavedOutlines();
-      });
-
-      // ---- Wire edit cards inside <li class="outline-row editing"> ----
-      (o.sections || []).forEach(sec=>{
-        const secKey = keyOf(o.id, sec.id);
-        if(!editingSections.has(secKey)) return;
-        const li = sectionsList.querySelector(`li.editing[data-sid="${escSel(sec.id)}"]`);
-        if(!li) return;
-
-        const secEl = li.querySelector('.section-edit');
-        const linksBar = secEl?.querySelector('[data-role="links-bar"]');
-        if (linksBar) linksBar.innerHTML = linksBarInnerHtml(sec.links || []);
-
-        // Save button (title, minutes, desc)
-        secEl?.querySelector('[data-act="save-section"]')?.addEventListener('click', (ev)=>{
-          ev.stopPropagation();
-          const list = getSavedOutlines() || [];
-          const me   = byId(list, o.id); if(!me) return;
-          const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
-          const titleEl = secEl.querySelector('[data-role="edit-title"]');
-          const descEl  = secEl.querySelector('[data-role="edit-desc"]');
-          const minsEl  = secEl.querySelector('[data-role="edit-mins"]');
-          s.name    = titleEl ? (titleEl.value || 'Untitled section') : s.name;
-          s.desc    = descEl ? descEl.value : s.desc;
-          s.minutes = minsEl ? Math.max(0.25, Number(minsEl.value || 0)) : s.minutes;
-          setSavedOutlines(list);
-          persist(o.id); // SYNC if active
-          editingSections.delete(secKey);
-          renderSavedOutlines();
-        });
-
-        // Debounced description autosave (live sync while editing)
-        const descEl = secEl?.querySelector('[data-role="edit-desc"]');
-        if (descEl) {
-          const autoSaveDesc = debounce(()=>{
-            const list = getSavedOutlines() || [];
-            const me   = byId(list, o.id); if(!me) return;
-            const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
-            s.desc = descEl.value;
-            setSavedOutlines(list);
-            persist(o.id); // SYNC if active
-          }, 400);
-          descEl.addEventListener('input', autoSaveDesc);
-        }
-
-        // Links bar DnD (copy from shelf + reorder)
-        if(linksBar){
-          let over=0;
-          linksBar.addEventListener('dragenter', ()=>{ over++; linksBar.classList.add('drag-over-outline'); });
-          linksBar.addEventListener('dragleave', ()=>{ over=Math.max(0,over-1); if(!over) linksBar.classList.remove('drag-over-outline'); });
-          linksBar.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
-          linksBar.addEventListener('drop', (e)=>{
-            e.preventDefault(); over=0; linksBar.classList.remove('drag-over-outline');
-            const payload = parsePayload(e.dataTransfer);
-            const list = getSavedOutlines() || [];
-            const me   = byId(list, o.id); if(!me) return;
-            const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
-            s.links = s.links || [];
-            if(payload?.type==='shelf'){
-              const shelf = (getWidgetShelf && getWidgetShelf()) || [];
-              const w = shelf.find(x=>x.id===payload.id);
-              if(!w) return;
-              s.links.push({ id:'l'+Date.now().toString(36), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
+        // link pill: reorder + edit + delete
+        linksBar.querySelectorAll('.section-link').forEach(pill=>{
+          pill.addEventListener('dragstart', (e)=>{
+            const index = Number(pill.dataset.idx);
+            try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'reorder', index})); }catch{}
+            e.dataTransfer.effectAllowed='move';
+            pill.classList.add('drag-ghost');
+          });
+          pill.addEventListener('dragend', ()=> pill.classList.remove('drag-ghost'));
+          pill.addEventListener('click', (e)=>{
+            e.stopPropagation();
+            const list = getList();
+            const ref  = byIdDeep(list, o.id); if(!ref?.item) return;
+            const s    = ref.item.sections?.find(x=>x.id===sec.id); if(!s) return;
+            const i    = Number(pill.dataset.idx);
+            const w    = s.links?.[i]; if(!w) return;
+            openWidgetEditor(w, (upd)=>{ 
+              upd.url = normalizeUrl(upd.url);
+              Object.assign(w, upd); 
               setSavedOutlines(list);
               persist(o.id); // SYNC if active
-              renderSavedOutlines();
-            }else if(payload?.type==='reorder'){
-              const from = payload.index;
-              const cards = [...linksBar.querySelectorAll('.section-link')];
-              let to = cards.length;
-              for(let i=0;i<cards.length;i++){
-                const r = cards[i].getBoundingClientRect();
-                if(e.clientY < r.top + r.height/2){ to=i; break; }
-              }
-              if(from==null || to==null || from===to) return;
-              const [moved] = s.links.splice(from,1);
-              s.links.splice(to,0,moved);
-              setSavedOutlines(list);
-              persist(o.id); // SYNC if active
-              renderSavedOutlines();
+              renderSavedOutlines(); 
+            });
+          });
+        });
+        linksBar.querySelectorAll('[data-act="del-link"]').forEach(bin=>{
+          bin.addEventListener('click', (e)=>{
+            e.stopPropagation();
+            const list = getList();
+            const ref  = byIdDeep(list, o.id); if(!ref?.item) return;
+            const s    = ref.item.sections?.find(x=>x.id===sec.id); if(!s) return;
+            const pill = bin.closest('.widget')?.querySelector('.section-link');
+            const i    = Number(pill?.dataset.idx ?? -1);
+            if(i>=0){ s.links.splice(i,1); setSavedOutlines(list); persist(o.id); renderSavedOutlines(); }
+          });
+        });
+      }
+
+      // Inline shelf actions (drag & edit & delete + ADD)
+      const shelfWrap = secEl?.querySelector('[data-role="inline-shelf"]');
+      if(shelfWrap){
+        shelfWrap.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=>{
+          if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
+          const shelf = (getWidgetShelf && getWidgetShelf()) || [];
+          const wid = 'W'+Date.now().toString(36);
+          const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
+          setWidgetShelf([...shelf, placeholder]);
+          const onCancel = ()=>{
+            const s2 = (getWidgetShelf && getWidgetShelf()) || [];
+            const i  = s2.findIndex(x=>x.id===wid);
+            if(i>=0){ s2.splice(i,1); setWidgetShelf([...s2]); }
+            renderSavedOutlines();
+          };
+          openWidgetEditor(placeholder, (upd)=>{
+            const s2 = (getWidgetShelf && getWidgetShelf()) || [];
+            const it = s2.find(x=>x.id===wid);
+            if(it){
+              upd.url = normalizeUrl(upd.url);
+              Object.assign(it, upd);
+              setWidgetShelf([...s2]);
             }
-          });
+            renderSavedOutlines();
+          }, onCancel);
+        });
 
-          // link pill: reorder + edit + delete
-          linksBar.querySelectorAll('.section-link').forEach(pill=>{
-            pill.addEventListener('dragstart', (e)=>{
-              const index = Number(pill.dataset.idx);
-              try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'reorder', index})); }catch{}
-              e.dataTransfer.effectAllowed='move';
-              pill.classList.add('drag-ghost');
-            });
-            pill.addEventListener('dragend', ()=> pill.classList.remove('drag-ghost'));
-            pill.addEventListener('click', (e)=>{
-              e.stopPropagation();
-              const list = getSavedOutlines() || [];
-              const me   = byId(list, o.id); if(!me) return;
-              const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
-              const i    = Number(pill.dataset.idx);
-              const w    = s.links?.[i]; if(!w) return;
-              openWidgetEditor(w, (upd)=>{ 
-                upd.url = normalizeUrl(upd.url);
-                Object.assign(w, upd); 
-                setSavedOutlines(list);
-                persist(o.id); // SYNC if active
-                renderSavedOutlines(); 
-              });
-            });
+        // draggable shelf cards
+        shelfWrap.querySelectorAll('.draggable-shelf').forEach(card=>{
+          card.addEventListener('dragstart', (e)=>{
+            const id = card.dataset.wid;
+            try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'shelf', id})); }catch{}
+            e.dataTransfer.effectAllowed='copy';
+            card.classList.add('drag-ghost');
           });
-          linksBar.querySelectorAll('[data-act="del-link"]').forEach(bin=>{
-            bin.addEventListener('click', (e)=>{
-              e.stopPropagation();
-              const list = getSavedOutlines() || [];
-              const me   = byId(list, o.id); if(!me) return;
-              const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
-              const pill = bin.closest('.widget')?.querySelector('.section-link');
-              const i    = Number(pill?.dataset.idx ?? -1);
-              if(i>=0){ s.links.splice(i,1); setSavedOutlines(list); persist(o.id); renderSavedOutlines(); }
-            });
-          });
-        }
-
-        // Inline shelf actions (drag & edit & delete + ADD)
-        const shelfWrap = secEl?.querySelector('[data-role="inline-shelf"]');
-        if(shelfWrap){
-          shelfWrap.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=>{
+          card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+          card.addEventListener('click', (e)=>{
+            e.stopPropagation();
             if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
             const shelf = (getWidgetShelf && getWidgetShelf()) || [];
-            const wid = 'W'+Date.now().toString(36);
-            const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
-            setWidgetShelf([...shelf, placeholder]);
-            const onCancel = ()=>{
-              const s2 = (getWidgetShelf && getWidgetShelf()) || [];
-              const i  = s2.findIndex(x=>x.id===wid);
-              if(i>=0){ s2.splice(i,1); setWidgetShelf([...s2]); }
-              renderSavedOutlines();
-            };
-            openWidgetEditor(placeholder, (upd)=>{
-              const s2 = (getWidgetShelf && getWidgetShelf()) || [];
-              const it = s2.find(x=>x.id===wid);
-              if(it){
-                upd.url = normalizeUrl(upd.url);
-                Object.assign(it, upd);
-                setWidgetShelf([...s2]);
-              }
-              renderSavedOutlines();
-            }, onCancel);
-          });
-
-          // draggable shelf cards
-          shelfWrap.querySelectorAll('.draggable-shelf').forEach(card=>{
-            card.addEventListener('dragstart', (e)=>{
-              const id = card.dataset.wid;
-              try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'shelf', id})); }catch{}
-              e.dataTransfer.effectAllowed='copy';
-              card.classList.add('drag-ghost');
-            });
-            card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-            card.addEventListener('click', (e)=>{
-              e.stopPropagation();
-              if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
-              const shelf = (getWidgetShelf && getWidgetShelf()) || [];
-              const w = shelf.find(x=>x.id===card.dataset.wid); if(!w) return;
-              openWidgetEditor(w, (upd)=>{
-                upd.url = normalizeUrl(upd.url);
-                Object.assign(w, upd); 
-                setWidgetShelf([...shelf]); 
-                renderSavedOutlines(); 
-              });
+            const w = shelf.find(x=>x.id===card.dataset.wid); if(!w) return;
+            openWidgetEditor(w, (upd)=>{
+              upd.url = normalizeUrl(upd.url);
+              Object.assign(w, upd); 
+              setWidgetShelf([...shelf]); 
+              renderSavedOutlines(); 
             });
           });
-          shelfWrap.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
-            btn.addEventListener('click', (e)=>{
-              e.stopPropagation();
-              if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
-              const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid;
-              const shelf = (getWidgetShelf && getWidgetShelf()) || [];
-              const idx = shelf.findIndex(x=>x.id===wid);
-              if(idx>=0){ shelf.splice(idx,1); setWidgetShelf([...shelf]); renderSavedOutlines(); }
-            });
+        });
+        shelfWrap.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
+          btn.addEventListener('click', (e)=>{
+            e.stopPropagation();
+            if(!setWidgetShelf) return alert('setWidgetShelf not wired in index.html');
+            const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid;
+            const shelf = (getWidgetShelf && getWidgetShelf()) || [];
+            const idx = shelf.findIndex(x=>x.id===wid);
+            if(idx>=0){ shelf.splice(idx,1); setWidgetShelf([...shelf]); renderSavedOutlines(); }
           });
-        }
-      });
+        });
+      }
     });
+  }
+
+  function goHome(){
+    const tabBtn = document.querySelector('.tab-link[data-tab="homeTab"]');
+    if (tabBtn && typeof tabBtn.click === 'function') { tabBtn.click(); return; }
+    const cand = ['[data-tab="home"]','[data-route="home"]','[data-nav="home"]','a[href="#home"]','#navHome','#homeTab','#tab-home'];
+    for(const sel of cand){
+      const el = document.querySelector(sel);
+      if(el && typeof el.click==='function'){ el.click(); return; }
+    }
+    const home = document.getElementById('homeTab');
+    if (home) {
+      document.getElementById('savedTab')?.classList.add('hidden');
+      document.getElementById('helpTab')?.classList.add('hidden');
+      home.classList.remove('hidden');
+      home.scrollIntoView({ behavior:'smooth', block:'start' });
+      return;
+    }
+    if(location.hash !== '#home') location.hash = '#home';
   }
 
   // ---------- create outline wiring ----------
@@ -775,13 +904,23 @@ export function setupSavedOutlines({
   if(createOk){
     createOk.onclick = ()=>{
       const t = (createTitle?.value || '').trim() || 'New outline';
-      const list = getSavedOutlines() || [];
+      const list = getList();
       list.push({ id:'O'+Date.now().toString(36), title:t, sections:[] });
       setSavedOutlines(list);
-      if (typeof saveOutlinesLocal === 'function') saveOutlinesLocal();
-      if (typeof renderHomeSavedBar === 'function') renderHomeSavedBar();
-      if (typeof touchCloud === 'function') touchCloud();
+      saveOutlinesLocal?.(); renderHomeSavedBar?.(); touchCloud?.();
       createForm?.classList.add('hidden');
+      renderSavedOutlines();
+    };
+  }
+
+  // ---------- create folder wiring ----------
+  if(createFolderBtn){
+    createFolderBtn.onclick = ()=>{
+      const name = prompt('Folder name:', 'New folder') || 'New folder';
+      const list = getList();
+      list.push({ id:'F'+Date.now().toString(36), type:'folder', title:name.trim()||'New folder', children:[] });
+      setSavedOutlines(list);
+      saveOutlinesLocal?.(); renderHomeSavedBar?.(); touchCloud?.();
       renderSavedOutlines();
     };
   }
