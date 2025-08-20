@@ -40,31 +40,26 @@
     .outline-row.dragging{ opacity:.35; }
 
     /* ===== Time value + unit fields (both editors) ===== */
-    :root { --sf-editor-field-h: 44px; } /* uniform height */
+    :root { --sf-editor-field-h: 36px; } /* compact + consistent */
 
-    /* Make number + select the same height & prevent clipped text on Windows */
     #editMinsInline, #edtValue,
     #editUnitInline, #edtUnit {
       height: var(--sf-editor-field-h) !important;
       box-sizing: border-box;
       font-size: 0.95rem;
-      line-height: normal;          /* fixes half-cut text */
-      padding-top: 8px;
-      padding-bottom: 10px;         /* a touch more bottom space */
+      line-height: normal;
+      padding-top: 6px;
+      padding-bottom: 8px;
       padding-left: 12px;
       padding-right: 12px;
       border-radius: 0.75rem;
       vertical-align: middle;
     }
-
-    /* Space for spinner/arrow so text stays centered */
-    #editMinsInline, #edtValue { padding-right: .75rem; } /* number spinner */
-    #editUnitInline, #edtUnit  { padding-right: 2rem; }   /* select arrow */
-
-    /* Normalize select rendering across browsers */
+    #editMinsInline, #edtValue { padding-right: .75rem; }
+    #editUnitInline, #edtUnit  { padding-right: 2rem; }
     #editUnitInline, #edtUnit {
       -webkit-appearance: none;
-        -moz-appearance: none;
+         -moz-appearance: none;
               appearance: none;
       background-position: right .6rem center;
       background-repeat: no-repeat;
@@ -99,7 +94,9 @@
   <!-- Tabs -->
   <nav class="mb-6">
     <div class="tabs-bar">
-      <button class="tab-link active" data-tab="homeTab">Home</button>
+      <button class="tab-link active" data-tab="landingTab">Overview</button>
+      <div class="tab-sep"></div>
+      <button class="tab-link" data-tab="homeTab">Planner</button>
       <div class="tab-sep"></div>
       <button class="tab-link" data-tab="savedTab">Saved Outlines</button>
       <div class="tab-sep"></div>
@@ -107,16 +104,60 @@
     </div>
   </nav>
 
-  <!-- HOME -->
-  <section id="homeTab">
+  <!-- LANDING / OVERVIEW -->
+  <section id="landingTab">
+    <div class="landing-hero card p-6 mb-6">
+      <div class="flex flex-col lg:flex-row items-center gap-6">
+        <div class="min-w-0 flex-1">
+          <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Turn a block of time into momentum.</h2>
+          <p class="mt-2 text-[15px] leading-6 text-slate-600">Skillflow structures one focused session into ordered mini‑goals. A live progress bar and quick editing keep you moving.</p>
+          <div class="mt-4 flex gap-2">
+            <button class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm" data-tab-jump="homeTab">Open the Planner</button>
+            <a class="px-4 py-2 rounded-xl border border-[var(--border)]" href="#help">Learn the basics</a>
+          </div>
+        </div>
+        <div class="flex-1 w-full">
+          <div class="demo card p-4">
+            <div class="text-sm muted mb-1">Demo progress</div>
+            <div class="demo-progress">
+              <div id="demoFill"></div>
+              <div class="demo-seg" style="--w:25%"></div>
+              <div class="demo-seg" style="--w:15%"></div>
+              <div class="demo-seg" style="--w:20%"></div>
+              <div class="demo-seg" style="--w:40%"></div>
+            </div>
+            <div class="mt-2 text-xs muted">Watch the bar fill. That’s your session, divided into mini‑goals.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="card p-5">
+        <div class="text-2xl">🎯</div>
+        <h3 class="block-title mt-1">Plan your session</h3>
+        <p class="text-sm mt-1 text-slate-600">Create subsections with times and notes. Load templates for repeatable training.</p>
+      </div>
+      <div class="card p-5">
+        <div class="text-2xl">⏱️</div>
+        <h3 class="block-title mt-1">Stay on track</h3>
+        <p class="text-sm mt-1 text-slate-600">A live timer + progress bar gives instant feedback. Click anywhere to jump.</p>
+      </div>
+      <div class="card p-5">
+        <div class="text-2xl">☁️</div>
+        <h3 class="block-title mt-1">Sync & organize</h3>
+        <p class="text-sm mt-1 text-slate-600">Save outlines, organize them in folders, and sync across devices.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLANNER (Home) -->
+  <section id="homeTab" class="hidden">
     <!-- Progress -->
     <section class="mb-4">
       <div class="flex items-center justify-between mb-1">
-        <div class="block-sub">Progress — click to jump</div>
-        <div class="flex items-center gap-3">
-          <div id="progressTotal" class="text-xs muted">Total: 0m</div>
-          <div id="progressPct" class="text-xs muted">0%</div>
-        </div>
+        <div class="block-sub">Progress — click to jump <span id="totalTimeTop" class="ml-2 text-xs muted"></span></div>
+        <div id="progressPct" class="text-xs muted">0%</div>
       </div>
       <div id="progressHost" class="relative w-full h-6 rounded-2xl overflow-hidden card">
         <div id="progressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
@@ -155,13 +196,12 @@
             <div class="min-w-0 flex items-center gap-3">
               <!-- View title -->
               <h2 id="currentTitle" class="text-2xl font-extrabold truncate">—</h2>
-              <!-- View duration text (no box in view mode) -->
+              <!-- View duration text -->
               <span id="currentDurDisp" class="text-sm muted whitespace-nowrap">0m</span>
-              <!-- Edit title (inline, autosizing) -->
+              <!-- Edit title -->
               <input id="editTitleInline" class="input text-2xl font-extrabold hidden align-middle shrink-0" placeholder="Section title" />
-              <!-- Edit duration (inline, compact side-by-side) -->
+              <!-- Edit duration compact -->
               <div id="editDurInline" class="hidden flex items-stretch gap-1 flex-nowrap whitespace-nowrap">
-                <!-- HEIGHT FIXED to match select -->
                 <input id="editMinsInline" class="input h-9 w-24 text-sm" type="number" min="0.01" step="0.1" placeholder="Min"/>
                 <select id="editUnitInline" class="input h-9 w-24 text-sm">
                   <option value="minutes" selected>min</option>
@@ -268,10 +308,9 @@
       </div>
     </div>
 
-    <div class="mb-3 flex flex-wrap items-center gap-2">
+    <div class="mb-3 flex items-center gap-2">
       <button id="createOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Create new outline</button>
       <button id="createFolderBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ New folder</button>
-
       <div id="createOutlineForm" class="card p-4 mb-0 hidden">
         <label class="text-sm">Outline title</label>
         <div class="mt-2 flex items-center gap-2">
@@ -282,7 +321,7 @@
       </div>
     </div>
 
-    <div class="text-sm muted mb-3">Tip: drag one outline card onto another to propose a merge (only when NOT editing). You can also drag an outline into a folder.</div>
+    <div class="text-sm muted mb-3">Tips: drag an outline onto another to propose a merge, or drag an outline **into a folder**. Drag onto empty space to move it back out.</div>
     <div id="savedList" class="grid lg:grid-cols-2 gap-4"></div>
   </section>
 
@@ -294,8 +333,8 @@
         <li>Create or load a saved outline on the right.</li>
         <li>Start the session timer, then jump between sections using the progress bar or outline.</li>
         <li>Edit links/notes for the current section with “Edit Section”.</li>
-        <li>In Saved Outlines, drag a plan onto another to merge them. You can also organize outlines into folders.</li>
-        <li>Open ⚙️ Settings to tweak theme, defaults, and alarm tone.</li>
+        <li>In Saved Outlines, drag a plan into a folder to organize, or onto another to merge.</li>
+        <li>Open ⚙️ Settings to tweak theme, sounds and defaults.</li>
       </ol>
     </div>
   </section>
@@ -312,46 +351,48 @@
       </div>
 
       <!-- Centered stack -->
-      <div class="flex flex-col items-center text-center gap-5">
-        <h2 id="focusTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight">—</h2>
+      <div class="card p-6">
+        <div class="flex flex-col items-center text-center gap-5">
+          <h2 id="focusTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight">—</h2>
 
-        <div id="focusMeta" class="muted text-sm"></div>
+          <div id="focusMeta" class="muted text-sm"></div>
 
-        <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
+          <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
 
-        <!-- Progress (focus instance) -->
-        <div class="w-full max-w-3xl">
-          <div class="mb-1 flex items-center justify-between">
-            <div class="block-sub">Progress</div>
-            <div id="focusProgressPct" class="text-xs muted">0%</div>
+          <!-- Progress (focus instance) -->
+          <div class="w-full max-w-3xl">
+            <div class="mb-1 flex items-center justify-between">
+              <div class="block-sub">Progress</div>
+              <div id="focusProgressPct" class="text-xs muted">0%</div>
+            </div>
+            <div id="focusProgressHost" class="relative w-full h-8 rounded-2xl overflow-hidden card">
+              <div id="focusProgressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
+              <div id="focusProgressSegments" class="absolute inset-0 flex"></div>
+              <div id="focusProgressTicks" class="absolute inset-0 pointer-events-none"></div>
+              <div id="focusScrubOverlay" class="absolute inset-0 cursor-pointer"></div>
+            </div>
           </div>
-          <div id="focusProgressHost" class="relative w-full h-8 rounded-2xl overflow-hidden card">
-            <div id="focusProgressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
-            <div id="focusProgressSegments" class="absolute inset-0 flex"></div>
-            <div id="focusProgressTicks" class="absolute inset-0 pointer-events-none"></div>
-            <div id="focusScrubOverlay" class="absolute inset-0 cursor-pointer"></div>
+
+          <!-- Controls -->
+          <div class="flex items-center justify-center gap-3 card p-3">
+            <button id="focusStartBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm">Start Study Session</button>
+            <button id="focusPauseBtn" class="px-4 py-2 rounded-xl border border-[var(--border)]">Pause</button>
+            <button id="focusReadyNextBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm hidden">
+              I’m ready — start next ▶
+            </button>
           </div>
-        </div>
 
-        <!-- Controls -->
-        <div class="flex items-center justify-center gap-3">
-          <button id="focusStartBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm">Start Study Session</button>
-          <button id="focusPauseBtn" class="px-4 py-2 rounded-xl border border-[var(--border)]">Pause</button>
-          <button id="focusReadyNextBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm hidden">
-            I’m ready — start next ▶
-          </button>
-        </div>
-
-        <!-- Links (focus instance) -->
-        <div id="focusLinksWrap" class="w-full max-w-3xl">
-          <div class="flex items-center justify-between mt-2">
-            <h3 class="block-title">Links</h3>
+          <!-- Links (focus instance) -->
+          <div id="focusLinksWrap" class="w-full max-w-3xl">
+            <div class="flex items-center justify-between mt-2">
+              <h3 class="block-title">Links</h3>
+            </div>
+            <div id="focusLinks" class="section-links-bar mt-2"></div>
           </div>
-          <div id="focusLinks" class="section-links-bar mt-2"></div>
-        </div>
 
-        <!-- Notes / info -->
-        <div id="focusDesc" class="text-sm whitespace-pre-wrap max-w-3xl w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
+          <!-- Notes / info -->
+          <div id="focusDesc" class="text-sm whitespace-pre-wrap max-w-3xl w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -360,14 +401,13 @@
 <!-- SETTINGS MODAL -->
 <div id="settingsModal" class="modal hidden" aria-hidden="true">
   <div class="modal-backdrop" data-close="1"></div>
-  <div class="modal-panel max-w-[680px]" role="dialog" aria-modal="true">
+  <div class="modal-panel max-w-[720px]" role="dialog" aria-modal="true">
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-lg font-semibold">Settings</h3>
       <button class="btn-xxs" data-close="1">✕</button>
     </div>
 
-    <!-- Appearance -->
-    <div class="mb-2 block-title">Appearance</div>
+    <h4 class="block-title mb-2">Appearance</h4>
     <div class="grid grid-cols-2 gap-3">
       <label class="flex flex-col gap-1"><span class="text-sm">Background</span><input id="setBg" type="color" class="input h-10 p-1"/></label>
       <label class="flex flex-col gap-1"><span class="text-sm">Text</span><input id="setFg" type="color" class="input h-10 p-1"/></label>
@@ -379,31 +419,29 @@
       </label>
     </div>
 
-    <!-- Sound -->
-    <div class="mt-5 mb-2 block-title">Sound</div>
+    <h4 class="block-title mt-5 mb-2">Sound</h4>
     <div class="grid grid-cols-2 gap-3">
-      <label class="flex flex-col gap-1">
-        <span class="text-sm">Ringtone</span>
+      <label class="flex flex-col gap-1"><span class="text-sm">Ringtone</span>
         <select id="setTone" class="input">
+          <option value="beep">Beep</option>
           <option value="chime">Chime</option>
           <option value="bell">Bell</option>
-          <option value="digital">Digital</option>
-          <option value="soft">Soft</option>
-          <option value="alarm">Alarm</option>
         </select>
       </label>
-      <label class="flex flex-col gap-1">
-        <span class="text-sm">Duration (ms)</span>
-        <input id="setToneMs" class="input" type="number" min="100" max="5000" step="50"/>
-      </label>
-      <div class="col-span-2 flex items-center gap-2">
-        <button id="previewToneBtn" class="btn-xs">▶ Preview</button>
+      <label class="flex flex-col gap-1"><span class="text-sm">Duration (ms)</span><input id="setToneDur" type="number" min="100" step="100" class="input"/></label>
+      <label class="flex flex-col gap-1"><span class="text-sm">Volume</span><input id="setToneVol" type="range" min="0" max="1" step="0.05"/></label>
+      <div class="flex items-end justify-end gap-2">
+        <button id="toneDefaultBtn" class="btn-xxs">Default</button>
+        <button id="tonePreviewBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Preview</button>
       </div>
     </div>
 
-    <div class="mt-4 flex items-center justify-end gap-2">
-      <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Close</button>
-      <button id="settingsSaveBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Done</button>
+    <div class="mt-4 flex items-center justify-between">
+      <button id="settingsResetBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Reset theme</button>
+      <div class="flex items-center gap-2">
+        <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Close</button>
+        <button id="settingsSaveBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -487,16 +525,13 @@
     { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',    icon:'emoji', emoji:'📘' }
   ];
   let prefs = loadJSON('prefs_v1') || {
-    splitRatio:56,
-    outlineCollapsed:false,
-    focusDefault:false,
+    splitRatio:56, outlineCollapsed:false, focusDefault:false,
     theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 },
-    sound:{ tone:'chime', durationMs: 500 }
+    ring: { type:'beep', duration:700, volume:0.6 }   // NEW sound prefs
   };
-  // fill missing defaults safely
-  prefs.sound = prefs.sound || { tone:'chime', durationMs: 500 };
+  // Back-fill legacy prefs that may not have ring
+  if(!prefs.ring){ prefs.ring = { type:'beep', duration:700, volume:0.6 }; }
 
-  // savedOutlines can now include folders; we keep structure as-is
   let savedOutlines = loadJSON('saved_outlines_v1') || [];
   let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0, awaitingNext:false };
 
@@ -542,15 +577,13 @@
   const saveTimerLocal     = ()=>{ saveJSON('timer_state_v2', timerState);        markDirty(); touchCloud(); };
 
   /*************** Tabs (delegated & dynamic, works with Pricing) ***************/
-  const homeTab=$('#homeTab'); const savedTab=$('#savedTab'); const helpTab=$('#helpTab');
+  const homeTab=$('#homeTab'); const savedTab=$('#savedTab'); const helpTab=$('#helpTab'); const landingTab=$('#landingTab');
   function showTab(id){
-    // Active button highlight
     document.querySelectorAll('.tab-link').forEach(b=>b.classList.remove('active'));
     const btn = document.querySelector(`.tab-link[data-tab="${id}"]`);
     if(btn) btn.classList.add('active');
 
-    // Known sections; include Pricing if present
-    const ids = ['homeTab','savedTab','helpTab','pricingTab'];
+    const ids = ['landingTab','homeTab','savedTab','helpTab','pricingTab'];
     ids.forEach(secId=>{
       const el = document.getElementById(secId);
       if(el) el.classList.toggle('hidden', secId !== id);
@@ -559,8 +592,6 @@
     if(id==='savedTab') renderSavedOutlines();
     if(id==='homeTab') renderHomeSavedBar();
   }
-
-  // Initial click wiring via event delegation so dynamically-added tabs (Pricing) work
   const tabsBar = document.querySelector('nav .tabs-bar');
   if(tabsBar){
     tabsBar.addEventListener('click', (e)=>{
@@ -569,9 +600,14 @@
       showTab(btn.dataset.tab);
     });
   }
-
-  // Jumps (e.g., "Manage" link)
   document.querySelectorAll('[data-tab-jump]').forEach(b=> b.onclick = ()=> showTab(b.dataset.tabJump));
+
+  /*************** Demo progress (landing) ***************/
+  const demoFill = document.getElementById('demoFill');
+  if(demoFill){
+    let pct = 0;
+    setInterval(()=>{ pct = (pct+2)%102; demoFill.style.width = Math.min(pct,100)+'%'; }, 60);
+  }
 
   /*************** Progress / Timer ***************/
   const startBtn = $('#startBtn'); const prevBtn=$('#prevBtn'); const nextBtn=$('#nextBtn'); const resetBtn=$('#resetBtn');
@@ -581,7 +617,6 @@
   const linkShelfDiv=$('#linkShelf'); const shelfWrap=$('#shelfWrap'); const editSectionBtn=$('#editSectionBtn'); const clearSectionLinksBtn=$('#clearSectionLinks');
   const addWidgetBtn=$('#addWidgetBtn'); const resetShelfBtn=$('#resetShelfBtn');
 
-  // Inline edit handles (title & duration)
   const editTitleInline = $('#editTitleInline');
   const currentDurDisp  = $('#currentDurDisp');
   const editDurInline   = $('#editDurInline');
@@ -590,11 +625,10 @@
 
   const outline=$('#outline'); const addOutlineItemBtn=$('#addOutlineItem'); const inlineAddRow=$('#inlineAddRow');
   const addTitleInput=$('#addTitleInput'); const addMinsInput=$('#addMinsInput'); const addConfirmBtn=$('#addConfirmBtn'); const addCancelBtn=$('#addCancelBtn');
-  const totalMins=$('#totalMins'); const clockEl=$('#clock');
+  const totalMins=$('#totalMins'); const totalTimeTop=$('#totalTimeTop'); const clockEl=$('#clock');
 
   const progressHost=$('#progressHost'), progressFill=$('#progressFill'), progressSegments=$('#progressSegments'),
         progressTicks=$('#progressTicks'), progressPctEl=$('#progressPct'), legend=$('#legend'), scrubOverlay=$('#scrubOverlay');
-  const progressTotalEl = $('#progressTotal');
 
   // Focus Mode elements
   const focusOverlay = $('#focusOverlay');
@@ -614,7 +648,7 @@
 
   const focusLinksDiv = $('#focusLinks');
 
-  // Split panes (drag-to-resize)
+  // Split panes
   const splitEl = $('#split'), leftPane = $('#leftPane'), rightPane = $('#rightPane'), splitHandle = $('#splitHandle');
   function applySplitRatio(r){ splitEl.style.setProperty('--leftRatio', (r||56) + '%'); }
   applySplitRatio(prefs.splitRatio||56);
@@ -625,6 +659,17 @@
     document.body.classList.add('no-select');
     onSplitMove(e);
   });
+  function onSplitMove(e){
+    const rect = splitEl.getBoundingClientRect();
+    const x = Math.max(rect.left, Math.min(e.clientX, rect.right));
+    const total = rect.width;
+    const minPx = 360;
+    const minPct = (minPx/total)*100;
+    let pct = ((x - rect.left)/total)*100;
+    pct = Math.max(minPct, Math.min(100 - minPct, pct));
+    splitLast = pct;
+    applySplitRatio(pct);
+  }
   splitHandle.addEventListener('pointermove', (e)=>{ if(draggingSplit) onSplitMove(e); });
   splitHandle.addEventListener('pointerup', ()=>{
     if(!draggingSplit) return;
@@ -633,26 +678,9 @@
     prefs.splitRatio = Math.round(splitLast*10)/10;
     savePrefs();
   });
-  function onSplitMove(e){
-    const rect = splitEl.getBoundingClientRect();
-    const x = Math.max(rect.left, Math.min(e.clientX, rect.right));
-    const total = rect.width;
-    const minPx = 360; // match CSS min-width
-    const minPct = (minPx/total)*100;
-    let pct = ((x - rect.left)/total)*100;
-    pct = Math.max(minPct, Math.min(100 - minPct, pct));
-    splitLast = pct;
-    applySplitRatio(pct);
-  }
 
   function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
   function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
-  function formatTotalMins(mins){
-    const m = Math.round(mins);
-    if(m < 60) return `${m}m`;
-    const h = Math.floor(m/60), r = m%60;
-    return r ? `${h}h ${r}m` : `${h}h`;
-  }
   function scheduleTotalSecs(s){ return s.reduce((a,b)=>a+minsToSecs(b.minutes||0),0); }
   function elapsedSeconds(sched, idx, secsLeft){ const past=sched.slice(0,idx).reduce((a,b)=>a+minsToSecs(b.minutes||0),0); const cur=sched[idx]?minsToSecs(sched[idx].minutes||0)-secsLeft:0; return past+cur; }
   function toMinutesValue(value, unit){ const v=Number(value)||0; if(unit==='seconds') return v/60; if(unit==='hours') return v*60; return v; }
@@ -703,8 +731,7 @@
     updateStartBtnLabel();
   }
   function syncEnd(){ endTimeMs = performance.now() + secondsLeft * 1000; }
-  // Shared tick used by both rAF (foreground) and setInterval (background)
-  let lastTimerPersistMs = 0;
+
   function tick(){
     if(!running) return;
 
@@ -713,27 +740,19 @@
       secondsLeft = remaining;
       setClockText(secsToClock(secondsLeft));
       updateProgress();
-
-      // Persist progress every ~3s while running
-      const now = Date.now();
-      if(now - lastTimerPersistMs > 3000){
-        markTimer();
-        lastTimerPersistMs = now;
-      }
     }
 
     if(secondsLeft <= 0){
-      // Section finished
       if(currentIndex < currentSession.length - 1){
         stopTimer();
         awaitingNext = true;
         showNextGate();
-        playBeep();
+        playRingtone();               // use prefs.ring
         markTimer();
         return;
       } else {
         stopTimer();
-        playBeep();
+        playRingtone();
         sessionStarted = false;
         updateStartBtnLabel();
         markTimer();
@@ -747,19 +766,13 @@
     if(running) return;
     running = true;
     syncEnd();
-
-    // Foreground: smooth UI updates
     loop();
-
-    // Background: keep ticking even when tab is hidden (clamped but reliable)
     if(bgTickId) clearInterval(bgTickId);
     bgTickId = setInterval(tick, 1000);
-
     updateStartBtnLabel();
     updateClockColor();
     markTimer();
   }
-
   function stopTimer(){
     running = false;
     if(rafId) cancelAnimationFrame(rafId); rafId = null;
@@ -768,25 +781,11 @@
     updateClockColor();
     markTimer();
   }
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'hidden'){ if(running) tick(); } });
+  function loop(){ if(!running) return; tick(); rafId = requestAnimationFrame(loop); }
 
-  document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState === 'hidden'){
-      if(running) tick();
-    }
-  });
+  const markTimer = ()=>{ timerState={ sessionStarted,running,currentIndex,secondsLeft,lastSyncTs:Date.now(), awaitingNext }; saveTimerLocal(); };
 
-  function loop(){
-    if(!running) return;
-    tick();
-    rafId = requestAnimationFrame(loop);
-  }
-
-  const markTimer = ()=>{
-    timerState={ sessionStarted,running,currentIndex,secondsLeft,lastSyncTs:Date.now(), awaitingNext };
-    saveTimerLocal();
-  };
-
-  // Gate controls (shared for normal + focus)
   function proceedNext(){
     if(!awaitingNext) return;
     awaitingNext=false;
@@ -807,7 +806,7 @@
 
   startBtn.onclick = ()=>{
     if(!currentSession.length) return;
-    if(awaitingNext) return; // wait for explicit confirmation
+    if(awaitingNext) return;
     if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(currentSession[0].minutes||0); totalSessionSecs=scheduleTotalSecs(currentSession); sessionStarted=true; markTimer(); startTimer(); }
     else{ running?stopTimer():startTimer(); }
   };
@@ -821,68 +820,30 @@
   function buildProgress(){
     const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
     progressSegments.innerHTML=''; legend.innerHTML=''; progressTicks.innerHTML='';
-
-    // Total time above bar
-    if(progressTotalEl){
-      progressTotalEl.textContent = 'Total: ' + formatTotalMins(total/60);
-    }
-
-    sched.forEach(sec=>{
-      const w=(minsToSecs(sec.minutes||0)/total)*100;
-      const seg=document.createElement('div');
-      seg.className='h-full relative bg-white/50';
-      seg.style.width=`${w}%`;
-      progressSegments.appendChild(seg);
-    });
-    let cum=0;
-    for(let i=1;i<sched.length;i++){
-      cum+=minsToSecs(sched[i-1].minutes||0);
-      const pct=(cum/total)*100;
-      const tick=document.createElement('div');
-      Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'});
-      progressTicks.appendChild(tick);
-    }
-    sched.forEach((sec,i)=>{
-      const chip=document.createElement('button');
-      chip.type='button';
-      chip.className='chip';
-      chip.dataset.idx=String(i);
-      chip.innerHTML=`${escapeHtml(sec.name||'')} <span class="opacity-80">(${sec.minutes||0}m)</span>`;
-      chip.onclick=()=>jumpToSection(i);
-      legend.appendChild(chip);
-    });
+    sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; progressSegments.appendChild(seg); });
+    let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); progressTicks.appendChild(tick); }
+    sched.forEach((sec,i)=>{ const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); chip.innerHTML=`${escapeHtml(sec.name||'')} <span class="opacity-80">(${sec.minutes||0}m)</span>`; chip.onclick=()=>jumpToSection(i); legend.appendChild(chip); });
     updateProgress();
-    buildFocusProgress(); // mirror into focus UI
+    buildFocusProgress();
   }
 
   function buildFocusProgress(){
     if(!focusProgressHost) return;
     const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
     focusProgressSegments.innerHTML=''; focusProgressTicks.innerHTML='';
-    sched.forEach(sec=>{
-      const w=(minsToSecs(sec.minutes||0)/total)*100;
-      const seg=document.createElement('div');
-      seg.className='h-full relative bg-white/50';
-      seg.style.width=`${w}%`;
-      focusProgressSegments.appendChild(seg);
-    });
-    let cum=0; for(let i=1;i<sched.length;i++){
-      cum+=minsToSecs(sched[i-1].minutes||0);
-      const pct=(cum/total)*100;
-      const tick=document.createElement('div');
-      Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'});
-      focusProgressTicks.appendChild(tick);
-    }
+    sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; focusProgressSegments.appendChild(seg); });
+    let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); focusProgressTicks.appendChild(tick); }
     updateFocusProgress();
   }
 
   function updateLegendActive(){ legend.querySelectorAll('.chip').forEach((el, i)=> el.classList.toggle('chip-active', i===currentIndex)); }
   function updateProgress(){
     const sched=currentSession; const total=scheduleTotalSecs(sched);
-    if(!total){ progressFill.style.width='0%'; progressPctEl.textContent='0%'; return; }
+    if(!total){ progressFill.style.width='0%'; progressPctEl.textContent='0%'; if(totalTimeTop) totalTimeTop.textContent=''; return; }
     const pct=Math.min(100,Math.max(0,(elapsedSeconds(sched,currentIndex,secondsLeft)/total)*100));
     progressFill.style.width = pct + '%';
     progressPctEl.textContent = Math.floor(pct) + '%';
+    if(totalTimeTop) totalTimeTop.textContent = `• Total: ${Math.round(total/60)}m`;
     updateLegendActive();
     updateStartBtnLabel();
     updateFocusProgress();
@@ -915,7 +876,7 @@
         markTimer();
         awaitingNext=false;
         hideNextGate();
-        updateStartBtnLabel();  // reflect Start vs Resume after manual scrub
+        updateStartBtnLabel();
         return;
       }
       cum+=dur;
@@ -1010,11 +971,7 @@
     const iconSel = modal.querySelector('#wIcon');
     const emojiRow = modal.querySelector('#emojiRow');
     const imgRow   = modal.querySelector('#imgRow');
-    const syncRows = ()=>{
-      const useImg = iconSel.value==='img';
-      emojiRow.classList.toggle('hidden', useImg);
-      imgRow.classList.toggle('hidden', !useImg);
-    };
+    const syncRows = ()=>{ const useImg = iconSel.value==='img'; emojiRow.classList.toggle('hidden', useImg); imgRow.classList.toggle('hidden', !useImg); };
     syncRows(); iconSel.addEventListener('change', syncRows);
 
     const close = ()=>{ modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 140); };
@@ -1052,7 +1009,6 @@
     editTitleInline.style.width = Math.max(desired, 140) + 'px';
   }
 
-  // Save meta edits (title + duration) when leaving edit mode
   function saveMetaEdits(){
     const s = currentSession[currentIndex];
     if(!s) return;
@@ -1080,7 +1036,8 @@
     renderCurrent();
     updateStartBtnLabel();
     markTimer();
-    // NOTE: Home changes NO LONGER push into Saved Outlines (source-of-truth is Saved tab)
+    // >>> SYNC to Saved when Home edits <<<
+    syncSavedFromCurrent();
   }
 
   editSectionBtn.onclick = ()=>{
@@ -1152,7 +1109,6 @@
     saveShelf(); renderShelf();
   };
 
-  // Shelf cards…
   function widgetCardHTML(w){
     const iconHtml = (w.icon==='img' && w.img)
       ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
@@ -1175,7 +1131,6 @@
 
     linkShelfDiv.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=> addWidgetBtn.click());
 
-    // Click to edit shelf item
     linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
       card.addEventListener('click', ()=>{
         if(!isEditingSection) return;
@@ -1185,7 +1140,6 @@
           Object.assign(w, upd); saveShelf(); renderShelf();
         });
       });
-      // Drag from shelf → current section links
       card.addEventListener('dragstart', e=>{
         if(!isEditingSection){ e.preventDefault(); return; }
         const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid});
@@ -1196,7 +1150,6 @@
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
     });
 
-    // Delete shelf item
     linkShelfDiv.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
       btn.addEventListener('click', (e)=>{
         e.stopPropagation();
@@ -1208,7 +1161,6 @@
     });
   }
 
-  // Current section links
   function renderCurrentLinks(){
     const sec=currentSectionRef(); const arr=sec?.links||[];
     linksDiv.innerHTML = arr.map((w,i)=>`
@@ -1222,7 +1174,6 @@
         ${isEditingSection ? `<button class="bin" data-act="del-link" title="Delete">🗑️</button>` : ''}
       </div>`).join('');
 
-    // Drag-reorder within bar
     linksDiv.querySelectorAll('.section-link').forEach(card=>{
       card.addEventListener('dragstart', e=>{
         if(!isEditingSection){ e.preventDefault(); return; }
@@ -1234,13 +1185,13 @@
       });
       card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
 
-      // Click: edit in edit-mode; open link in view-mode
       card.addEventListener('click', ()=>{
         const i = Number(card.dataset.idx); const target = sec.links[i]; if(!target) return;
         if(isEditingSection){
           openWidgetEditor(target, (upd)=>{
             upd.url = normalizeUrl(upd.url);
             Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks();
+            syncSavedFromCurrent();
           });
         } else {
           const url = normalizeUrl(target.url||'');
@@ -1255,16 +1206,13 @@
           e.stopPropagation();
           const pill = btn.closest('.widget')?.querySelector('.section-link');
           const i = Number(pill?.dataset.idx ?? -1);
-          if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); }
+          if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); }
         });
       });
     }
-
-    // Keep focus links mirrored
     renderFocusLinks();
   }
 
-  // CLEAR LINKS button
   clearSectionLinksBtn.onclick = ()=>{
     if(!isEditingSection) return;
     const sec = currentSectionRef();
@@ -1274,9 +1222,9 @@
     saveCurrentSession();
     renderCurrentLinks();
     renderFocusLinks();
+    syncSavedFromCurrent();
   };
 
-  // Drop handlers (home links)
   let overCount = 0;
   linksDiv.addEventListener('dragenter', e=>{ if(!isEditingSection) return; overCount++; linksDiv.classList.add('drag-over-outline'); });
   linksDiv.addEventListener('dragleave', e=>{ if(!isEditingSection) return; overCount=Math.max(0, overCount-1); if(overCount===0) linksDiv.classList.remove('drag-over-outline'); });
@@ -1289,31 +1237,18 @@
     if(payload.type==='shelf'){
       const w=widgetShelf.find(x=>x.id===payload.id); if(!w) return;
       sec.links.push({ id:'l_'+Date.now()+Math.random().toString(16).slice(2), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
-      saveCurrentSession(); renderCurrentLinks(); renderFocusLinks();
+      saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
     } else if(payload.type==='reorder'){
       const from=payload.index; const cards=[...linksDiv.querySelectorAll('.section-link')];
       let to=cards.length; for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
-      if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks();
+      if(from===to || from==null || to==null) return; const [m]=sec.links.splice(from,1); sec.links.splice(to,0,m); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
     }
   });
 
-  // Description auto-grow + autosave
-  const autoGrow = (ta)=>{
-    if(!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(240, ta.scrollHeight) + 'px';
-  };
-  sectionDescEl.addEventListener('input', ()=>{
-    if(sectionDescEl.disabled) return;
-    const s=currentSession[currentIndex]; if(!s) return;
-    autoGrow(sectionDescEl);
-    sectionNotes[s.id] = sectionDescEl.value;
-    saveNotes();
-  });
-  // grow once on load
-  setTimeout(()=> autoGrow(sectionDescEl), 0);
+  const syncSavedFromCurrentDebounced = debounce(()=>{ try{ syncSavedFromCurrent(); }catch{} }, 400);
+  sectionDescEl.addEventListener('input', ()=>{ if(sectionDescEl.disabled) return; const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); syncSavedFromCurrentDebounced(); });
 
-  /*************** Outline (Home) with interactive reorder ***************/
+  /*************** Outline (Home) ***************/
   function renderOutline(){
     outline.innerHTML = currentSession.map((s,i)=>
       `<li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}" draggable="true">
@@ -1326,7 +1261,6 @@
         </div>
       </li>`).join('');
 
-    // Jump on click
     outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
       li.addEventListener('click', (e)=>{
         if(li.classList.contains('editing')) return;
@@ -1335,7 +1269,6 @@
       });
     });
 
-    // Inline edit inside outline list
     outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
@@ -1373,17 +1306,16 @@
 
           saveCurrentSession();
           renderOutline(); buildProgress(); updateProgress(); renderCurrent(); updateStartBtnLabel(); markTimer();
+          syncSavedFromCurrent();
         };
         li.querySelector('#edtSave').onclick = saveInline;
 
-        // Save on Enter
         [edtTitle, edtValue].forEach(el=>{
           el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveInline(); } });
         });
       });
     });
 
-    // Drag reorder with live placeholder
     let dragging = null;
     const makePh = (h, titleText)=>{ 
       const ph = document.createElement('li'); 
@@ -1448,6 +1380,7 @@
         else if(currentIndex < from && currentIndex >= finalTo) currentIndex += 1;
 
         saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent();
+        syncSavedFromCurrent();
       }
       dragging.el.classList.remove('dragging');
       dragging.placeholder.remove();
@@ -1455,22 +1388,43 @@
     });
 
     if(totalMins) totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(currentSession)/60)} minutes`;
+    if(totalTimeTop) totalTimeTop.textContent = `• Total: ${Math.round(scheduleTotalSecs(currentSession)/60)}m`;
   }
 
-  // Inline add
   addOutlineItemBtn.onclick = ()=>{ inlineAddRow.classList.remove('hidden'); addTitleInput.value=''; addMinsInput.value=''; addTitleInput.focus(); };
   addCancelBtn.onclick = ()=> inlineAddRow.classList.add('hidden');
   addConfirmBtn.onclick = ()=>{
     const title=(addTitleInput.value||'').trim() || 'New section'; const mins=Math.max(0.25, Number(addMinsInput.value)||5);
     currentSession.push({ id:'S'+Date.now(), name:title, minutes:mins, links:[] });
     inlineAddRow.classList.add('hidden'); saveCurrentSession(); renderAll(); markTimer();
+    syncSavedFromCurrent();
   };
 
-  /*************** Source of truth: Saved → Home (no Home→Saved writes) ***************/
+  /*************** Two-way sync glue (Home ↔ Saved Outlines) ***************/
   function getActiveOutlineId(){ return (timerState && timerState.outlineId) ? timerState.outlineId : null; }
 
-  // No-op: Home changes should NOT update Saved Outlines anymore.
-  function syncSavedFromCurrent(){ /* intentionally empty to keep Saved as the default source */ }
+  function syncSavedFromCurrent(){
+    const activeId = getActiveOutlineId();
+    if(!activeId) return;
+    const idx = savedOutlines.findIndex(o=>o.id===activeId);
+    if(idx<0) return;
+    const saved = savedOutlines[idx];
+    const newSections = currentSession.map(sec=>{
+      let sid = sec.id;
+      if(!sid){ sid = 'S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); sec.id = sid; }
+      return {
+        id: sid,
+        name: sec.name,
+        minutes: sec.minutes,
+        links: structuredClone(sec.links || []),
+        desc: sectionNotes[sid] ?? ''
+      };
+    });
+    saved.sections = newSections;
+    saveOutlinesLocal();
+    renderHomeSavedBar();
+    touchCloud();
+  }
 
   function syncCurrentFromSaved(outlineObj){
     const activeId = getActiveOutlineId();
@@ -1481,7 +1435,6 @@
     const oldActiveMins = Number(oldActive?.minutes || 0);
     const elapsedInActive = oldActiveId ? Math.max(0, minsToSecs(oldActiveMins) - secondsLeft) : 0;
 
-    // Rebuild Home schedule from Saved outline (by id; keep timer state)
     currentSession = (outlineObj.sections || []).map(s=>({
       id: s.id || ('S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
       name: s.name,
@@ -1489,7 +1442,6 @@
       links: structuredClone(s.links || [])
     }));
 
-    // Rebuild notes from saved desc
     sectionNotes = {};
     (outlineObj.sections || []).forEach(s=>{ if(s?.id) sectionNotes[s.id] = s.desc || ''; });
 
@@ -1521,39 +1473,27 @@
 
   /*************** Saved Outlines module wiring ***************/
   const homeSavedScroller = $('#homeSavedScroller');
-  // flatten outlines for quick bar (include folders’ children)
-  function flattenOutlines(list){
-    const out=[];
-    (list||[]).forEach(item=>{
-      if(item && item.type==='folder'){
-        (item.children||[]).forEach(o=> out.push(o));
-      }else{
-        out.push(item);
-      }
-    });
-    return out.filter(Boolean);
-  }
   function renderHomeSavedBar(){
     const activeId = (timerState && timerState.outlineId) || null;
-    const all = flattenOutlines(savedOutlines);
     homeSavedScroller.innerHTML =
-      (all.length
-        ? all.map(o=>`
-            <button type="button"
-                    class="chip ${o.id===activeId ? 'chip-active' : ''}"
-                    data-oid="${escapeHtml(o.id)}"
-                    title="${escapeHtml(o.title || 'Outline')}">
-              ${escapeHtml(o.title || 'Untitled')}
-            </button>`).join('')
+      (savedOutlines.length
+        ? savedOutlines
+            .filter(o=>!o.type) /* outlines only at root */
+            .map(o=>`
+                <button type="button"
+                        class="chip ${o.id===activeId ? 'chip-active' : ''}"
+                        data-oid="${escapeHtml(o.id)}"
+                        title="${escapeHtml(o.title || 'Outline')}">
+                  ${escapeHtml(o.title || 'Untitled')}
+                </button>`).join('')
         : `<div class="text-xs muted">No saved outlines yet.</div>`);
 
     homeSavedScroller.querySelectorAll('[data-oid]').forEach(btn=>{
       btn.onclick = ()=>{
-        const all2 = flattenOutlines(savedOutlines);
-        const o = all2.find(x=>x.id===btn.dataset.oid);
+        const o = savedOutlines.find(x=>x.id===btn.dataset.oid);
         if(o){
           applyOutlineToCurrent(o);
-          requestAnimationFrame(renderHomeSavedBar); // re-highlight
+          requestAnimationFrame(renderHomeSavedBar);
         }
       };
     });
@@ -1577,7 +1517,7 @@
     applyOutline: applyOutlineToCurrent,
     touchCloud,
     renderHomeSavedBar,
-    // Live sync Saved → Home
+    // New sync hooks
     getActiveOutlineId,
     syncCurrentFromSaved
   });
@@ -1633,15 +1573,14 @@
           if(d.currentSession) currentSession = d.currentSession;
           if(d.notes) sectionNotes = d.notes;
           if(d.prefs) prefs = d.prefs;
+          if(!prefs.ring) prefs.ring = { type:'beep', duration:700, volume:0.6 };
           if(d.widgetShelf) widgetShelf = d.widgetShelf;
           if(d.savedOutlines) savedOutlines = d.savedOutlines;
           if(d.timer) timerState = d.timer;
-          // defaults backfill:
-          prefs.sound = prefs.sound || { tone:'chime', durationMs: 500 };
           applyTheme(prefs.theme||{});
           applySplitRatio(prefs.splitRatio||56);
           setTimerFromState(timerState); renderAll(); renderHomeSavedBar(); setCloudMode('Saved to cloud ✓');
-          if(prefs.focusDefault) showFocus(); // only if user asked for it
+          if(prefs.focusDefault) showFocus();
         } else { 
           setCloudMode('Cloud sync on'); 
           if(prefs.focusDefault) showFocus();
@@ -1659,8 +1598,9 @@
   /*************** Settings modal UI ***************/
   const settingsModal = $('#settingsModal');
   const setBg=$('#setBg'), setFg=$('#setFg'), setAccent=$('#setAccent'), setBorder=$('#setBorder'), setBorderW=$('#setBorderW'), setFocusDefault=$('#setFocusDefault');
-  const setTone=$('#setTone'), setToneMs=$('#setToneMs'), previewToneBtn=$('#previewToneBtn');
-  const settingsSaveBtn=$('#settingsSaveBtn');
+  const toneSel=$('#setTone'), toneDur=$('#setToneDur'), toneVol=$('#setToneVol');
+  const tonePreviewBtn=$('#tonePreviewBtn'), toneDefaultBtn=$('#toneDefaultBtn');
+  const settingsSaveBtn=$('#settingsSaveBtn'), settingsResetBtn=$('#settingsResetBtn');
 
   function applyTheme(t){
     document.documentElement.style.setProperty('--bg', t.bg || '#ffffff');
@@ -1679,8 +1619,9 @@
     setBorderW.value = String(prefs.theme?.borderW ?? 2);
     setFocusDefault.checked = !!prefs.focusDefault;
 
-    setTone.value = prefs.sound?.tone || 'chime';
-    setToneMs.value = String(prefs.sound?.durationMs ?? 500);
+    toneSel.value = prefs.ring?.type || 'beep';
+    toneDur.value = String(prefs.ring?.duration ?? 700);
+    toneVol.value = String(prefs.ring?.volume ?? 0.6);
 
     showModal(settingsModal);
   }
@@ -1689,42 +1630,56 @@
   settingsModal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') closeSettings(); });
   $('#settingsBtn').onclick = openSettings;
 
-  // Live-apply appearance as you edit (no need to hit Save)
-  const liveThemeApply = ()=>{
+  // Live theme preview + save as user tweaks
+  function commitThemeFromInputs(){
     prefs.theme = {
       bg:setBg.value, fg:setFg.value, accent:setAccent.value, border:setBorder.value, borderW:Math.max(0, Number(setBorderW.value)||2)
     };
     applyTheme(prefs.theme);
     savePrefs();
-  };
-  [setBg,setFg,setAccent,setBorder,setBorderW].forEach(el=>{
-    el?.addEventListener('input', liveThemeApply);
-    el?.addEventListener('change', liveThemeApply);
-  });
-  setFocusDefault.addEventListener('change', ()=>{
-    prefs.focusDefault = !!setFocusDefault.checked;
-    savePrefs();
-  });
-
-  settingsSaveBtn.onclick = ()=>{ closeSettings(); };
-
-  // ---------- Sound ----------
-  function ensureAudio(){
-    try{
-      if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if(ctx.state === 'suspended') ctx.resume();
-    }catch{}
   }
-  setTone.addEventListener('change', ()=>{
-    prefs.sound.tone = setTone.value;
-    savePrefs();
+  [setBg,setFg,setAccent,setBorder].forEach(inp=>{
+    inp.addEventListener('input', commitThemeFromInputs);
+    // Clicking anywhere else should close the color panel
+    inp.addEventListener('focus', ()=>{ settingsModal.classList.add('color-open'); });
   });
-  setToneMs.addEventListener('input', ()=>{
-    const v = Math.max(100, Math.min(5000, Number(setToneMs.value)||500));
-    prefs.sound.durationMs = v; savePrefs();
-  });
-  previewToneBtn.addEventListener('click', ()=>{ playBeep(true); });
+  document.addEventListener('pointerdown', (e)=>{
+    if(!settingsModal || settingsModal.classList.contains('hidden')) return;
+    // If a color input is focused and you click outside any of them, blur it
+    const focused = document.activeElement;
+    if(focused && focused.type==='color' && !focused.contains(e.target)){
+      focused.blur();
+      settingsModal.classList.remove('color-open');
+    }
+  }, true);
 
+  // Sound settings
+  function commitSoundFromInputs(){
+    prefs.ring = {
+      type: toneSel.value || 'beep',
+      duration: Math.max(100, Number(toneDur.value)||700),
+      volume: Math.max(0, Math.min(1, Number(toneVol.value)||0.6))
+    };
+    savePrefs();
+  }
+  [toneSel,toneDur,toneVol].forEach(el=> el.addEventListener('input', commitSoundFromInputs));
+  toneDefaultBtn.onclick = ()=>{
+    toneSel.value='beep'; toneDur.value='700'; toneVol.value='0.6';
+    commitSoundFromInputs();
+  };
+  tonePreviewBtn.onclick = ()=>{
+    // Preview with the live control values (fixes “duration doesn’t change”)
+    const cfg = {
+      type: toneSel.value, duration: Math.max(100, Number(toneDur.value)||700), volume: Math.max(0, Math.min(1, Number(toneVol.value)||0.6))
+    };
+    playRingtone(cfg);
+  };
+
+  settingsSaveBtn.onclick = ()=>{ commitThemeFromInputs(); commitSoundFromInputs(); closeSettings(); };
+  settingsResetBtn.onclick = ()=>{
+    prefs.theme = { bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 };
+    applyTheme(prefs.theme); savePrefs(); openSettings();
+  };
   applyTheme(prefs.theme||{});
 
   /*************** Focus Mode UI helpers ***************/
@@ -1741,7 +1696,6 @@
         </div>
       </div>`).join('') : `<div class="text-xs muted">No links for this section.</div>`;
 
-    // Click to open links (read-only in focus)
     focusLinksDiv.querySelectorAll('.section-link').forEach(card=>{
       card.addEventListener('click', ()=>{
         const i = Number(card.dataset.idx);
@@ -1772,15 +1726,8 @@
     updateClockColor();
     updateStartBtnLabel();
   }
-  function showFocus(){
-    if(!focusOverlay) return;
-    renderFocusUI();
-    focusOverlay.classList.remove('hidden');
-  }
-  function hideFocus(){
-    if(!focusOverlay) return;
-    focusOverlay.classList.add('hidden');
-  }
+  function showFocus(){ renderFocusUI(); focusOverlay.classList.remove('hidden'); }
+  function hideFocus(){ focusOverlay.classList.add('hidden'); }
   if(focusModeBtn) focusModeBtn.onclick = showFocus;
   if(focusExitBtn) focusExitBtn.onclick = hideFocus;
 
@@ -1798,7 +1745,6 @@
     sectionNotes[s.id] = sectionNotes[s.id] || '';
     sectionDescEl.value = sectionNotes[s.id];
     sectionDescEl.disabled = !isEditingSection;
-    autoGrow(sectionDescEl);
 
     renderCurrentLinks();
     setClockText(secsToClock(secondsLeft));
@@ -1806,70 +1752,53 @@
   }
   function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
 
-  // ---------- Sounds ----------
+  // ------- Ringtone / Audio --------
   let ctx = null;
-  function unlockAudio(){
+  function ensureAudio(){
     try{
       if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
       if(ctx.state === 'suspended') ctx.resume();
     }catch{}
   }
   ['click','keydown','touchstart','pointerdown'].forEach(ev=>{
-    document.addEventListener(ev, unlockAudio, { once:true, passive:true });
+    document.addEventListener(ev, ensureAudio, { once:true, passive:true });
   });
 
-  function playBeep(preview=false){
+  function playRingtone(override){
     try{
       ensureAudio();
-      const tone = (prefs.sound?.tone)||'chime';
-      const durMs = Math.max(100, Math.min(5000, Number(prefs.sound?.durationMs)||500));
-      const now = ctx.currentTime;
-      const dur = (durMs/1000);
+      const cfg = Object.assign({ type:'beep', duration:700, volume:0.6 }, prefs?.ring||{}, override||{});
+      const vol = Math.max(0, Math.min(1, cfg.volume));
+      const dur = Math.max(100, Math.min(6000, Math.floor(cfg.duration)));
+      const endAt = (sec)=> setTimeout(()=>{ try{ g.disconnect(); }catch{} }, Math.ceil(sec*1000)+10);
 
-      const gain = ctx.createGain();
-      gain.gain.value = 0.06;
-      gain.connect(ctx.destination);
+      const g = ctx.createGain(); g.gain.value = vol; g.connect(ctx.destination);
 
-      const makeOsc = (type, freq, start, length, vol=1)=>{
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = type;
-        o.frequency.setValueAtTime(freq, now + start);
-        g.gain.setValueAtTime(0, now + start);
-        g.gain.linearRampToValueAtTime(0.7*vol, now + start + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + start + length);
-        o.connect(g); g.connect(gain);
-        o.start(now + start);
-        o.stop(now + start + length + 0.05);
-      };
-
-      // simple patterns
-      if(tone==='digital'){
-        makeOsc('square', 880, 0, Math.min(0.2, dur));
-      }else if(tone==='soft'){
-        makeOsc('triangle', 660, 0, Math.min(0.35, dur));
-      }else if(tone==='bell'){
-        makeOsc('sine', 880, 0, Math.min(0.35, dur), 1.0);
-        makeOsc('sine', 1320, 0.01, Math.min(0.28, dur-0.01), 0.6);
-      }else if(tone==='alarm'){
-        // two quick beeps repeating while duration lasts
-        const unit = 0.18;
-        const reps = Math.max(1, Math.floor(dur / (unit*2)));
-        for(let i=0;i<reps;i++){
-          const t = i*unit*2;
-          makeOsc('square', 760, t, unit*0.7, 0.9);
-          makeOsc('square', 760, t+unit, unit*0.7, 0.9);
-        }
-      }else{ // chime (default)
-        makeOsc('sine', 660, 0, Math.min(0.25, dur), 0.9);
-        makeOsc('sine', 990, 0.02, Math.min(0.22, dur-0.02), 0.6);
+      if(cfg.type === 'chime'){
+        // Two quick sines (do + mi)
+        const o1 = ctx.createOscillator(); o1.type='sine'; o1.frequency.value=784; o1.connect(g);
+        const o2 = ctx.createOscillator(); o2.type='sine'; o2.frequency.value=988; o2.connect(g);
+        o1.start(); setTimeout(()=>o2.start(), Math.max(60, dur*0.35));
+        setTimeout(()=>{ try{o1.stop();o2.stop();}catch{}; endAt(dur/1000); }, dur);
+      } else if(cfg.type === 'bell'){
+        // Soft decaying bell (AM + decay)
+        const o = ctx.createOscillator(); o.type='triangle'; o.frequency.value=880; o.connect(g);
+        const decay = ctx.createGain(); decay.gain.value = vol;
+        o.connect(decay); decay.connect(ctx.destination);
+        o.start();
+        decay.gain.setTargetAtTime(0.0001, ctx.currentTime + 0.05, Math.max(0.05, dur/1000/3));
+        setTimeout(()=>{ try{o.stop();}catch{}; endAt(dur/1000); }, dur);
+      } else {
+        // Default: short square beep with gain ramp
+        const o = ctx.createOscillator(); o.type='square'; o.frequency.value=880; o.connect(g);
+        o.start();
+        setTimeout(()=>{ try{o.stop();}catch{}; endAt(dur/1000); }, dur);
       }
-
-      // preview a little louder
-      if(preview){ gain.gain.value = 0.09; setTimeout(()=>{ try{ gain.disconnect(); }catch{} }, durMs+200); }
-      else { setTimeout(()=>{ try{ gain.disconnect(); }catch{} }, Math.max(400, durMs)); }
     }catch{}
   }
+
+  // Default landing view
+  showTab('landingTab');
 
   setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
   if(prefs.focusDefault) showFocus();
