@@ -259,7 +259,11 @@ export function setupSavedOutlines({
         titleEl.addEventListener('dragstart', (e)=>{
           draggingOutlineId = o.id; isMergeDrag = true; window.__draggingOutlineId = o.id;
           document.body.classList.add('is-merge-drag');
-          try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'merge', id:o.id})); }catch{}
+          try{
+            e.dataTransfer.setData('text/plain', JSON.stringify({type:'merge', id:o.id}));
+            const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+            if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
+          }catch{}
           e.dataTransfer.effectAllowed='move';
           card.classList.add('drag-ghost');
         });
@@ -326,7 +330,11 @@ export function setupSavedOutlines({
           const titleText = (li.querySelector('.title')?.textContent || '').trim();
           dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) };
           li.classList.add('dragging'); li.after(dragging.placeholder);
-          try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'sec-move', from: idx, oid:o.id})); }catch{}
+          try{
+            e.dataTransfer.setData('text/plain', JSON.stringify({type:'sec-move', from: idx, oid:o.id}));
+            const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+            if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
+          }catch{}
           e.dataTransfer.effectAllowed='move';
         });
         li.addEventListener('dragend', ()=>{ li.classList.remove('dragging'); dragging?.placeholder?.remove(); dragging = null; });
@@ -416,7 +424,11 @@ export function setupSavedOutlines({
 
           // Click to edit & delete
           linksBar.querySelectorAll('.section-link').forEach(pill=>{
-            pill.addEventListener('dragstart', (e)=>{ const index = Number(pill.dataset.idx); try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'reorder', index})); }catch{} e.dataTransfer.effectAllowed='move'; pill.classList.add('drag-ghost'); });
+            pill.addEventListener('dragstart', (e)=>{ const index = Number(pill.dataset.idx); try{
+              e.dataTransfer.setData('text/plain', JSON.stringify({type:'reorder', index}));
+              const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+              if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
+            }catch{} e.dataTransfer.effectAllowed='move'; pill.classList.add('drag-ghost'); });
             pill.addEventListener('dragend', ()=> pill.classList.remove('drag-ghost'));
             pill.addEventListener('click', (e)=>{ e.stopPropagation();
               const list = (getSavedOutlines && getSavedOutlines()) || []; const me = byId(list, o.id); if(!me) return;
@@ -460,7 +472,11 @@ export function setupSavedOutlines({
           });
 
           shelfWrap.querySelectorAll('.draggable-shelf').forEach(card=>{
-            card.addEventListener('dragstart', (e)=>{ const id = card.dataset.wid; try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'shelf', id})); }catch{} e.dataTransfer.effectAllowed='copy'; card.classList.add('drag-ghost'); });
+            card.addEventListener('dragstart', (e)=>{ const id = card.dataset.wid; try{
+              e.dataTransfer.setData('text/plain', JSON.stringify({type:'shelf', id}));
+              const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+              if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
+            }catch{} e.dataTransfer.effectAllowed='copy'; card.classList.add('drag-ghost'); });
             card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
             card.addEventListener('click', (e)=>{ e.stopPropagation(); if(!setWidgetShelf) return; const shelf = (getWidgetShelf && getWidgetShelf()) || []; const w = shelf.find(x=>x.id===card.dataset.wid); if(!w) return;
               openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); setWidgetShelf([...shelf]); renderSavedOutlines(); });

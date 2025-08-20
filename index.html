@@ -55,8 +55,8 @@
     /* Make outline title editor narrower on Planner list */
     .outline-edit-title{ max-width:60%; }
 
-    /* Taller description by default on Planner */
-    #sectionDesc{ min-height: 160px; }
+    /* Taller description by default on Planner (~3x) */
+    #sectionDesc{ min-height: 300px; }
   </style>
 </head>
 
@@ -121,17 +121,17 @@
       </div>
 
       <div class="landing-grid">
-        <section class="feature card">
+        <section class="feature card p-4">
           <h3 class="block-title mb-2">Why mini‑goals?</h3>
           <p class="muted text-sm">Teams and individuals finish more when large tasks are split into clear, visible steps. In our internal testing, sessions with at least 4 mini‑goals saw a <span class="stat" data-target="42">0</span>% increase in completion compared with unstructured blocks.</p>
         </section>
 
-        <section class="feature card">
+        <section class="feature card p-4">
           <h3 class="block-title mb-2">Plan once. Stay present.</h3>
           <p class="muted text-sm">Design your outline up front, then work. Skillflow’s progress bar gives instant feedback and guards against drift.</p>
         </section>
 
-        <section class="feature card">
+        <section class="feature card p-4">
           <h3 class="block-title mb-2">Flexible links & notes</h3>
           <p class="muted text-sm">Attach links and notes to each mini‑goal so everything you need is one click away.</p>
         </section>
@@ -229,7 +229,10 @@
             <div id="homeSavedRow" class="mb-3">
               <div class="flex items-center justify-between">
                 <h4 class="block-title">Saved Outlines</h4>
-                <button id="manageOutlinesLink" class="text-xs underline" data-tab-jump="savedTab">Manage</button>
+                <div class="flex items-center gap-2">
+                  <button id="createOutlineFromHome" class="text-xs underline">+ Create</button>
+                  <button id="manageOutlinesLink" class="text-xs underline" data-tab-jump="savedTab">Manage</button>
+                </div>
               </div>
               <div id="homeSavedScroller" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
             </div>
@@ -362,7 +365,7 @@
   <!-- ======= FOCUS MODE ======= -->
   <div id="focusOverlay" class="fixed inset-0 hidden z-[100]">
     <div class="absolute inset-0 bg-[var(--bg)]"></div>
-    <div class="relative z-10 w-full h-full flex items-center justify-center p-6">
+    <div class="relative z-10 w-full h-full flex items-center justify-content-center p-6">
       <div class="max-w-4xl w-full">
         <div class="flex items-center justify-end mb-4">
           <button id="focusExitBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Exit Focus ✕</button>
@@ -670,7 +673,7 @@
             <input id="dlgVal" class="input w-full mb-3" value="${initial}"/>
             <div class="flex justify-end gap-2">
               <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="x">Cancel</button>
-              <button class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-ok="1">OK</button>
+              <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-ok="1">OK</button>
             </div>
           </div>`;
         document.body.appendChild(m);
@@ -1105,7 +1108,12 @@
           openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); saveShelf(); renderShelf(); });
         });
         card.addEventListener('dragstart', e=>{ if(!isEditingSection){ e.preventDefault(); return; }
-          const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid}); try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{} e.dataTransfer.effectAllowed='copy'; card.classList.add('drag-ghost'); });
+          const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid}); try{
+            e.dataTransfer.setData('text/plain', payloadStr);
+            /* remove default ghost image */
+            const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+            if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
+          }catch{} e.dataTransfer.effectAllowed='copy'; card.classList.add('drag-ghost'); });
         card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
       });
       linkShelfDiv.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
@@ -1128,7 +1136,11 @@
       linksDiv.querySelectorAll('.section-link').forEach(card=>{
         card.addEventListener('dragstart', e=>{ if(!isEditingSection){ e.preventDefault(); return; }
           const index=Number(card.dataset.idx);
-          const payloadStr = JSON.stringify({type:'reorder', index}); try{ e.dataTransfer.setData('text/plain', payloadStr); }catch{} e.dataTransfer.effectAllowed='move'; card.classList.add('drag-ghost'); });
+          const payloadStr = JSON.stringify({type:'reorder', index}); try{
+            e.dataTransfer.setData('text/plain', payloadStr);
+            const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+            if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
+          }catch{} e.dataTransfer.effectAllowed='move'; card.classList.add('drag-ghost'); });
         card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
         card.addEventListener('click', ()=>{ const i = Number(card.dataset.idx); const target = sec.links[i]; if(!target) return;
           if(isEditingSection){ openWidgetEditor(target, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); }); }
@@ -1219,7 +1231,11 @@
           const titleText = (li.querySelector('button')?.textContent || '').trim();
           dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) };
           li.classList.add('dragging'); li.after(dragging.placeholder);
-          try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'outline-move', from: idx})); }catch{} e.dataTransfer.effectAllowed='move';
+          try{
+            e.dataTransfer.setData('text/plain', JSON.stringify({type:'outline-move', from: idx}));
+            const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+            if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
+          }catch{} e.dataTransfer.effectAllowed='move';
         });
         li.addEventListener('dragend', ()=>{ li.classList.remove('dragging'); dragging?.placeholder?.remove(); dragging = null; });
         const onOver = (e)=>{ if(!dragging) return; e.preventDefault(); const r = li.getBoundingClientRect(); const before = e.clientY < (r.top + r.height/2); const ph = dragging.placeholder; if(before){ if(li.previousSibling !== ph) outline.insertBefore(ph, li); }else{ if(li.nextSibling !== ph) li.after(ph); } };
@@ -1562,6 +1578,14 @@
     const createFolderForm = $('#createFolderForm'); const newFolderName = $('#newFolderName');
     const createFolderConfirm = $('#createFolderConfirm'); const createFolderCancel = $('#createFolderCancel');
     const folderCrumbs = $('#folderCrumbs');
+    const createOutlineFromHome = $('#createOutlineFromHome');
+    if(createOutlineFromHome){
+      createOutlineFromHome.onclick = ()=>{
+        showTab('savedTab');
+        requestAnimationFrame(()=> document.getElementById('createOutlineBtn')?.click());
+      };
+    }
+
     let currentFolderId = null;
 
     createFolderBtn.onclick = ()=>{ createFolderForm.classList.toggle('hidden'); if(!createFolderForm.classList.contains('hidden')){ newFolderName.value=''; newFolderName.focus(); } };
@@ -1598,9 +1622,10 @@
         });
       });
 
-      // Folder icons grid
+      // Folder icons grid (with delete bins)
       folderGrid.innerHTML = savedFolders.map(f=>`
         <div class="folder-card" data-fid="${f.id}" title="${escapeHtml(f.name)}" draggable="false">
+          <button class="folder-del" data-act="del-folder" title="Delete folder">🗑️</button>
           <div class="folder-icon"></div>
           <div class="folder-name truncate">${escapeHtml(f.name)}</div>
         </div>`).join('');
@@ -1616,6 +1641,24 @@
           const o = savedOutlines.find(x=>x.id===oid); if(!o) return;
           o.folderId = card.dataset.fid;
           saveOutlinesLocal(); touchCloud(); renderSavedOutlines();
+        });
+      });
+      // Delete handlers
+      folderGrid.querySelectorAll('[data-act="del-folder"]').forEach(btn=>{
+        btn.addEventListener('click', async (e)=>{
+          e.stopPropagation();
+          const fid = btn.closest('.folder-card')?.dataset.fid;
+          if(!fid) return;
+          const ok = await sfConfirm('Delete this folder? Outlines inside will be moved to Main.');
+          if(!ok) return;
+          // Move outlines out of the folder
+          savedOutlines.forEach(o => { if(o.folderId === fid) o.folderId = null; });
+          // Delete folder
+          const idx = savedFolders.findIndex(f=>f.id===fid);
+          if(idx>=0){ savedFolders.splice(idx,1); }
+          saveFoldersLocal(); saveOutlinesLocal(); touchCloud();
+          if(currentFolderId===fid) currentFolderId=null;
+          renderFoldersUI(); renderSavedOutlines();
         });
       });
     }
