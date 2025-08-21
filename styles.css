@@ -199,12 +199,42 @@ html,body{background:var(--bg);color:var(--fg)}
 .tour{position:fixed;inset:0;z-index:95}
 .tour.hidden{display:none}
 .tour-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.55);backdrop-filter:blur(2px)}
-.tour-panel{position:absolute;left:50%;top:20px;transform:translateX(-50%);max-width:680px;width:calc(100% - 28px);background:var(--panel);border:var(--borderW) solid var(--border);border-radius:14px;padding:16px;box-shadow:0 30px 80px rgba(15,23,42,.35)}
+.tour-panel{
+  position:absolute;
+  left:50%; top:20px; transform:translateX(-50%);
+  max-width:420px; width:calc(100% - 28px);
+  min-height:220px;
+  background:var(--panel);
+  border:var(--borderW) solid var(--border);
+  border-radius:14px;
+  padding:16px;
+  box-shadow:0 30px 80px rgba(15,23,42,.35);
+}
 .tour-title{font-weight:800;margin-bottom:.25rem}
 .tour-body{color:var(--muted);font-size:.95rem}
 .tour-actions{display:flex;align-items:center;gap:.5rem;margin-top:.75rem}
 .tour-actions .spacer{flex:1}
-.spotlight{outline:3px solid var(--accent); outline-offset:2px; border-radius:12px}
+/* arrow */
+.tour-panel::after{
+  content:""; position:absolute; width:0; height:0; border:10px solid transparent;
+}
+.tour-panel--top::after{ /* panel BELOW anchor: arrow on top pointing up */
+  top:-20px; left:24px; border-bottom-color:var(--panel);
+}
+.tour-panel--bottom::after{ /* panel ABOVE anchor: arrow on bottom pointing down */
+  bottom:-20px; left:24px; border-top-color:var(--panel);
+}
+.tour-panel--left::after{ /* panel RIGHT of anchor: arrow on left */
+  left:-20px; top:24px; border-right-color:var(--panel);
+}
+.tour-panel--right::after{ /* panel LEFT of anchor: arrow on right */
+  right:-20px; top:24px; border-left-color:var(--panel);
+}
+/* Spotlighted anchor sits above the backdrop so it's not blurred/dimmed */
+.spotlight{
+  outline:3px solid var(--accent); outline-offset:2px; border-radius:12px;
+  position:relative; z-index:96;
+}
 
 /* ===== Landing page ===== */
 .landing-hero{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;padding:18px}

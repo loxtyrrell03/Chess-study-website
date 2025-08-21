@@ -365,16 +365,17 @@
   <!-- ======= FOCUS MODE ======= -->
   <div id="focusOverlay" class="fixed inset-0 hidden z-[100]">
     <div class="absolute inset-0 bg-[var(--bg)]"></div>
-    <div class="relative z-10 w-full h-full flex items-center justify-content-center p-6">
-      <div class="max-w-4xl w-full">
-        <div class="flex items-center justify-end mb-4">
+    <div class="relative z-10 w-full h-full flex items-center justify-center p-6">
+      <div class="card w-full max-w-3xl mx-auto p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div class="block-sub">Focus mode</div>
           <button id="focusExitBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Exit Focus ✕</button>
         </div>
         <div class="flex flex-col items-center text-center gap-5">
           <h2 id="focusTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight">—</h2>
           <div id="focusMeta" class="muted text-sm"></div>
           <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
-          <div class="w-full max-w-3xl">
+          <div class="w-full">
             <div class="mb-1 flex items-center justify-between">
               <div class="block-sub">Progress</div>
               <div id="focusProgressPct" class="text-xs muted">0%</div>
@@ -386,11 +387,14 @@
               <div id="focusScrubOverlay" class="absolute inset-0 cursor-pointer"></div>
             </div>
           </div>
-          <div id="focusLinksWrap" class="w-full max-w-3xl">
+          <div id="focusLinksWrap" class="w-full">
             <div class="flex items-center justify-between mt-2"><h3 class="block-title">Links</h3></div>
             <div id="focusLinks" class="section-links-bar mt-2"></div>
           </div>
-          <div id="focusDesc" class="text-sm whitespace-pre-wrap max-w-3xl w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
+          <div id="focusDescWrap" class="w-full">
+            <div class="flex items-center justify-between mt-2"><h3 class="block-title">Description</h3></div>
+            <div id="focusDesc" class="text-sm whitespace-pre-wrap w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -668,19 +672,24 @@
         m.className = 'modal';
         m.innerHTML = `
           <div class="modal-backdrop" data-close="x"></div>
-          <div class="modal-panel max-w-[420px]">
-            <div class="mb-2 block-title">${label}</div>
-            <input id="dlgVal" class="input w-full mb-3" value="${initial}"/>
-            <div class="flex justify-end gap-2">
-              <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="x">Cancel</button>
-              <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-ok="1">OK</button>
+          <div class="modal-panel max-w-[520px]">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-lg font-semibold">${label}</h3>
+              <button class="btn-xxs" data-close="1">✕</button>
+            </div>
+            <div class="grid gap-2">
+              <input id="dlgVal" class="input w-full mb-3" value="${initial}"/>
+              <div class="mt-3 flex items-center justify-end gap-2">
+                <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
+                <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-ok="1">OK</button>
+              </div>
             </div>
           </div>`;
         document.body.appendChild(m);
         const inp = m.querySelector('#dlgVal'); inp.focus(); inp.select();
         m.addEventListener('click', (e)=>{
           if(e.target?.dataset?.ok==='1'){ finish(inp.value); }
-          if(e.target?.dataset?.close==='x'){ finish(null); }
+          if(e.target?.dataset?.close==='1' || e.target?.dataset?.close==='x'){ finish(null); }
         });
         function finish(v){ m.classList.add('hidden'); setTimeout(()=>m.remove(), 140); resolve(v); }
       });
@@ -958,55 +967,63 @@
       return 'https://' + host + rest;
     }
 
-    function openWidgetEditor(widget, onSave, onCancel){
-      // kept as an in‑page modal (no browser popup)
-      const modal = document.createElement('div');
-      modal.className = 'modal';
-      modal.innerHTML = `
-        <div class="modal-backdrop" data-close="1"></div>
-        <div class="modal-panel max-w-[520px]">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="text-lg font-semibold">Edit link</h3>
-            <button class="btn-xxs" data-close="1">✕</button>
-          </div>
-          <div class="grid gap-2">
-            <label class="text-sm">Title <input id="wLabel" class="input mt-1" value="${escapeHtml(widget.label || '')}"/></label>
-            <label class="text-sm">URL <input id="wUrl" class="input mt-1" value="${escapeHtml(widget.url || '')}" placeholder="https://… or aimchess.com"/></label>
-            <label class="text-sm">Icon type
-              <select id="wIcon" class="input mt-1">
-                <option value="emoji" ${widget.icon!=='img'?'selected':''}>Emoji/Text</option>
-                <option value="img"   ${widget.icon==='img'?'selected':''}>Image URL</option>
-              </select>
-            </label>
-            <label class="text-sm" id="emojiRow">Emoji/Text <input id="wEmoji" class="input mt-1" value="${escapeHtml(widget.emoji || '')}" placeholder="♟️"/></label>
-            <label class="text-sm hidden" id="imgRow">Image URL <input id="wImg" class="input mt-1" value="${escapeHtml(widget.img || '')}" placeholder="https://…/icon.png"/></label>
-          </div>
-          <div class="mt-3 flex items-center justify-end gap-2">
-            <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
-            <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
-          </div>
-        </div>`;
-      document.body.appendChild(modal);
-      const iconSel = modal.querySelector('#wIcon');
-      const emojiRow = modal.querySelector('#emojiRow');
-      const imgRow   = modal.querySelector('#imgRow');
-      const syncRows = ()=>{ const useImg = iconSel.value==='img'; emojiRow.classList.toggle('hidden', useImg); imgRow.classList.toggle('hidden', !useImg); };
-      syncRows(); iconSel.addEventListener('change', syncRows);
-      const close = ()=>{ modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 140); };
-      modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ onCancel && onCancel(); close(); } });
-      const onEsc = (e)=>{ if(e.key==='Escape'){ onCancel && onCancel(); close(); document.removeEventListener('keydown', onEsc);} };
-      document.addEventListener('keydown', onEsc);
-      modal.querySelector('#wSave').onclick = ()=>{
-        const label = modal.querySelector('#wLabel').value.trim() || 'Untitled';
-        let url     = modal.querySelector('#wUrl').value.trim() || '';
-        url = normalizeUrl(url);
-        const icon  = iconSel.value==='img' ? 'img' : 'emoji';
-        let emoji='', img='';
-        if(icon==='img') img = modal.querySelector('#wImg').value.trim();
-        else emoji = modal.querySelector('#wEmoji').value.trim() || '🔗';
-        onSave({ label, url, icon, emoji, img });
-        onCancel = null; close();
-      };
+    /*************** CLEAR button for Links ***************/
+    clearSectionLinksBtn.onclick = async ()=>{
+      if(!isEditingSection) return;
+      const sec = currentSectionRef(); if(!sec) return;
+      const ok = await sfConfirm('Clear all links from this section?');
+      if(!ok) return;
+      sec.links = [];
+      saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+    };
+
+    /*************** Drag & Drop into Links bar ***************/
+    function computeDropIndexInLinks(e){
+      const sec = currentSectionRef() || { links: [] };
+      const widgets = Array.from(linksDiv.querySelectorAll('.widget'));
+      const target = e.target.closest('.widget');
+      if(target){
+        const idxFromDom = widgets.indexOf(target);
+        const rect = target.getBoundingClientRect();
+        const before = e.clientY < (rect.top + rect.height/2);
+        return Math.max(0, (before ? idxFromDom : idxFromDom + 1));
+      }
+      return (sec.links || []).length;
+    }
+    function setupLinksDnD(){
+      linksDiv.addEventListener('dragover', (e)=>{
+        if(!isEditingSection) return;
+        const payload = parseDropPayload(e.dataTransfer);
+        e.preventDefault();
+        linksDiv.classList.add('drag-over-outline');
+        try{ e.dataTransfer.dropEffect = (payload && payload.type==='reorder') ? 'move' : 'copy'; }catch{}
+      });
+      linksDiv.addEventListener('dragleave', ()=> linksDiv.classList.remove('drag-over-outline'));
+      linksDiv.addEventListener('drop', (e)=>{
+        if(!isEditingSection) return;
+        e.preventDefault();
+        linksDiv.classList.remove('drag-over-outline');
+        const payload = parseDropPayload(e.dataTransfer);
+        const sec = currentSectionRef(); if(!sec) return;
+        const dropIdx = computeDropIndexInLinks(e);
+
+        if(payload?.type === 'shelf'){
+          const w = widgetShelf.find(x=>x.id===payload.id);
+          if(!w) return;
+          const copy = { label:w.label, url:normalizeUrl(w.url||''), icon:w.icon||'emoji', emoji:w.emoji||'🔗', img:w.img||'' };
+          sec.links = sec.links || [];
+          sec.links.splice(dropIdx, 0, copy);
+          saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+        } else if(payload?.type === 'reorder'){
+          const from = Number(payload.index);
+          if(Number.isFinite(from) && sec.links && from>=0 && from<sec.links.length){
+            const [moved] = sec.links.splice(from, 1);
+            const to = from < dropIdx ? dropIdx - 1 : dropIdx;
+            sec.links.splice(Math.max(0, Math.min(sec.links.length, to)), 0, moved);
+            saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+          }
+        }
+      });
     }
 
     /*************** Current panel (Home) ***************/
@@ -1099,9 +1116,8 @@
         </div>`;
     }
     function renderShelf(){
-      linkShelfDiv.innerHTML = (isEditingSection ? `<button class="add-pill" data-act="add-shelf"> Add</button>` : '')
-        + widgetShelf.map(widgetCardHTML).join('');
-      linkShelfDiv.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=> addWidgetBtn.click());
+      // removed inline "+Add" pill; use "+ New Widget" button instead
+      linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
       linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
         card.addEventListener('click', ()=>{ if(!isEditingSection) return;
           const w = widgetShelf.find(x=>x.id===card.dataset.wid); if(!w) return;
@@ -1542,6 +1558,54 @@
       { tab:'savedTab',    title:'Saved Outlines & Folders', body:'Reuse sessions. Double‑click a folder to open it. Drag cards onto folders/breadcrumbs to move them.', anchor:'#foldersWrap' },
     ];
     let stepIndex = 0;
+
+    function placeTourPanel(anchorEl){
+      const panel = document.querySelector('.tour-panel');
+      if(!panel){ return; }
+      panel.classList.remove('tour-panel--top','tour-panel--bottom','tour-panel--left','tour-panel--right');
+      // default position (no anchor)
+      if(!anchorEl){
+        panel.style.left='50%'; panel.style.top='20px'; panel.style.transform='translateX(-50%)';
+        return;
+      }
+      const vw = window.innerWidth, vh = window.innerHeight, margin = 12;
+      // First, ensure panel has content laid out so offsetWidth/Height are real
+      const panelW = Math.min(420, vw-28);
+      const panelH = Math.max(220, panel.offsetHeight || 220);
+      const r = anchorEl.getBoundingClientRect();
+
+      const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
+      let left=0, top=0, orient='top'; // orient = where arrow sits on the panel
+
+      if(vh - r.bottom >= panelH + margin){
+        // place panel BELOW anchor (arrow on TOP of panel)
+        orient='top';
+        top = r.bottom + margin;
+        left = clamp(r.left + r.width/2 - panelW/2, 14, vw - panelW - 14);
+      } else if(r.top >= panelH + margin){
+        // place panel ABOVE anchor (arrow on BOTTOM)
+        orient='bottom';
+        top = r.top - panelH - margin;
+        left = clamp(r.left + r.width/2 - panelW/2, 14, vw - panelW - 14);
+      } else if(vw - r.right >= panelW + margin){
+        // place to the RIGHT (arrow on LEFT)
+        orient='left';
+        left = r.right + margin;
+        top  = clamp(r.top + r.height/2 - panelH/2, 14, vh - panelH - 14);
+      } else {
+        // place to the LEFT (arrow on RIGHT)
+        orient='right';
+        left = r.left - panelW - margin;
+        top  = clamp(r.top + r.height/2 - panelH/2, 14, vh - panelH - 14);
+      }
+
+      panel.style.width = panelW + 'px';
+      panel.style.left = left + 'px';
+      panel.style.top = top + 'px';
+      panel.style.transform = 'none';
+      panel.classList.add('tour-panel--'+orient);
+    }
+
     function showStep(i){
       stepIndex = Math.max(0, Math.min(steps.length-1, i));
       const s = steps[stepIndex];
@@ -1549,7 +1613,10 @@
       tourTitle.textContent = s.title; tourBody.textContent = s.body;
       tourPrev.disabled = stepIndex===0; tourNext.classList.toggle('hidden', stepIndex===steps.length-1); tourFinish.classList.toggle('hidden', stepIndex!==steps.length-1);
       $$('.spotlight').forEach(el=>el.classList.remove('spotlight'));
-      if(s.anchor){ const el = document.querySelector(s.anchor); if(el){ el.classList.add('spotlight'); el.scrollIntoView({behavior:'smooth', block:'center'}); } }
+      let anchorEl = null;
+      if(s.anchor){ const el = document.querySelector(s.anchor); if(el){ el.classList.add('spotlight'); el.scrollIntoView({behavior:'smooth', block:'center'}); anchorEl = el; } }
+      // position panel after DOM updates/scroll
+      requestAnimationFrame(()=> placeTourPanel(anchorEl));
     }
     function startTour(){ tourOverlay.classList.remove('hidden'); showStep(0); }
     function endTour(){ tourOverlay.classList.add('hidden'); $$('.spotlight').forEach(el=>el.classList.remove('spotlight')); }
@@ -1558,6 +1625,7 @@
     tourNext.onclick = ()=> showStep(stepIndex+1);
     tourFinish.onclick = endTour;
     tourOverlay.addEventListener('click', (e)=>{ if(e.target.classList.contains('tour-backdrop')) endTour(); });
+    window.addEventListener('resize', ()=>{ if(!tourOverlay.classList.contains('hidden')) showStep(stepIndex); });
 
     /*************** Initial render ***************/
     function renderCurrent(){ const s=currentSession[currentIndex]; 
@@ -1569,6 +1637,9 @@
     function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
 
     setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
+    // Set up Links drop target behavior once
+    setupLinksDnD();
+
     // Land on Overview by default
     showTab('overviewTab');
     if(prefs.focusDefault) showFocus();
