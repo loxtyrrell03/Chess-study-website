@@ -185,7 +185,7 @@ html,body{background:var(--bg);color:var(--fg)}
 /* Auth extras */
 .auth-sep{display:flex;align-items:center;gap:.75rem;color:var(--muted);font-size:.9rem}
 .auth-sep span{white-space:nowrap}
-.auth-sep::before,.auth-sep::after{content:"";height:1px;background:color-mix(in srgb,var(--border) 70%,transparent);flex:1}
+.auth-sep::before,.auth-sep::after{content:"";height:1px;background:color-mix(in srgb, var(--border) 70%,transparent);flex:1}
 .btn-wide{min-width:160px;text-align:center}
 
 /* ===== Toasts ===== */
@@ -195,46 +195,32 @@ html,body{background:var(--bg);color:var(--fg)}
 .toast.success{background:#059669}
 .toast.error{background:#dc2626}
 
-/* ===== TOUR overlay ===== */
+/* ===== TOUR overlay (narrower panel, arrow, elevate so highlighted area is unblurred) ===== */
 .tour{position:fixed;inset:0;z-index:95}
 .tour.hidden{display:none}
 .tour-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.55);backdrop-filter:blur(2px)}
+/* Narrower, taller content */
 .tour-panel{
-  position:absolute;
-  left:50%; top:20px; transform:translateX(-50%);
-  max-width:420px; width:calc(100% - 28px);
-  min-height:220px;
+  position:absolute; /* positioned by JS near the anchor */
+  max-width:420px; width:min(420px, calc(100% - 28px));
   background:var(--panel);
   border:var(--borderW) solid var(--border);
-  border-radius:14px;
-  padding:16px;
-  box-shadow:0 30px 80px rgba(15,23,42,.35);
+  border-radius:14px; padding:16px;
+  box-shadow:0 30px 80px rgba(15,23,42,.35)
 }
 .tour-title{font-weight:800;margin-bottom:.25rem}
-.tour-body{color:var(--muted);font-size:.95rem}
+.tour-body{color:var(--muted);font-size:.95rem;line-height:1.35}
 .tour-actions{display:flex;align-items:center;gap:.5rem;margin-top:.75rem}
 .tour-actions .spacer{flex:1}
-/* arrow */
-.tour-panel::after{
-  content:""; position:absolute; width:0; height:0; border:10px solid transparent;
+/* Arrow that points to the anchor */
+.tour-arrow{
+  position:absolute; width:14px; height:14px; background:var(--panel);
+  border:var(--borderW) solid var(--border); transform:rotate(45deg);
+  box-shadow:0 12px 30px rgba(15,23,42,.20); z-index:96
 }
-.tour-panel--top::after{ /* panel BELOW anchor: arrow on top pointing up */
-  top:-20px; left:24px; border-bottom-color:var(--panel);
-}
-.tour-panel--bottom::after{ /* panel ABOVE anchor: arrow on bottom pointing down */
-  bottom:-20px; left:24px; border-top-color:var(--panel);
-}
-.tour-panel--left::after{ /* panel RIGHT of anchor: arrow on left */
-  left:-20px; top:24px; border-right-color:var(--panel);
-}
-.tour-panel--right::after{ /* panel LEFT of anchor: arrow on right */
-  right:-20px; top:24px; border-left-color:var(--panel);
-}
-/* Spotlighted anchor sits above the backdrop so it's not blurred/dimmed */
-.spotlight{
-  outline:3px solid var(--accent); outline-offset:2px; border-radius:12px;
-  position:relative; z-index:96;
-}
+/* Keep highlighted element crisp above the blur */
+.tour-elevate{ position:relative; z-index:120 !important }
+.spotlight{ outline:3px solid var(--accent); outline-offset:2px; border-radius:12px }
 
 /* ===== Landing page ===== */
 .landing-hero{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;padding:18px}

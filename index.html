@@ -123,7 +123,11 @@
       <div class="landing-grid">
         <section class="feature card p-4">
           <h3 class="block-title mb-2">Why mini‑goals?</h3>
-          <p class="muted text-sm">Teams and individuals finish more when large tasks are split into clear, visible steps. In our internal testing, sessions with at least 4 mini‑goals saw a <span class="stat" data-target="42">0</span>% increase in completion compared with unstructured blocks.</p>
+          <ul class="list-disc pl-5 space-y-1 text-sm muted">
+            <li><strong>Tracking progress boosts outcomes.</strong> A meta‑analysis of 138 studies (n≈19,951) found that monitoring progress increases goal attainment—especially when progress is recorded or shared. <em>Harkin et&nbsp;al., 2016</em></li>
+            <li><strong>Be specific.</strong> Specific, challenging goals consistently outperform “do your best” intentions (typical performance effects ≈ 0.42–0.80). <em>Locke &amp; Latham, 2002</em></li>
+            <li><strong>Momentum matters.</strong> Visible head‑starts and proximity to a goal increase completion and effort (e.g., 34% vs 19% completion). <em>Nunes &amp; Drèze, 2006; Kivetz et&nbsp;al., 2006</em></li>
+          </ul>
         </section>
 
         <section class="feature card p-4">
@@ -143,7 +147,7 @@
       <!-- Progress -->
       <section class="mb-4">
         <div class="flex items-center justify-between mb-1">
-          <div class="block-sub">Progress — click to jump</div>
+          <div id="progressLabel" class="block-sub">Progress — click to jump</div>
           <div id="progressPct" class="text-xs muted">0%</div>
         </div>
         <div id="progressHost" class="relative w-full h-6 rounded-2xl overflow-hidden card">
@@ -362,19 +366,24 @@
 
   </div>
 
-  <!-- ======= FOCUS MODE ======= -->
+  <!-- ======= FOCUS MODE (centered card + Description header) ======= -->
   <div id="focusOverlay" class="fixed inset-0 hidden z-[100]">
     <div class="absolute inset-0 bg-[var(--bg)]"></div>
     <div class="relative z-10 w-full h-full flex items-center justify-center p-6">
-      <div class="card w-full max-w-3xl mx-auto p-6">
-        <div class="flex items-center justify-between mb-4">
-          <div class="block-sub">Focus mode</div>
-          <button id="focusExitBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Exit Focus ✕</button>
+      <!-- Centered card wrapper (includes Exit button) -->
+      <div class="card w-full max-w-3xl p-5">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 id="focusTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight">—</h2>
+            <div id="focusMeta" class="muted text-sm"></div>
+          </div>
+          <button id="focusExitBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] shrink-0">Exit Focus ✕</button>
         </div>
-        <div class="flex flex-col items-center text-center gap-5">
-          <h2 id="focusTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight">—</h2>
-          <div id="focusMeta" class="muted text-sm"></div>
+
+        <div class="mt-4 flex flex-col items-center text-center gap-5">
           <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
+
+          <!-- Progress -->
           <div class="w-full">
             <div class="mb-1 flex items-center justify-between">
               <div class="block-sub">Progress</div>
@@ -387,11 +396,15 @@
               <div id="focusScrubOverlay" class="absolute inset-0 cursor-pointer"></div>
             </div>
           </div>
+
+          <!-- Links -->
           <div id="focusLinksWrap" class="w-full">
             <div class="flex items-center justify-between mt-2"><h3 class="block-title">Links</h3></div>
             <div id="focusLinks" class="section-links-bar mt-2"></div>
           </div>
-          <div id="focusDescWrap" class="w-full">
+
+          <!-- Description (header added) -->
+          <div class="w-full">
             <div class="flex items-center justify-between mt-2"><h3 class="block-title">Description</h3></div>
             <div id="focusDesc" class="text-sm whitespace-pre-wrap w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
           </div>
@@ -502,6 +515,7 @@
   <!-- ======= UI TOUR OVERLAY ======= -->
   <div id="tourOverlay" class="tour hidden" aria-hidden="true">
     <div class="tour-backdrop" data-close="1"></div>
+    <div id="tourArrow" class="tour-arrow" aria-hidden="true"></div>
     <div class="tour-panel">
       <div id="tourStepTitle" class="tour-title">Welcome to Skillflow</div>
       <div id="tourStepBody"  class="tour-body">We’ll show you the basics in a few small steps.</div>
@@ -672,24 +686,19 @@
         m.className = 'modal';
         m.innerHTML = `
           <div class="modal-backdrop" data-close="x"></div>
-          <div class="modal-panel max-w-[520px]">
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="text-lg font-semibold">${label}</h3>
-              <button class="btn-xxs" data-close="1">✕</button>
-            </div>
-            <div class="grid gap-2">
-              <input id="dlgVal" class="input w-full mb-3" value="${initial}"/>
-              <div class="mt-3 flex items-center justify-end gap-2">
-                <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
-                <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-ok="1">OK</button>
-              </div>
+          <div class="modal-panel max-w-[420px]">
+            <div class="mb-2 block-title">${label}</div>
+            <input id="dlgVal" class="input w-full mb-3" value="${initial}"/>
+            <div class="flex justify-end gap-2">
+              <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="x">Cancel</button>
+              <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-ok="1">OK</button>
             </div>
           </div>`;
         document.body.appendChild(m);
         const inp = m.querySelector('#dlgVal'); inp.focus(); inp.select();
         m.addEventListener('click', (e)=>{
           if(e.target?.dataset?.ok==='1'){ finish(inp.value); }
-          if(e.target?.dataset?.close==='1' || e.target?.dataset?.close==='x'){ finish(null); }
+          if(e.target?.dataset?.close==='x'){ finish(null); }
         });
         function finish(v){ m.classList.add('hidden'); setTimeout(()=>m.remove(), 140); resolve(v); }
       });
@@ -967,63 +976,55 @@
       return 'https://' + host + rest;
     }
 
-    /*************** CLEAR button for Links ***************/
-    clearSectionLinksBtn.onclick = async ()=>{
-      if(!isEditingSection) return;
-      const sec = currentSectionRef(); if(!sec) return;
-      const ok = await sfConfirm('Clear all links from this section?');
-      if(!ok) return;
-      sec.links = [];
-      saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
-    };
-
-    /*************** Drag & Drop into Links bar ***************/
-    function computeDropIndexInLinks(e){
-      const sec = currentSectionRef() || { links: [] };
-      const widgets = Array.from(linksDiv.querySelectorAll('.widget'));
-      const target = e.target.closest('.widget');
-      if(target){
-        const idxFromDom = widgets.indexOf(target);
-        const rect = target.getBoundingClientRect();
-        const before = e.clientY < (rect.top + rect.height/2);
-        return Math.max(0, (before ? idxFromDom : idxFromDom + 1));
-      }
-      return (sec.links || []).length;
-    }
-    function setupLinksDnD(){
-      linksDiv.addEventListener('dragover', (e)=>{
-        if(!isEditingSection) return;
-        const payload = parseDropPayload(e.dataTransfer);
-        e.preventDefault();
-        linksDiv.classList.add('drag-over-outline');
-        try{ e.dataTransfer.dropEffect = (payload && payload.type==='reorder') ? 'move' : 'copy'; }catch{}
-      });
-      linksDiv.addEventListener('dragleave', ()=> linksDiv.classList.remove('drag-over-outline'));
-      linksDiv.addEventListener('drop', (e)=>{
-        if(!isEditingSection) return;
-        e.preventDefault();
-        linksDiv.classList.remove('drag-over-outline');
-        const payload = parseDropPayload(e.dataTransfer);
-        const sec = currentSectionRef(); if(!sec) return;
-        const dropIdx = computeDropIndexInLinks(e);
-
-        if(payload?.type === 'shelf'){
-          const w = widgetShelf.find(x=>x.id===payload.id);
-          if(!w) return;
-          const copy = { label:w.label, url:normalizeUrl(w.url||''), icon:w.icon||'emoji', emoji:w.emoji||'🔗', img:w.img||'' };
-          sec.links = sec.links || [];
-          sec.links.splice(dropIdx, 0, copy);
-          saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
-        } else if(payload?.type === 'reorder'){
-          const from = Number(payload.index);
-          if(Number.isFinite(from) && sec.links && from>=0 && from<sec.links.length){
-            const [moved] = sec.links.splice(from, 1);
-            const to = from < dropIdx ? dropIdx - 1 : dropIdx;
-            sec.links.splice(Math.max(0, Math.min(sec.links.length, to)), 0, moved);
-            saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
-          }
-        }
-      });
+    function openWidgetEditor(widget, onSave, onCancel){
+      // kept as an in‑page modal (no browser popup)
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-backdrop" data-close="1"></div>
+        <div class="modal-panel max-w-[520px]">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-lg font-semibold">Edit link</h3>
+            <button class="btn-xxs" data-close="1">✕</button>
+          </div>
+          <div class="grid gap-2">
+            <label class="text-sm">Title <input id="wLabel" class="input mt-1" value="${escapeHtml(widget.label || '')}"/></label>
+            <label class="text-sm">URL <input id="wUrl" class="input mt-1" value="${escapeHtml(widget.url || '')}" placeholder="https://… or aimchess.com"/></label>
+            <label class="text-sm">Icon type
+              <select id="wIcon" class="input mt-1">
+                <option value="emoji" ${widget.icon!=='img'?'selected':''}>Emoji/Text</option>
+                <option value="img"   ${widget.icon==='img'?'selected':''}>Image URL</option>
+              </select>
+            </label>
+            <label class="text-sm" id="emojiRow">Emoji/Text <input id="wEmoji" class="input mt-1" value="${escapeHtml(widget.emoji || '')}" placeholder="♟️"/></label>
+            <label class="text-sm hidden" id="imgRow">Image URL <input id="wImg" class="input mt-1" value="${escapeHtml(widget.img || '')}" placeholder="https://…/icon.png"/></label>
+          </div>
+          <div class="mt-3 flex items-center justify-end gap-2">
+            <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
+            <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      const iconSel = modal.querySelector('#wIcon');
+      const emojiRow = modal.querySelector('#emojiRow');
+      const imgRow   = modal.querySelector('#imgRow');
+      const syncRows = ()=>{ const useImg = iconSel.value==='img'; emojiRow.classList.toggle('hidden', useImg); imgRow.classList.toggle('hidden', !useImg); };
+      syncRows(); iconSel.addEventListener('change', syncRows);
+      const close = ()=>{ modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 140); };
+      modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ onCancel && onCancel(); close(); } });
+      const onEsc = (e)=>{ if(e.key==='Escape'){ onCancel && onCancel(); close(); document.removeEventListener('keydown', onEsc);} };
+      document.addEventListener('keydown', onEsc);
+      modal.querySelector('#wSave').onclick = ()=>{
+        const label = modal.querySelector('#wLabel').value.trim() || 'Untitled';
+        let url     = modal.querySelector('#wUrl').value.trim() || '';
+        url = normalizeUrl(url);
+        const icon  = iconSel.value==='img' ? 'img' : 'emoji';
+        let emoji='', img='';
+        if(icon==='img') img = modal.querySelector('#wImg').value.trim();
+        else emoji = modal.querySelector('#wEmoji').value.trim() || '🔗';
+        onSave({ label, url, icon, emoji, img });
+        onCancel = null; close();
+      };
     }
 
     /*************** Current panel (Home) ***************/
@@ -1115,29 +1116,46 @@
           ${isEditingSection ? `<button class="bin" data-act="del-shelf" title="Delete from shelf">🗑️</button>` : ''}
         </div>`;
     }
+
+    // Widget shelf (edit mode) — removed redundant "+ Add" pill, fixed DnD
     function renderShelf(){
-      // removed inline "+Add" pill; use "+ New Widget" button instead
       linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
+
+      // Click to edit
       linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
         card.addEventListener('click', ()=>{ if(!isEditingSection) return;
           const w = widgetShelf.find(x=>x.id===card.dataset.wid); if(!w) return;
           openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); saveShelf(); renderShelf(); });
         });
-        card.addEventListener('dragstart', e=>{ if(!isEditingSection){ e.preventDefault(); return; }
-          const payloadStr = JSON.stringify({type:'shelf', id:card.dataset.wid}); try{
+
+        // Drag payload
+        card.addEventListener('dragstart', e=>{
+          if(!isEditingSection){ e.preventDefault(); return; }
+          const payloadStr = JSON.stringify({ type:'shelf', id:card.dataset.wid });
+          try{
             e.dataTransfer.setData('text/plain', payloadStr);
-            /* remove default ghost image */
-            const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
-            if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
-          }catch{} e.dataTransfer.effectAllowed='copy'; card.classList.add('drag-ghost'); });
+            const img = new Image(); img.src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+            if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img,0,0);
+          }catch{}
+          e.dataTransfer.effectAllowed='copy';
+          card.classList.add('drag-ghost');
+        });
         card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
       });
+
+      // Delete from shelf
       linkShelfDiv.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
-        btn.addEventListener('click', (e)=>{ e.stopPropagation(); if(!isEditingSection) return; const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid; const idx = widgetShelf.findIndex(x=>x.id===wid); if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); }});
+        btn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          if(!isEditingSection) return;
+          const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid;
+          const idx = widgetShelf.findIndex(x=>x.id===wid);
+          if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); }
+        });
       });
     }
 
-    // Current section links
+    // Current section links — now accepts drops from shelf + simple move-to-end reorder
     function renderCurrentLinks(){
       const sec=currentSectionRef(); const arr=sec?.links||[];
       linksDiv.innerHTML = arr.map((w,i)=>`
@@ -1149,30 +1167,88 @@
           ${isEditingSection ? `<button class="bin" data-act="del-link" title="Delete">🗑️</button>` : ''}
         </div>`).join('');
 
+      // Drag existing pills (for reorder)
       linksDiv.querySelectorAll('.section-link').forEach(card=>{
-        card.addEventListener('dragstart', e=>{ if(!isEditingSection){ e.preventDefault(); return; }
+        card.addEventListener('dragstart', e=>{
+          if(!isEditingSection){ e.preventDefault(); return; }
           const index=Number(card.dataset.idx);
-          const payloadStr = JSON.stringify({type:'reorder', index}); try{
+          const payloadStr = JSON.stringify({type:'reorder', index});
+          try{
             e.dataTransfer.setData('text/plain', payloadStr);
             const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
             if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
-          }catch{} e.dataTransfer.effectAllowed='move'; card.classList.add('drag-ghost'); });
+          }catch{}
+          e.dataTransfer.effectAllowed='move';
+          card.classList.add('drag-ghost');
+        });
         card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
-        card.addEventListener('click', ()=>{ const i = Number(card.dataset.idx); const target = sec.links[i]; if(!target) return;
-          if(isEditingSection){ openWidgetEditor(target, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(target, upd); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); }); }
-          else { const url = normalizeUrl(target.url||''); if(url) window.open(url, '_blank', 'noopener'); }
+
+        // Click → edit (when editing) or open (when not)
+        card.addEventListener('click', ()=>{
+          const i = Number(card.dataset.idx); const target = sec.links[i]; if(!target) return;
+          if(isEditingSection){
+            openWidgetEditor(target, (upd)=>{
+              upd.url = normalizeUrl(upd.url);
+              Object.assign(target, upd);
+              saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+            });
+          }else{
+            const url = normalizeUrl(target.url||''); if(url) window.open(url,'_blank','noopener');
+          }
         });
       });
 
+      // Delete link
       if(isEditingSection){
         linksDiv.querySelectorAll('[data-act="del-link"]').forEach(btn=>{
-          btn.addEventListener('click', (e)=>{ e.stopPropagation(); const pill = btn.closest('.widget')?.querySelector('.section-link'); const i = Number(pill?.dataset.idx ?? -1);
+          btn.addEventListener('click', (e)=>{
+            e.stopPropagation();
+            const pill = btn.closest('.widget')?.querySelector('.section-link'); const i = Number(pill?.dataset.idx ?? -1);
             if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); }
           });
         });
       }
+
+      // 👉 Accept drops from the shelf (and move-to-end on reorder)
+      if(isEditingSection){
+        const acceptPayload = p => p && (p.type==='shelf' || p.type==='reorder');
+
+        linksDiv.addEventListener('dragover', (e)=>{
+          let ok=false; try{ ok = acceptPayload(parseDropPayload(e.dataTransfer)); }catch{}
+          if(ok){ e.preventDefault(); linksDiv.classList.add('drag-over-outline'); }
+        });
+        linksDiv.addEventListener('dragleave', ()=> linksDiv.classList.remove('drag-over-outline'));
+        linksDiv.addEventListener('drop', (e)=>{
+          e.preventDefault(); linksDiv.classList.remove('drag-over-outline');
+          let p=null; try{ p = parseDropPayload(e.dataTransfer); }catch{}
+          if(!p) return;
+
+          if(p.type==='shelf'){
+            const wid = p.id; const w = widgetShelf.find(x=>x.id===wid); if(!w) return;
+            sec.links = sec.links || [];
+            // shallow clone so edits don’t change the shelf item
+            sec.links.push({ label:w.label, url:normalizeUrl(w.url||''), emoji:w.emoji, icon:w.icon, img:w.img });
+          }else if(p.type==='reorder'){
+            const from = Number(p.index);
+            if(!Number.isNaN(from) && from>=0 && from<sec.links.length){
+              sec.links.push( sec.links.splice(from,1)[0] ); // move to end (simple behavior)
+            }
+          }
+          saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+        });
+      }
+
       renderFocusLinks();
     }
+
+    // Clear all links in current section
+    clearSectionLinksBtn.onclick = async ()=>{
+      if(!isEditingSection) return;
+      const sec = currentSectionRef(); if(!sec || !(sec.links||[]).length) return;
+      const ok = await sfConfirm('Clear all links from this mini‑goal?'); if(!ok) return;
+      sec.links.length = 0;
+      saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+    };
 
     const syncSavedFromCurrentDebounced = debounce(()=>{ try{ syncSavedFromCurrent(); }catch{} }, 400);
     sectionDescEl.addEventListener('input', ()=>{ if(sectionDescEl.disabled) return; const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); syncSavedFromCurrentDebounced(); });
@@ -1546,86 +1622,122 @@
     }
     function tone(){ playTone(prefs.audio?.tone || 'beep', Number(prefs.audio?.duration || 0.6), Number(prefs.audio?.volume || 0.5)); }
 
-    /*************** TOUR (Overview → Planner) ***************/
+    /*************** TOUR (Overview → Planner) — smarter placement + arrows ***************/
     const learnBtn = $('#learnBasicsBtn'); const tourOverlay = $('#tourOverlay');
     const tourTitle = $('#tourStepTitle'); const tourBody = $('#tourStepBody');
+    const tourPanel = tourOverlay.querySelector('.tour-panel');
+    const tourArrow = $('#tourArrow');
     const tourPrev = $('#tourPrev'); const tourNext = $('#tourNext'); const tourFinish = $('#tourFinish');
+
     const steps = [
-      { tab:'overviewTab', title:'Welcome to Skillflow', body:'We’ll take a 30‑second tour. Click Next.', anchor:null },
-      { tab:'homeTab',     title:'The Planner', body:'A single session with mini‑goals. The progress bar at the top keeps you oriented.', anchor:'#progressHost' },
-      { tab:'homeTab',     title:'Sections & links', body:'Each section can store notes and quick links. Click any link pill to edit.', anchor:'#linksWrap' },
-      { tab:'homeTab',     title:'Right‑pane outline', body:'Drag to reorder, click to jump, Edit to rename/duration.', anchor:'#outline' },
-      { tab:'savedTab',    title:'Saved Outlines & Folders', body:'Reuse sessions. Double‑click a folder to open it. Drag cards onto folders/breadcrumbs to move them.', anchor:'#foldersWrap' },
+      { tab:'overviewTab', title:'Welcome to Skillflow', body:'A 30‑second tour. You can close any time.', anchor:null },
+      { tab:'homeTab', title:'Progress — click to jump', body:'This live bar shows where you are. Click any segment to jump to that mini‑goal.', anchor:'#progressHost', elevate:['#progressHost','#progressLabel','#progressPct'] },
+      { tab:'homeTab', title:'Your current mini‑goal', body:'The entire left pane is the mini‑goal you’re on. Add links you’ll need, jot a quick description or mini‑checklist, and keep moving.', anchor:'#leftPane' },
+      { tab:'homeTab', title:'Right‑pane outline', body:'This is your map. Click to jump, drag to reorder, Edit to rename or change durations.', anchor:'#outline' },
+      { tab:'savedTab', title:'Saved outlines', body:'Reuse sessions as templates. Drag cards onto folders/breadcrumbs to move them.', anchor:'#foldersWrap' },
+      { tab:'savedTab', title:'Create your first outline', body:'Click “Create new outline”, add a few sections, then “Use outline” from the card to load it into the Planner. You can Edit any section later.', anchor:'#createOutlineBtn' },
     ];
     let stepIndex = 0;
 
-    function placeTourPanel(anchorEl){
-      const panel = document.querySelector('.tour-panel');
-      if(!panel){ return; }
-      panel.classList.remove('tour-panel--top','tour-panel--bottom','tour-panel--left','tour-panel--right');
-      // default position (no anchor)
+    function removeSpotlights(){
+      $$('.spotlight').forEach(el=>el.classList.remove('spotlight'));
+      $$('.tour-elevate').forEach(el=>el.classList.remove('tour-elevate'));
+    }
+
+    function placePanelNear(anchorEl){
+      // Default: top-center of viewport
+      const vpW = window.innerWidth, vpH = window.innerHeight;
+      const pad = 12;
+
+      // Reset to auto so we can measure
+      Object.assign(tourPanel.style, { left:'', top:'', transform:'', right:'', bottom:'' });
+      const ph = tourPanel.offsetHeight || 220;
+      const pw = tourPanel.offsetWidth  || 360;
+
       if(!anchorEl){
-        panel.style.left='50%'; panel.style.top='20px'; panel.style.transform='translateX(-50%)';
+        // center-top
+        tourPanel.style.left = `${Math.max(pad, Math.min(vpW - pw - pad, (vpW - pw)/2))}px`;
+        tourPanel.style.top  = `${pad + 8}px`;
+        tourArrow.style.display='none';
         return;
       }
-      const vw = window.innerWidth, vh = window.innerHeight, margin = 12;
-      // First, ensure panel has content laid out so offsetWidth/Height are real
-      const panelW = Math.min(420, vw-28);
-      const panelH = Math.max(220, panel.offsetHeight || 220);
+
       const r = anchorEl.getBoundingClientRect();
+      const spaces = {
+        top:    r.top,
+        bottom: vpH - r.bottom,
+        left:   r.left,
+        right:  vpW - r.right
+      };
 
-      const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
-      let left=0, top=0, orient='top'; // orient = where arrow sits on the panel
+      // Choose side with most room, prefer bottom/top over sides
+      let pos = 'bottom';
+      if(spaces.bottom >= ph + pad) pos='bottom';
+      else if(spaces.top >= ph + pad) pos='top';
+      else if(spaces.right >= pw + pad) pos='right';
+      else if(spaces.left >= pw + pad) pos='left';
 
-      if(vh - r.bottom >= panelH + margin){
-        // place panel BELOW anchor (arrow on TOP of panel)
-        orient='top';
-        top = r.bottom + margin;
-        left = clamp(r.left + r.width/2 - panelW/2, 14, vw - panelW - 14);
-      } else if(r.top >= panelH + margin){
-        // place panel ABOVE anchor (arrow on BOTTOM)
-        orient='bottom';
-        top = r.top - panelH - margin;
-        left = clamp(r.left + r.width/2 - panelW/2, 14, vw - panelW - 14);
-      } else if(vw - r.right >= panelW + margin){
-        // place to the RIGHT (arrow on LEFT)
-        orient='left';
-        left = r.right + margin;
-        top  = clamp(r.top + r.height/2 - panelH/2, 14, vh - panelH - 14);
-      } else {
-        // place to the LEFT (arrow on RIGHT)
-        orient='right';
-        left = r.left - panelW - margin;
-        top  = clamp(r.top + r.height/2 - panelH/2, 14, vh - panelH - 14);
+      const cx = r.left + r.width/2, cy = r.top + r.height/2;
+
+      if(pos==='bottom'){
+        tourPanel.style.top  = `${Math.min(vpH - ph - pad, r.bottom + pad)}px`;
+        tourPanel.style.left = `${Math.max(pad, Math.min(vpW - pw - pad, cx - pw/2))}px`;
+        tourArrow.style.display='block';
+        Object.assign(tourArrow.style, { transform:'rotate(45deg)', top:`${r.bottom + pad - 7}px`, left:`${Math.max(pad+10, Math.min(vpW - pad - 10, cx)) - 7}px` });
+      }else if(pos==='top'){
+        tourPanel.style.top  = `${Math.max(pad, r.top - ph - pad)}px`;
+        tourPanel.style.left = `${Math.max(pad, Math.min(vpW - pw - pad, cx - pw/2))}px`;
+        tourArrow.style.display='block';
+        Object.assign(tourArrow.style, { transform:'rotate(45deg)', top:`${r.top - pad - 7}px`, left:`${Math.max(pad+10, Math.min(vpW - pad - 10, cx)) - 7}px` });
+      }else if(pos==='right'){
+        tourPanel.style.left = `${Math.min(vpW - pw - pad, r.right + pad)}px`;
+        tourPanel.style.top  = `${Math.max(pad, Math.min(vpH - ph - pad, cy - ph/2))}px`;
+        tourArrow.style.display='block';
+        Object.assign(tourArrow.style, { transform:'rotate(45deg)', top:`${cy - 7}px`, left:`${r.right + pad - 7}px` });
+      }else{ // left
+        tourPanel.style.left = `${Math.max(pad, r.left - pw - pad)}px`;
+        tourPanel.style.top  = `${Math.max(pad, Math.min(vpH - ph - pad, cy - ph/2))}px`;
+        tourArrow.style.display='block';
+        Object.assign(tourArrow.style, { transform:'rotate(45deg)', top:`${cy - 7}px`, left:`${r.left - pad - 7}px` });
       }
-
-      panel.style.width = panelW + 'px';
-      panel.style.left = left + 'px';
-      panel.style.top = top + 'px';
-      panel.style.transform = 'none';
-      panel.classList.add('tour-panel--'+orient);
     }
 
     function showStep(i){
       stepIndex = Math.max(0, Math.min(steps.length-1, i));
       const s = steps[stepIndex];
       showTab(s.tab);
-      tourTitle.textContent = s.title; tourBody.textContent = s.body;
-      tourPrev.disabled = stepIndex===0; tourNext.classList.toggle('hidden', stepIndex===steps.length-1); tourFinish.classList.toggle('hidden', stepIndex!==steps.length-1);
-      $$('.spotlight').forEach(el=>el.classList.remove('spotlight'));
+
+      tourTitle.textContent = s.title;
+      tourBody.textContent  = s.body;
+      tourPrev.disabled = stepIndex===0;
+      tourNext.classList.toggle('hidden', stepIndex===steps.length-1);
+      tourFinish.classList.toggle('hidden', stepIndex!==steps.length-1);
+
+      removeSpotlights();
+
       let anchorEl = null;
-      if(s.anchor){ const el = document.querySelector(s.anchor); if(el){ el.classList.add('spotlight'); el.scrollIntoView({behavior:'smooth', block:'center'}); anchorEl = el; } }
-      // position panel after DOM updates/scroll
-      requestAnimationFrame(()=> placeTourPanel(anchorEl));
+      if(s.anchor){
+        anchorEl = document.querySelector(s.anchor);
+        if(anchorEl){
+          // Keep the anchor crisp and above the backdrop
+          anchorEl.classList.add('spotlight','tour-elevate');
+          (s.elevate||[]).forEach(sel => document.querySelector(sel)?.classList.add('tour-elevate'));
+          anchorEl.scrollIntoView({ behavior:'smooth', block:'center' });
+        }
+      }
+      // Place panel smartly to not clash with the anchor
+      placePanelNear(anchorEl);
     }
+
     function startTour(){ tourOverlay.classList.remove('hidden'); showStep(0); }
-    function endTour(){ tourOverlay.classList.add('hidden'); $$('.spotlight').forEach(el=>el.classList.remove('spotlight')); }
-    learnBtn && (learnBtn.onclick = ()=>{ startTour(); });
+    function endTour(){ tourOverlay.classList.add('hidden'); removeSpotlights(); }
+
+    learnBtn && (learnBtn.onclick = ()=> startTour());
     tourPrev.onclick = ()=> showStep(stepIndex-1);
     tourNext.onclick = ()=> showStep(stepIndex+1);
     tourFinish.onclick = endTour;
     tourOverlay.addEventListener('click', (e)=>{ if(e.target.classList.contains('tour-backdrop')) endTour(); });
-    window.addEventListener('resize', ()=>{ if(!tourOverlay.classList.contains('hidden')) showStep(stepIndex); });
+    window.addEventListener('resize', ()=> placePanelNear(document.querySelector(steps[stepIndex].anchor||'')));
 
     /*************** Initial render ***************/
     function renderCurrent(){ const s=currentSession[currentIndex]; 
@@ -1637,9 +1749,6 @@
     function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
 
     setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
-    // Set up Links drop target behavior once
-    setupLinksDnD();
-
     // Land on Overview by default
     showTab('overviewTab');
     if(prefs.focusDefault) showFocus();
