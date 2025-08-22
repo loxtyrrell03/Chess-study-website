@@ -7,14 +7,15 @@
 // • Drag an outline card onto a folder (or breadcrumb) to move it.
 // • Filtering: savedList shows items in current folder (Main shows items without folderId).
 //
-// Edit behavior preserved. Link editing remains available. Widget shelf UI is intentionally removed from Saved nav.
+// All edit/merge/links behavior from earlier versions preserved.
+// Uses window.sfConfirm / window.sfPrompt for in-page dialogs (no browser popups).
 
 export function setupSavedOutlines({
   getSavedOutlines,
   setSavedOutlines,
   saveOutlinesLocal,
-  getWidgetShelf,   // kept in signature for compatibility (not used here)
-  setWidgetShelf,   // kept in signature for compatibility (not used here)
+  getWidgetShelf,
+  setWidgetShelf,
   applyOutline,
   touchCloud,
   renderHomeSavedBar,
@@ -40,6 +41,10 @@ export function setupSavedOutlines({
   const mergeTitleInp = document.getElementById('mergeTitleInput');
   const mergeConfirm  = document.getElementById('mergeConfirmBtn');
   const mergeCancel   = document.getElementById('mergeCancelBtn');
+
+  // Folder DOM lives in index.html (folder grid + breadcrumbs)
+  const folderGrid    = document.getElementById('folderGrid');
+  const folderCrumbs  = document.getElementById('folderCrumbs');
 
   // ---------- UI state ----------
   const expandedOutlines = new Set();
@@ -69,6 +74,13 @@ export function setupSavedOutlines({
     }
   }
 
+  function parsePayload(dt){
+    let str=''; const types = dt?.types ? Array.from(dt.types) : [];
+    if(types.includes('text/plain')) str = dt.getData('text/plain');
+    if(!str && types.includes('text')) str = dt.getData('text');
+    if(!str) str = dt.getData('application/json') || dt.getData('Text') || '';
+    try{ return JSON.parse(str); }catch{ return null; }
+  }
   function normalizeUrl(input){
     let u = (input || '').trim();
     if(!u) return '';
@@ -83,6 +95,15 @@ export function setupSavedOutlines({
     }
     return 'https://' + host + rest;
   }
+  function goHome(){
+    const tabBtn = document.querySelector('.tab-link[data-tab="homeTab"]');
+    if (tabBtn && typeof tabBtn.click === 'function') { tabBtn.click(); return; }
+    const home = document.getElementById('homeTab');
+    if (home) { document.getElementById('savedTab')?.classList.add('hidden'); document.getElementById('helpTab')?.classList.add('hidden'); home.classList.remove('hidden'); home.scrollIntoView({ behavior:'smooth', block:'start' }); return; }
+    if(location.hash !== '#home') location.hash = '#home';
+  }
+
+  // Small dialog helpers from index.html
   const askConfirm = (msg)=> (window.sfConfirm ? window.sfConfirm(msg) : Promise.resolve(confirm(msg)));
   const askPrompt  = (label, def)=> (window.sfPrompt  ? window.sfPrompt(label, def) : Promise.resolve(prompt(label, def)));
 
@@ -138,6 +159,32 @@ export function setupSavedOutlines({
     }).join('');
   }
 
+  function inlineShelfHtml(shelf){
+    const add = `<button class="add-pill" data-act="add-shelf" title="Add widget"> Add</button>`;
+    const items = (shelf||[]).map(w=>{
+      const iconHtml = (w.icon==='img' && w.img)
+        ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
+        : `<span class="link-icon">${escapeHtml(w.emoji || '🔗')}</span>`;
+      return `
+        <div class="widget" data-wid="${escapeHtml(w.id)}">
+          <div class="link-card draggable-shelf" draggable="true" data-wid="${escapeHtml(w.id)}" title="${escapeHtml(w.url || '')}" style="cursor:grab">
+            ${iconHtml}
+            <div class="min-w-0">
+              <div class="truncate" style="font-size:.95rem">${escapeHtml(w.label || 'Untitled')}</div>
+              <div class="text-xs muted truncate">${escapeHtml(w.url || '')}</div>
+            </div>
+          </div>
+          <button class="bin" data-act="del-shelf" title="Delete from shelf">🗑️</button>
+        </div>`;
+    }).join('');
+    return `
+      <div data-role="inline-shelf">
+        <div class="text-xs muted mb-1" style="font-weight:600">Widget shelf</div>
+        <div class="editor-shelf" data-role="shelf-row">${add}${items || ''}</div>
+        <div class="text-xs muted mt-1">Drag from shelf → drop into the “Links” bar below. Click any shelf item to edit.</div>
+      </div>`;
+  }
+
   function sectionEditCardInnerHtml(s){
     const desc = escapeHtml(s.desc || '');
     return `
@@ -151,6 +198,7 @@ export function setupSavedOutlines({
           </div>
         </div>
         <div class="row"><label class="text-sm" style="font-weight:600">Description</label><textarea class="input w-full" data-role="edit-desc">${desc}</textarea></div>
+        ${inlineShelfHtml((getWidgetShelf && getWidgetShelf()) || [])}
         <div class="row"><div class="text-sm font-bold">Links</div><div class="section-links-bar" data-role="links-bar">${linksBarInnerHtml(s.links)}</div></div>
         <div class="row" style="justify-content:end; display:flex;">
           <button class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-act="save-section">Save</button>
@@ -171,7 +219,7 @@ export function setupSavedOutlines({
       if(!card) return;
 
       // Header actions
-      card.querySelector('[data-act="load"]')?.addEventListener('click', ()=>{ applyOutline && applyOutline(o); const homeBtn = document.querySelector('.tab-link[data-tab="homeTab"]'); homeBtn?.click(); });
+      card.querySelector('[data-act="load"]')?.addEventListener('click', ()=>{ applyOutline && applyOutline(o); goHome(); });
       card.querySelector('[data-act="duplicate"]')?.addEventListener('click', async ()=>{
         const list = (getSavedOutlines && getSavedOutlines()) || [];
         const src  = byId(list, o.id); if(!src) return;
@@ -194,6 +242,7 @@ export function setupSavedOutlines({
       });
       card.querySelector('[data-act="toggle-expand"]')?.addEventListener('click', ()=>{ if(expandedOutlines.has(o.id)) expandedOutlines.delete(o.id); else expandedOutlines.add(o.id); renderSavedOutlines(); });
       card.querySelector('[data-act="add-section"]')?.addEventListener('click', ()=>{
+        // Inline add row at top of sections list
         expandedOutlines.add(o.id);
         const me = byId((getSavedOutlines && getSavedOutlines()) || [], o.id); if(!me) return;
         me.sections = me.sections || [];
@@ -203,7 +252,7 @@ export function setupSavedOutlines({
         renderSavedOutlines();
       });
 
-      // Make title draggable for merge + folder move indicator
+      // Make title draggable for merge + for folder move indicator
       const titleEl = card.querySelector('[data-role="outline-title"]');
       if(titleEl){
         titleEl.setAttribute('draggable','true');
@@ -300,8 +349,8 @@ export function setupSavedOutlines({
         const from = dragging.from;
         const rows = Array.from(sectionsList.querySelectorAll('li.outline-row'));
         const phIndex = rows.indexOf(dragging.placeholder);
-        the_to = phIndex < 0 ? rows.length-1 : phIndex;
-        const finalTo = (the_to > from) ? the_to - 1 : the_to;
+        const to = phIndex < 0 ? rows.length-1 : phIndex;
+        const finalTo = (to > from) ? to - 1 : to;
         if(from !== finalTo && from >= 0 && finalTo >= 0){
           const list = (getSavedOutlines && getSavedOutlines()) || [];
           const me   = byId(list, o.id); if(!me) return;
@@ -344,7 +393,7 @@ export function setupSavedOutlines({
           descEl.addEventListener('input', autoSaveDesc);
         }
 
-        // Links bar DnD + edit + delete
+        // Links bar DnD
         if(linksBar){
           let over=0;
           linksBar.addEventListener('dragenter', ()=>{ over++; linksBar.classList.add('drag-over-outline'); });
@@ -352,21 +401,25 @@ export function setupSavedOutlines({
           linksBar.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
           linksBar.addEventListener('drop', (e)=>{
             e.preventDefault(); over=0; linksBar.classList.remove('drag-over-outline');
+            const payload = parsePayload(e.dataTransfer);
             const list = (getSavedOutlines && getSavedOutlines()) || [];
             const me   = byId(list, o.id); if(!me) return;
             const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
             s.links = s.links || [];
-            // Accept drops from Planner shelf via payload type 'shelf'
-            try{
-              const payload = JSON.parse(e.dataTransfer.getData('text/plain') || '{}');
-              if(payload?.type==='shelf'){
-                // We don't access shelf list here; accept a generic link payload if present
-                if(payload.label && payload.url){
-                  s.links.push({ id:'l'+Date.now().toString(36), label:payload.label, url:payload.url, icon:payload.icon||'emoji', emoji:payload.emoji||'🔗', img:payload.img||'' });
-                }
-              }
-            }catch{}
-            setSavedOutlines(list); persist(o.id); renderSavedOutlines();
+            if(payload?.type==='shelf'){
+              const shelf = (getWidgetShelf && getWidgetShelf()) || [];
+              const w = shelf.find(x=>x.id===payload.id);
+              if(!w) return;
+              s.links.push({ id:'l'+Date.now().toString(36), label:w.label, url:w.url, icon:w.icon, emoji:w.emoji||'', img:w.img||'' });
+              setSavedOutlines(list); persist(o.id); renderSavedOutlines();
+            }else if(payload?.type==='reorder'){
+              const from = payload.index;
+              const cards = [...linksBar.querySelectorAll('.section-link')];
+              let to = cards.length; for(let i=0;i<cards.length;i++){ const r = cards[i].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=i; break; } }
+              if(from==null || to==null || from===to) return;
+              const [moved] = s.links.splice(from,1); s.links.splice(to,0,moved);
+              setSavedOutlines(list); persist(o.id); renderSavedOutlines();
+            }
           });
 
           // Click to edit & delete
@@ -381,8 +434,7 @@ export function setupSavedOutlines({
               const list = (getSavedOutlines && getSavedOutlines()) || []; const me = byId(list, o.id); if(!me) return;
               const s    = me.sections?.find(x=>x.id===sec.id); if(!s) return;
               const i    = Number(pill.dataset.idx); const w = s.links?.[i]; if(!w) return;
-              // Use editor from index
-              window.openWidgetEditor && openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); setSavedOutlines(list); persist(o.id); renderSavedOutlines(); });
+              openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); setSavedOutlines(list); persist(o.id); renderSavedOutlines(); });
             });
           });
           linksBar.querySelectorAll('[data-act="del-link"]').forEach(bin=>{
@@ -392,6 +444,48 @@ export function setupSavedOutlines({
               const pill = bin.closest('.widget')?.querySelector('.section-link');
               const i    = Number(pill?.dataset.idx ?? -1);
               if(i>=0){ s.links.splice(i,1); setSavedOutlines(list); persist(o.id); renderSavedOutlines(); }
+            });
+          });
+        }
+
+        // Inline shelf actions
+        const shelfWrap = secEl?.querySelector('[data-role="inline-shelf"]');
+        if(shelfWrap){
+          shelfWrap.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=>{
+            if(!setWidgetShelf) return;
+            const shelf = (getWidgetShelf && getWidgetShelf()) || [];
+            const wid = 'W'+Date.now().toString(36);
+            const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
+            setWidgetShelf([...shelf, placeholder]);
+            const onCancel = ()=>{
+              const s2 = (getWidgetShelf && getWidgetShelf()) || [];
+              const i  = s2.findIndex(x=>x.id===wid);
+              if(i>=0){ s2.splice(i,1); setWidgetShelf([...s2]); }
+              renderSavedOutlines();
+            };
+            openWidgetEditor(placeholder, (upd)=>{
+              const s2 = (getWidgetShelf && getWidgetShelf()) || [];
+              const it = s2.find(x=>x.id===wid);
+              if(it){ upd.url = normalizeUrl(upd.url); Object.assign(it, upd); setWidgetShelf([...s2]); }
+              renderSavedOutlines();
+            }, onCancel);
+          });
+
+          shelfWrap.querySelectorAll('.draggable-shelf').forEach(card=>{
+            card.addEventListener('dragstart', (e)=>{ const id = card.dataset.wid; try{
+              e.dataTransfer.setData('text/plain', JSON.stringify({type:'shelf', id}));
+              const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+              if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
+            }catch{} e.dataTransfer.effectAllowed='copy'; card.classList.add('drag-ghost'); });
+            card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+            card.addEventListener('click', (e)=>{ e.stopPropagation(); if(!setWidgetShelf) return; const shelf = (getWidgetShelf && getWidgetShelf()) || []; const w = shelf.find(x=>x.id===card.dataset.wid); if(!w) return;
+              openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); setWidgetShelf([...shelf]); renderSavedOutlines(); });
+            });
+          });
+          shelfWrap.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
+            btn.addEventListener('click', (e)=>{ e.stopPropagation(); if(!setWidgetShelf) return; const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid;
+              const shelf = (getWidgetShelf && getWidgetShelf()) || []; const idx = shelf.findIndex(x=>x.id===wid);
+              if(idx>=0){ shelf.splice(idx,1); setWidgetShelf([...shelf]); renderSavedOutlines(); }
             });
           });
         }

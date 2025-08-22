@@ -87,7 +87,8 @@
     </div>
   </div>
 
-  <nav class="tabs-bar topnav-links">
+  <button id="navToggle" aria-expanded="false" aria-controls="topnav" title="Menu">☰</button>
+<nav id="topnav" class="tabs-bar topnav-links">
     <button class="tab-link active" data-tab="overviewTab">Overview</button>
     <div class="tab-sep"></div>
     <button class="tab-link" data-tab="homeTab">Planner</button>
@@ -561,6 +562,7 @@
 <div id="tourSpotbox" class="tour-spotbox hidden" aria-hidden="true"></div>
 <!-- Floating arrow + panel -->
 <div id="tourArrow" class="tour-arrow hidden" aria-hidden="true"></div>
+<div id="tourSpotBox" class="tour-spotbox hidden" aria-hidden="true"></div>
 <div id="tourPanel" class="tour-panel hidden" role="dialog" aria-live="polite">
   <div id="tourStepTitle" class="tour-title">Welcome to Skillflow</div>
   <div id="tourStepBody" class="tour-body">We’ll show you the basics in a few small steps.</div>
@@ -691,6 +693,9 @@ function showTab(id){
   }
 }
 const tabsBar = document.querySelector('.topnav-links');
+const navToggleBtn = document.getElementById('navToggle');
+const topbarEl = document.getElementById('topbar') || document.querySelector('.topbar');
+if(navToggleBtn && topbarEl){ navToggleBtn.addEventListener('click', ()=>{ const open = topbarEl.classList.toggle('nav-open'); navToggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false'); }); }
 if(tabsBar){
   tabsBar.addEventListener('click', (e)=>{
     const btn = e.target.closest('.tab-link'); if(!btn) return;
@@ -1463,11 +1468,29 @@ onAuthStateChanged(auth, async (user)=>{
         applyTheme(prefs.theme||{}); applySplitRatio(prefs.splitRatio||56);
         setTimerFromState(timerState); renderAll(); renderHomeSavedBar(); setCloudMode('Saved to cloud ✓');
         if(prefs.focusDefault) showFocus();
+
+// Reveal-on-scroll for Overview
+const revealObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(ent=>{
+    if(ent.isIntersecting){ ent.target.classList.add('in'); revealObserver.unobserve(ent.target); }
+  });
+},{ threshold:.12 });
+document.querySelectorAll('.reveal').forEach(el=> revealObserver.observe(el));
+
       } else { setCloudMode('Cloud sync on'); if(prefs.focusDefault) showFocus(); }
     }catch{ setLocalMode('Cloud read failed'); if(prefs.focusDefault) showFocus(); }
   } else {
     authOpenBtn.classList.remove('hidden'); userBadge.classList.add('hidden'); setLocalMode('Local mode');
     if(prefs.focusDefault) showFocus();
+
+// Reveal-on-scroll for Overview
+const revealObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(ent=>{
+    if(ent.isIntersecting){ ent.target.classList.add('in'); revealObserver.unobserve(ent.target); }
+  });
+},{ threshold:.12 });
+document.querySelectorAll('.reveal').forEach(el=> revealObserver.observe(el));
+
   }
 });
 
@@ -1841,6 +1864,15 @@ function renderAll(){ renderOutline(); buildProgress(); updateProgress(); render
 setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
 showTab('overviewTab');
 if(prefs.focusDefault) showFocus();
+
+// Reveal-on-scroll for Overview
+const revealObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(ent=>{
+    if(ent.isIntersecting){ ent.target.classList.add('in'); revealObserver.unobserve(ent.target); }
+  });
+},{ threshold:.12 });
+document.querySelectorAll('.reveal').forEach(el=> revealObserver.observe(el));
+
 
 /*************** Folders UI helpers (Saved tab container) ***************/
 const folderGrid = $('#folderGrid'); const createFolderBtn = $('#createFolderBtn');
