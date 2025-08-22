@@ -11,43 +11,43 @@
 /* Stronger progress fill & proper layering (planner + focus) */
 #progressSegments{ z-index:0 !important; }
 #progressFill{
-  z-index:2 !important;
-  background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
-  border-right:2px solid var(--accent-600) !important;
+z-index:2 !important;
+background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
+border-right:2px solid var(--accent-600) !important;
 }
 #progressTicks{ z-index:3 !important; }
 #scrubOverlay{ z-index:4 !important; }
 
 #focusProgressSegments{ z-index:0 !important; }
 #focusProgressFill{
-  z-index:2 !important;
-  background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
-  border-right:2px solid var(--accent-600) !important;
+z-index:2 !important;
+background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
+border-right:2px solid var(--accent-600) !important;
 }
 #focusProgressTicks{ z-index:3 !important; }
 #focusScrubOverlay{ z-index:4 !important; }
 
 /* Reorder placeholder (shared) */
 .drop-placeholder{
-  opacity:.6;
-  border:2px dashed var(--accent);
-  background:color-mix(in srgb, var(--accent-100) 60%, transparent);
-  height:var(--ph,44px);
-  border-radius:10px;
-  margin:.125rem 0;
+opacity:.6;
+border:2px dashed var(--accent);
+background:color-mix(in srgb, var(--accent-100) 60%, transparent);
+height:var(--ph,44px);
+border-radius:10px;
+margin:.125rem 0;
 }
 
 /* Compact inline editors height normalization */
 :root { --sf-editor-field-h: 44px; }
 #editMinsInline, #edtValue,
 #editUnitInline, #edtUnit {
-  height: var(--sf-editor-field-h) !important;
-  box-sizing: border-box;
-  font-size: 0.95rem;
-  line-height: normal;
-  padding: 8px 12px 10px 12px;
-  border-radius: 0.75rem;
-  vertical-align: middle;
+height: var(--sf-editor-field-h) !important;
+box-sizing: border-box;
+font-size: 0.95rem;
+line-height: normal;
+padding: 8px 12px 10px 12px;
+border-radius: 0.75rem;
+vertical-align: middle;
 }
 #editMinsInline, #edtValue { padding-right: .75rem; }
 #editUnitInline, #edtUnit { padding-right: 2rem; -webkit-appearance:none; -moz-appearance:none; appearance:none; }
@@ -64,31 +64,16 @@
 <!-- ======= TOP BAR ======= -->
 <header id="topbar" class="topbar">
   <div class="brand">
-    <span class="logo" aria-hidden="true">
-      <!-- Minimal aurora-swirl logo -->
-      <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#a7f3d0"/>
-            <stop offset="1" stop-color="#60a5fa"/>
-          </linearGradient>
-          <linearGradient id="g2" x1="1" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#facc15"/>
-            <stop offset="1" stop-color="#a78bfa"/>
-          </linearGradient>
-        </defs>
-        <circle cx="32" cy="32" r="28" fill="url(#g1)" opacity=".25"/>
-        <path d="M12 40c10-8 16-8 24-2s14 6 16-6" stroke="url(#g2)" stroke-width="6" stroke-linecap="round" fill="none"/>
-      </svg>
-    </span>
+    <span class="logo">📁</span>
     <div class="brand-text">
       <div class="brand-title">Skillflow</div>
       <div class="brand-sub">Structure your training. Master any skill.</div>
     </div>
   </div>
 
-  <button id="navToggle" aria-expanded="false" aria-controls="topnav" title="Menu">☰</button>
-<nav id="topnav" class="tabs-bar topnav-links">
+  <button id="navToggle" aria-label="Toggle navigation">☰</button>
+
+  <nav class="tabs-bar topnav-links">
     <button class="tab-link active" data-tab="overviewTab">Overview</button>
     <div class="tab-sep"></div>
     <button class="tab-link" data-tab="homeTab">Planner</button>
@@ -97,7 +82,7 @@
     <div class="tab-sep"></div>
     <button class="tab-link" data-tab="helpTab">How to use</button>
     <div class="tab-sep"></div>
-    <!-- Pricing button wired into showTab; pricing-tab.js mounts into #pricingTab -->
+    <!-- NEW: visible Pricing button wired into showTab -->
     <button class="tab-link" data-tab="pricingTab">Pricing</button>
   </nav>
 
@@ -119,7 +104,7 @@
 
   <!-- ======= OVERVIEW / LANDING ======= -->
   <section id="overviewTab">
-    <div class="landing-hero card">
+    <div class="landing-hero card aurora-frame reveal">
       <div class="hero-copy">
         <h1 class="hero-title">Turn big goals into <em>mini‑goals</em> and stay on track.</h1>
         <p class="hero-sub">Skillflow is a session‑based planner with a live progress bar that keeps you focused inside a single time block.</p>
@@ -140,53 +125,53 @@
       </div>
     </div>
 
-    <!-- LESS BOXY OVERVIEW: aurora blocks, no borders -->
+    <!-- NEW: vertical stack, aurora-outlined feature cards with friendly copy -->
     <div class="landing-stack">
-      <section class="feature aurora-block p-6 reveal">
+      <section class="feature card aurora-frame reveal p-4">
         <h3 class="block-title mb-2">Why mini‑goals?</h3>
-        <ul class="list-disc pl-5 space-y-2 text-sm muted">
-          <li><strong>Clear beats vague.</strong> Specific targets outperform “do your best” intentions — mini‑goals give you that clarity.</li>
-          <li><strong>Progress you can see.</strong> When you track progress, you’re more likely to finish — especially when you write it down or share it.</li>
-          <li><strong>Small wins, big momentum.</strong> Checking off a mini‑goal gives a quick win that keeps motivation high throughout the session.</li>
-          <li><strong>Built‑in pacing.</strong> Mini‑goals act like checkpoints so you don’t over‑spend time on one part and rush the rest.</li>
+        <ul class="list-disc pl-5 space-y-1 text-sm muted">
+          <li><strong>Specific beats vague.</strong> Swapping “do your best” for clear, bite‑size targets gives you a concrete next step and sharper focus.</li>
+          <li><strong>Progress you can see.</strong> Watching the bar move (and sharing wins) keeps momentum high and makes finishing more likely.</li>
+          <li><strong>Closer feels faster.</strong> As you near the next checkpoint, effort naturally ramps up—mini‑goals create these “finish lines” all through your session.</li>
         </ul>
       </section>
 
-      <section class="feature aurora-block p-6 reveal">
-        <h3 class="block-title mb-4">Mini‑goals vs. “do your best”</h3>
-        <div class="compare-grid">
-          <div class="compare-card">
-            <div class="compare-head">With mini‑goals ✅</div>
-            <ul class="compare-list">
-              <li>Clear targets → consistent output</li>
-              <li>Visible progress keeps you engaged</li>
-              <li>Quick wins reduce procrastination</li>
-              <li>Checkpoints improve time pacing</li>
-              <li>Momentum builds as you get closer</li>
-            </ul>
-          </div>
-          <div class="compare-card">
-            <div class="compare-head bad">“Do your best” ✗</div>
-            <ul class="compare-list bad">
-              <li>Vague aim → easy to drift/zone out</li>
-              <li>Feedback arrives late (at the end)</li>
-              <li>Harder to start — no obvious first step</li>
-              <li>Inconsistent pacing; tasks balloon or stall</li>
-              <li>Motivation dips without visible progress</li>
-            </ul>
-          </div>
-        </div>
-        <p class="mt-3 text-xs muted">Based on well‑established findings in goal‑setting and progress research; results vary by person and task.</p>
-      </section>
-
-      <section class="feature aurora-block p-6 reveal">
+      <section class="feature card aurora-frame reveal p-4">
         <h3 class="block-title mb-2">Plan once. Stay present.</h3>
         <p class="muted text-sm">Design your outline up front, then work. Skillflow’s progress bar gives instant feedback and guards against drift.</p>
       </section>
 
-      <section class="feature aurora-block p-6 reveal">
+      <section class="feature card aurora-frame reveal p-4">
         <h3 class="block-title mb-2">Flexible links & notes</h3>
         <p class="muted text-sm">Attach links and notes to each mini‑goal so everything you need is one click away.</p>
+      </section>
+
+      <!-- NEW: simple side‑by‑side comparison -->
+      <section class="feature card aurora-frame reveal p-4">
+        <h3 class="block-title mb-3">Mini‑goals vs “do your best”</h3>
+        <div class="compare-grid">
+          <div class="compare-card">
+            <div class="compare-head">With mini‑goals ✅</div>
+            <ul class="compare-list">
+              <li>Clear next action; less dithering</li>
+              <li>Visible progress boosts motivation</li>
+              <li>Built‑in checkpoints to course‑correct</li>
+              <li>Lower mental load (one step at a time)</li>
+              <li>Easier to attach the right links/resources</li>
+            </ul>
+          </div>
+          <div class="compare-card">
+            <div class="compare-head bad">“Do your best” ✖︎</div>
+            <ul class="compare-list bad">
+              <li>Vague target → aimless effort</li>
+              <li>Hard to tell if you’re on track</li>
+              <li>Easier to drift or zone out</li>
+              <li>Higher chance of procrastination</li>
+              <li>Resources scattered; more context switching</li>
+            </ul>
+          </div>
+        </div>
+        <p class="text-xs muted mt-3">This guidance reflects well‑established findings on specific goals, progress monitoring, and the goal‑gradient effect.</p>
       </section>
     </div>
   </section>
@@ -243,6 +228,19 @@
               <!-- Label simplified to “Save” when editing (see JS) -->
               <button id="editSectionBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Edit Section</button>
             </div>
+          </div>
+
+          <!-- Shelf -->
+          <div id="shelfWrap" class="mt-4 hidden">
+            <div class="flex items-center justify-between">
+              <h3 class="block-title">Widget shelf</h3>
+              <div class="flex items-center gap-2">
+                <button id="addWidgetBtn" class="btn-xs">+ New Widget</button>
+                <button id="resetShelfBtn" class="btn-xs">Reset Shelf</button>
+              </div>
+            </div>
+            <div id="linkShelf" class="mt-2 editor-shelf"></div>
+            <div class="text-xs muted mt-1">Drag from shelf → links below. Click any item to edit.</div>
           </div>
 
           <!-- Links -->
@@ -325,15 +323,17 @@
       </div>
     </div>
 
-    <!-- Create outline button (form is now an overlay-styled panel via CSS) -->
+    <!-- Create outline (reworked as a small popover next to the button) -->
     <div class="mb-3 flex items-center gap-2">
-      <button id="createOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Create new outline</button>
-      <div id="createOutlineForm" class="card p-4 mb-0 hidden">
-        <label class="text-sm">Outline title</label>
-        <div class="mt-2 flex items-center gap-2">
-          <input id="newOutlineTitle" class="input flex-1" placeholder="e.g., 90-min Balanced Plan"/>
-          <button id="createOutlineConfirm" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Create</button>
-          <button id="createOutlineCancel" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Cancel</button>
+      <div id="createOutlineWrap" class="pop-wrap">
+        <button id="createOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Create new outline</button>
+        <div id="createOutlineForm" class="popover card mb-0 hidden">
+          <label class="text-sm">Outline title</label>
+          <div class="mt-2 flex items-center gap-2">
+            <input id="newOutlineTitle" class="input flex-1" placeholder="e.g., 90‑min Balanced Plan"/>
+            <button id="createOutlineConfirm" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Create</button>
+            <button id="createOutlineCancel" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Cancel</button>
+          </div>
         </div>
       </div>
     </div>
@@ -342,59 +342,73 @@
     <div id="foldersWrap" class="card p-4 mb-4">
       <div class="flex items-center justify-between">
         <div id="folderCrumbs" class="breadcrumbs"></div>
-        <div class="flex items-center gap-2">
+        <div id="createFolderWrap" class="flex items-center gap-2 pop-wrap">
           <button id="createFolderBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ New folder</button>
+          <div id="createFolderForm" class="popover hidden">
+            <div class="flex items-center gap-2">
+              <input id="newFolderName" class="input flex-1" placeholder="Folder name"/>
+              <button id="createFolderConfirm" class="btn-xs">Create</button>
+              <button id="createFolderCancel" class="btn-xs">Cancel</button>
+            </div>
+          </div>
         </div>
       </div>
-      <div id="createFolderForm" class="mt-2 hidden">
-        <div class="flex items-center gap-2">
-          <input id="newFolderName" class="input flex-1" placeholder="Folder name"/>
-          <button id="createFolderConfirm" class="btn-xs">Create</button>
-          <button id="createFolderCancel" class="btn-xs">Cancel</button>
-        </div>
-      </div>
+
       <div id="folderGrid" class="folder-grid mt-3"></div>
     </div>
 
     <hr class="sep-line"/>
 
-    <div class="text-sm muted mb-3">Tip: drag one outline card onto another to propose a merge (only when NOT editing). Drag a card onto a folder (or onto <strong>Main</strong> above) to move it.</div>
+    <div class="text-sm muted mb-3">Tip: drag one outline card onto another to propose a merge (only when NOT editing). Drag a card onto a folder (or breadcrumb) to move it.</div>
     <div id="savedList" class="grid lg:grid-cols-2 gap-4"></div>
   </section>
 
   <!-- ======= HOW TO ======= -->
   <section id="helpTab" class="hidden">
-    <div class="howto-stack">
-      <h2 class="howto-title">How to use Skillflow</h2>
-      <ol class="howto-steps">
-        <li class="howto-step reveal">
-          <h3>1) Create an outline</h3>
-          <p>Go to <strong>Saved</strong> and press <em>+ Create new outline</em>. Add a few mini‑goals with minutes.</p>
-          <button class="btn-xs" data-tab-jump="savedTab">Go to Saved</button>
-        </li>
-        <li class="howto-step reveal">
-          <h3>2) Organize with folders (optional)</h3>
-          <p>Press <em>+ New folder</em> to make folders. Drag & drop outlines onto a folder, or onto <em>Main</em> to move them back.</p>
-        </li>
-        <li class="howto-step reveal">
-          <h3>3) Enrich sections</h3>
-          <p>Open an outline and edit sections to add a title, minutes, helpful links and a short description.</p>
-        </li>
-        <li class="howto-step reveal">
-          <h3>4) Load into the Planner</h3>
-          <p>Click <em>Load</em> on an outline. In the Planner, click the progress bar to jump between mini‑goals.</p>
-        </li>
-        <li class="howto-step reveal">
-          <h3>5) Work the session</h3>
-          <p>Press <em>Start</em>. Stay focused, follow your mini‑goals, and watch the progress bar fill.</p>
-        </li>
-      </ol>
+    <div class="card p-5 space-y-6">
+      <div class="grid md:grid-cols-2 gap-6 items-center">
+        <div>
+          <h3 class="block-title mb-2">Plan once, then execute</h3>
+          <p class="text-sm muted">Create a single focused session and divide it into ordered mini‑goals. The live progress bar shows exactly where you are.</p>
+        </div>
+        <div class="demo-box">
+          <div class="demo-progress small"><div class="demo-fill"></div></div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6 items-center">
+        <div class="order-2 md:order-1 demo-box">
+          <div class="chip">Openings <span class="opacity-70">(15m)</span></div>
+          <div class="chip">Tactics <span class="opacity-70">(20m)</span></div>
+          <div class="chip">Endgames <span class="opacity-70">(25m)</span></div>
+        </div>
+        <div class="order-1 md:order-2">
+          <h3 class="block-title mb-2">Keep useful links at hand</h3>
+          <p class="text-sm muted">Add links to each mini‑goal—resources open in one click so you never break flow.</p>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6 items-center">
+        <div>
+          <h3 class="block-title mb-2">Focus mode</h3>
+          <p class="text-sm muted">A distraction‑reduced workspace with boxed sections, borders, and a larger clock. Perfect for deep work.</p>
+        </div>
+        <div class="demo-box">
+          <div class="focus-demo card">
+            <div class="clock-badge">12:34</div>
+            <div class="demo-progress small"><div class="demo-fill"></div></div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <!-- ======= PRICING (mount target; pricing-tab.js renders here) ======= -->
+  <!-- ======= PRICING ======= -->
   <section id="pricingTab" class="hidden">
-    <div id="pricingMount" class="p-1"></div>
+    <div id="pricingMount" class="card p-5">
+      <h3 class="block-title mb-2">Pricing</h3>
+      <p class="text-sm muted">Loading pricing…</p>
+    </div>
   </section>
 </div>
 
@@ -414,15 +428,6 @@
 
       <div class="mt-4 flex flex-col items-center text-center gap-5">
         <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
-
-        <!-- NEW: Focus controls inside overlay -->
-        <div class="flex flex-wrap items-center justify-center gap-2">
-          <button id="focusStartBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Start Study Session</button>
-          <button id="focusPauseBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Pause</button>
-          <button id="focusPrevBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">◀ Prev</button>
-          <button id="focusNextBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Next ▶</button>
-          <button id="focusReadyNextBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white hidden">I’m ready — start next ▶</button>
-        </div>
 
         <!-- Progress -->
         <div class="w-full">
@@ -513,7 +518,7 @@
   </div>
 </div>
 
-<!-- ======= AUTH MODAL ======= -->
+<!-- ======= AUTH MODAL (unchanged layout) ======= -->
 <div id="authModal" class="modal hidden" aria-hidden="true">
   <div class="modal-backdrop" data-close="1"></div>
   <div class="modal-panel max-w-[520px]" role="dialog" aria-modal="true">
@@ -558,11 +563,10 @@
 <div id="tourOverlay" class="tour hidden" aria-hidden="true">
   <div class="tour-backdrop" data-close="1"></div>
 </div>
-<!-- Single highlight box -->
-<div id="tourSpotbox" class="tour-spotbox hidden" aria-hidden="true"></div>
-<!-- Floating arrow + panel -->
-<div id="tourArrow" class="tour-arrow hidden" aria-hidden="true"></div>
+<!-- Big spotbox for grouped highlights -->
 <div id="tourSpotBox" class="tour-spotbox hidden" aria-hidden="true"></div>
+<!-- Floating (always on top) arrow + panel -->
+<div id="tourArrow" class="tour-arrow hidden" aria-hidden="true"></div>
 <div id="tourPanel" class="tour-panel hidden" role="dialog" aria-live="polite">
   <div id="tourStepTitle" class="tour-title">Welcome to Skillflow</div>
   <div id="tourStepBody" class="tour-body">We’ll show you the basics in a few small steps.</div>
@@ -590,6 +594,7 @@ import { getFirestore, doc, getDoc, setDoc, serverTimestamp, deleteField } from 
 
 import { setupSavedOutlines } from "./saved-outlines.js";
 
+/*************** Firebase config ***************/
 const firebaseConfig = {
   apiKey: "AIzaSyAMyUlfqqOlnt-kHO-C-vB_rzJ-9eudxck",
   authDomain: "chessstudyplanner.firebaseapp.com",
@@ -605,13 +610,18 @@ getAnalytics(app);
 /*************** Local state + helpers ***************/
 const saveJSON = (k,v)=> localStorage.setItem(k, JSON.stringify(v));
 const loadJSON = (k)=> { try{ return JSON.parse(localStorage.getItem(k)); }catch{ return null } };
-const $  = (q)=> document.querySelector(q);
+const $ = (q)=> document.querySelector(q);
 const $$ = (q)=> Array.from(document.querySelectorAll(q));
+
+/* Mobile nav toggle */
+const navToggle = $('#navToggle');
+const topbar = $('#topbar');
+navToggle?.addEventListener('click', ()=> topbar.classList.toggle('nav-open'));
 
 // Primary state
 let currentSession = loadJSON('current_session_v1') || [];
-let sectionNotes   = loadJSON('section_notes_v1') || {};
-let widgetShelf    = loadJSON('linkShelf_v1') || [
+let sectionNotes = loadJSON('section_notes_v1') || {};
+let widgetShelf = loadJSON('linkShelf_v1') || [
   { id:'w_lichess', label:'Lichess', url:'https://lichess.org', icon:'img', img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
   { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img', img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
   { id:'w_chessable',label:'Chessable', url:'https://www.chessable.com', icon:'emoji', emoji:'📘' }
@@ -624,10 +634,10 @@ let prefs = loadJSON('prefs_v1') || {
   audio:{ volume:0.5, tone:'beep', duration:0.6 }
 };
 let savedOutlines = loadJSON('saved_outlines_v1') || [];
-let savedFolders  = loadJSON('outline_folders_v1') || []; // {id, name}
-let timerState    = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0, awaitingNext:false };
+let savedFolders = loadJSON('outline_folders_v1') || []; // {id, name}
+let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0, awaitingNext:false };
 
-// Cloud
+/*************** Cloud ***************/
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: "select_account" });
@@ -637,9 +647,9 @@ const userDocRef = (uid)=> doc(db, 'users', uid, 'apps', 'chess_planner_v2');
 
 const debounce = (fn,ms=1000)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
 let dirty = false;
-const markDirty   = ()=> { dirty = true; };
-const setLocalMode= (m='Local mode')=> cloudStatus.textContent = m;
-const setCloudMode= (m='Cloud sync on')=> cloudStatus.textContent = m;
+const markDirty = ()=> { dirty = true; };
+const setLocalMode = (m='Local mode')=> cloudStatus.textContent = m;
+const setCloudMode = (m='Cloud sync on')=> cloudStatus.textContent = m;
 
 const saveCloudDebounced = debounce(async ()=>{
   if(!currentUser) return;
@@ -662,12 +672,12 @@ window.addEventListener('beforeunload', ()=>{ if(currentUser) saveCloudDebounced
 
 // Local save wrappers
 const saveCurrentSession = ()=>{ saveJSON('current_session_v1', currentSession); markDirty(); touchCloud(); };
-const saveNotes          = ()=>{ saveJSON('section_notes_v1', sectionNotes); markDirty(); touchCloud(); };
-const saveShelf          = ()=>{ saveJSON('linkShelf_v1', widgetShelf); markDirty(); touchCloud(); };
-const savePrefs          = ()=>{ saveJSON('prefs_v1', prefs); markDirty(); touchCloud(); };
-const saveOutlinesLocal  = ()=>{ saveJSON('saved_outlines_v1', savedOutlines); markDirty(); touchCloud(); };
-const saveFoldersLocal   = ()=>{ saveJSON('outline_folders_v1', savedFolders); markDirty(); touchCloud(); };
-const saveTimerLocal     = ()=>{ saveJSON('timer_state_v2', timerState); markDirty(); touchCloud(); };
+const saveNotes = ()=>{ saveJSON('section_notes_v1', sectionNotes); markDirty(); touchCloud(); };
+const saveShelf = ()=>{ saveJSON('linkShelf_v1', widgetShelf); markDirty(); touchCloud(); };
+const savePrefs = ()=>{ saveJSON('prefs_v1', prefs); markDirty(); touchCloud(); };
+const saveOutlinesLocal = ()=>{ saveJSON('saved_outlines_v1', savedOutlines); markDirty(); touchCloud(); };
+const saveFoldersLocal = ()=>{ saveJSON('outline_folders_v1', savedFolders); markDirty(); touchCloud(); };
+const saveTimerLocal = ()=>{ saveJSON('timer_state_v2', timerState); markDirty(); touchCloud(); };
 
 /*************** Tabs (delegated) ***************/
 function showTab(id){
@@ -684,25 +694,34 @@ function showTab(id){
   if(id==='savedTab'){ renderSavedOutlines(); renderFoldersUI(); }
   if(id==='homeTab') { renderHomeSavedBar(); }
   if(id==='pricingTab'){
-    // Let pricing-tab.js know the tab is visible
-    const mount = document.getElementById('pricingMount');
-    document.dispatchEvent(new CustomEvent('pricing:show', { detail:{ mount } }));
-    if(typeof window.mountPricing === 'function'){
-      try{ window.mountPricing(mount); }catch{}
-    }
+    // Ensure pricing content is mounted from pricing-tab.js
+    try{
+      if(window.mountPricing) window.mountPricing(document.getElementById('pricingMount'));
+      document.dispatchEvent(new CustomEvent('pricing:show', { detail:{ mount: document.getElementById('pricingMount') } }));
+    }catch{}
   }
 }
 const tabsBar = document.querySelector('.topnav-links');
-const navToggleBtn = document.getElementById('navToggle');
-const topbarEl = document.getElementById('topbar') || document.querySelector('.topbar');
-if(navToggleBtn && topbarEl){ navToggleBtn.addEventListener('click', ()=>{ const open = topbarEl.classList.toggle('nav-open'); navToggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false'); }); }
 if(tabsBar){
   tabsBar.addEventListener('click', (e)=>{
     const btn = e.target.closest('.tab-link'); if(!btn) return;
     showTab(btn.dataset.tab);
   });
+
+  // If pricing-tab.js also injects a button, keep only one
+  const dup = tabsBar.querySelectorAll('.tab-link[data-tab="pricingTab"]');
+  if(dup.length > 1){ dup.forEach((el,i)=>{ if(i>0) el.remove(); }); }
 }
 document.querySelectorAll('[data-tab-jump]').forEach(b=> b.onclick = ()=> showTab(b.dataset.tabJump));
+
+/*************** Reveal-on-scroll for Overview ***************/
+const revealEls = $$('.reveal');
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(en=>{
+    if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
+  });
+}, { threshold: 0.12 });
+revealEls.forEach(el=> io.observe(el));
 
 /*************** Toast + in‑page dialogs ***************/
 const toastHost = $('#toastHost');
@@ -760,47 +779,46 @@ function sfPrompt(label, initial=''){
     function finish(v){ m.classList.add('hidden'); setTimeout(()=>m.remove(), 140); resolve(v); }
   });
 }
-// expose
+// make available to Saved Outlines module
 window.sfConfirm = sfConfirm;
-window.sfPrompt  = sfPrompt;
+window.sfPrompt = sfPrompt;
 
 /*************** Progress / Timer ***************/
 const startBtn = $('#startBtn'); const prevBtn=$('#prevBtn'); const nextBtn=$('#nextBtn'); const resetBtn=$('#resetBtn');
 const readyNextBtn = $('#readyNextBtn');
 
 const currentTitleEl = $('#currentTitle'); const sectionDescEl=$('#sectionDesc'); const linksDiv=$('#links');
-const editSectionBtn=$('#editSectionBtn'); const clearSectionLinksBtn=$('#clearSectionLinks');
+const linkShelfDiv=$('#linkShelf'); const shelfWrap=$('#shelfWrap'); const editSectionBtn=$('#editSectionBtn'); const clearSectionLinksBtn=$('#clearSectionLinks');
+const addWidgetBtn=$('#addWidgetBtn'); const resetShelfBtn=$('#resetShelfBtn');
 
 const editTitleInline = $('#editTitleInline');
-const currentDurDisp  = $('#currentDurDisp');
-const editDurInline   = $('#editDurInline');
-const editMinsInline  = $('#editMinsInline');
-const editUnitInline  = $('#editUnitInline');
+const currentDurDisp = $('#currentDurDisp');
+const editDurInline = $('#editDurInline');
+const editMinsInline = $('#editMinsInline');
+const editUnitInline = $('#editUnitInline');
 
 const outline=$('#outline'); const addOutlineItemBtn=$('#addOutlineItem'); const inlineAddRow=$('#inlineAddRow');
 const addTitleInput=$('#addTitleInput'); const addMinsInput=$('#addMinsInput'); const addConfirmBtn=$('#addConfirmBtn'); const addCancelBtn=$('#addCancelBtn');
 const totalMins=$('#totalMins'); const clockEl=$('#clock');
 
 const progressHost=$('#progressHost'), progressFill=$('#progressFill'), progressSegments=$('#progressSegments'),
-      progressTicks=$('#progressTicks'), progressPctEl=$('#progressPct'), legend=$('#legend'), scrubOverlay=$('#scrubOverlay');
+progressTicks=$('#progressTicks'), progressPctEl=$('#progressPct'), legend=$('#legend'), scrubOverlay=$('#scrubOverlay');
 
-// Focus Mode
+// Focus Mode elements
 const focusOverlay = $('#focusOverlay');
 const focusModeBtn = $('#focusModeBtn');
 const focusExitBtn = $('#focusExitBtn');
 const focusTitleEl = $('#focusTitle');
-const focusMetaEl  = $('#focusMeta');
-const focusDescEl  = $('#focusDesc');
+const focusMetaEl = $('#focusMeta');
+const focusDescEl = $('#focusDesc');
 const focusClockEl = $('#focusClock');
 const focusStartBtn= $('#focusStartBtn');
 const focusPauseBtn= $('#focusPauseBtn');
 const focusReadyBtn= $('#focusReadyNextBtn');
-const focusPrevBtn = $('#focusPrevBtn');
-const focusNextBtn = $('#focusNextBtn');
 
 const focusProgressHost=$('#focusProgressHost'), focusProgressFill=$('#focusProgressFill'),
-      focusProgressSegments=$('#focusProgressSegments'), focusProgressTicks=$('#focusProgressTicks'),
-      focusProgressPctEl=$('#focusProgressPct'), focusScrubOverlay=$('#focusScrubOverlay');
+focusProgressSegments=$('#focusProgressSegments'), focusProgressTicks=$('#focusProgressTicks'),
+focusProgressPctEl=$('#focusProgressPct'), focusScrubOverlay=$('#focusScrubOverlay');
 
 const focusLinksDiv = $('#focusLinks');
 
@@ -877,7 +895,7 @@ function tick(){
       stopTimer();
       awaitingNext = true;
       showNextGate();
-      tone();
+      tone(); // use prefs
       markTimer();
       return;
     } else {
@@ -921,29 +939,19 @@ function showNextGate(){ readyNextBtn.classList.remove('hidden'); if(focusReadyB
 function hideNextGate(){ readyNextBtn.classList.add('hidden'); if(focusReadyBtn) focusReadyBtn.classList.add('hidden'); updateStartBtnLabel(); }
 readyNextBtn.onclick = proceedNext; focusReadyBtn && (focusReadyBtn.onclick = proceedNext);
 
-// FIX: Do not reset to beginning on first start if user scrubbed mid-session
 startBtn.onclick = ()=>{
   if(!currentSession.length) return;
   if(awaitingNext) return;
-  if(!sessionStarted){
-    sessionStarted = true;
-    if(secondsLeft<=0 && currentSession[currentIndex]){
-      secondsLeft = minsToSecs(currentSession[currentIndex].minutes||0);
-    }
-    markTimer(); startTimer();
-  } else {
-    running?stopTimer():startTimer();
-  }
+  if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(currentSession[0].minutes||0); totalSessionSecs=scheduleTotalSecs(currentSession); sessionStarted=true; markTimer(); startTimer(); }
+  else{ running?stopTimer():startTimer(); }
 };
 focusStartBtn && (focusStartBtn.onclick = ()=> startBtn.click());
 focusPauseBtn && (focusPauseBtn.onclick = ()=>{ if(running) stopTimer(); });
-focusPrevBtn && (focusPrevBtn.onclick = ()=> prevBtn.click());
-focusNextBtn && (focusNextBtn.onclick = ()=> nextBtn.click());
 
 prevBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } updateStartBtnLabel(); };
 nextBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } else stopTimer(); updateStartBtnLabel(); };
 
-// Full reset
+// Full reset: restore from Saved if an active outline exists
 resetBtn.onclick = async ()=>{
   awaitingNext=false; hideNextGate(); stopTimer(); sessionStarted=false;
   const activeId = (timerState && timerState.outlineId) || null;
@@ -1045,39 +1053,42 @@ function normalizeUrl(input){
 }
 
 function openWidgetEditor(widget, onSave, onCancel){
+  // kept as an in‑page modal (no browser popup)
   const modal = document.createElement('div');
   modal.className = 'modal';
   modal.innerHTML = `
-    <div class="modal-backdrop" data-close="1"></div>
-    <div class="modal-panel max-w-[520px]">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-lg font-semibold">Edit link</h3>
-        <button class="btn-xxs" data-close="1">✕</button>
-      </div>
-      <div class="grid gap-2">
-        <label class="text-sm">Title <input id="wLabel" class="input mt-1" value="\${escapeHtml(widget.label || '')}"/></label>
-        <label class="text-sm">URL <input id="wUrl" class="input mt-1" value="\${escapeHtml(widget.url || '')}" placeholder="https://… or aimchess.com"/></label>
-        <label class="text-sm">Icon type
-          <select id="wIcon" class="input mt-1">
-            <option value="emoji" \${widget.icon!=='img'?'selected':''}>Emoji/Text</option>
-            <option value="img" \${widget.icon==='img'?'selected':''}>Image URL</option>
-          </select>
-        </label>
-        <label class="text-sm" id="emojiRow">Emoji/Text <input id="wEmoji" class="input mt-1" value="\${escapeHtml(widget.emoji || '')}" placeholder="♟️"/></label>
-        <label class="text-sm hidden" id="imgRow">Image URL <input id="wImg" class="input mt-1" value="\${escapeHtml(widget.img || '')}" placeholder="https://…/icon.png"/></label>
-      </div>
-      <div class="mt-3 flex items-center justify-end gap-2">
-        <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
-        <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
-      </div>
-    </div>`;
+  <div class="modal-backdrop" data-close="1"></div>
+  <div class="modal-panel max-w-[520px]">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-lg font-semibold">Edit link</h3>
+      <button class="btn-xxs" data-close="1">✕</button>
+    </div>
+    <div class="grid gap-2">
+      <label class="text-sm">Title <input id="wLabel" class="input mt-1" value="${escapeHtml(widget.label || '')}"/></label>
+      <label class="text-sm">URL <input id="wUrl" class="input mt-1" value="${escapeHtml(widget.url || '')}" placeholder="https://… or aimchess.com"/></label>
+      <label class="text-sm">Icon type
+        <select id="wIcon" class="input mt-1">
+          <option value="emoji" ${widget.icon!=='img'?'selected':''}>Emoji/Text</option>
+          <option value="img" ${widget.icon==='img'?'selected':''}>Image URL</option>
+        </select>
+      </label>
+      <label class="text-sm" id="emojiRow">Emoji/Text <input id="wEmoji" class="input mt-1" value="${escapeHtml(widget.emoji || '')}" placeholder="♟️"/></label>
+      <label class="text-sm hidden" id="imgRow">Image URL <input id="wImg" class="input mt-1" value="${escapeHtml(widget.img || '')}" placeholder="https://…/icon.png"/></label>
+    </div>
+    <div class="mt-3 flex items-center justify-end gap-2">
+      <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
+      <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
+    </div>
+  </div>`;
   document.body.appendChild(modal);
   const iconSel = modal.querySelector('#wIcon');
   const emojiRow = modal.querySelector('#emojiRow');
   const imgRow = modal.querySelector('#imgRow');
   const syncRows = ()=>{ const useImg = iconSel.value==='img'; emojiRow.classList.toggle('hidden', useImg); imgRow.classList.toggle('hidden', !useImg); };
   syncRows(); iconSel.addEventListener('change', syncRows);
-  const close = ()=>{ modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 140); };
+  const close = ()=>{
+    modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 140);
+  };
   modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ onCancel && onCancel(); close(); } });
   const onEsc = (e)=>{ if(e.key==='Escape'){ onCancel && onCancel(); close(); document.removeEventListener('keydown', onEsc);} };
   document.addEventListener('keydown', onEsc);
@@ -1126,6 +1137,8 @@ function saveMetaEdits(){
 
 editSectionBtn.onclick = ()=>{ if(!isEditingSection){ isEditingSection = true; updateEditUI(); } else { saveMetaEdits(); isEditingSection = false; updateEditUI(); } };
 function updateEditUI(){
+  shelfWrap.classList.toggle('hidden', !isEditingSection);
+  clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
   // Label simplified while editing
   editSectionBtn.textContent = isEditingSection ? 'Save' : 'Edit Section';
 
@@ -1142,14 +1155,86 @@ function updateEditUI(){
     editUnitInline.value = 'minutes';
   }
   sectionDescEl.disabled = !isEditingSection;
-  renderCurrentLinks();
+  renderCurrentLinks(); renderShelf();
 }
 editTitleInline.addEventListener('input', autosizeTitleInput);
 window.addEventListener('resize', ()=>{ if(isEditingSection) autosizeTitleInput(); });
 
 function currentSectionRef(){ return currentSession[currentIndex]; }
 
-// Current section links — accepts shelf drops from Planner shelf
+// Add widget
+addWidgetBtn.onclick = ()=>{ if(!isEditingSection) editSectionBtn.click();
+  const wid = 'W'+Date.now().toString(36);
+  const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
+  widgetShelf = [...widgetShelf, placeholder]; saveShelf(); renderShelf();
+  const onCancel = ()=>{ const idx = widgetShelf.findIndex(x=>x.id===wid); if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); } };
+  openWidgetEditor(placeholder, (upd)=>{ upd.url = normalizeUrl(upd.url); const it = widgetShelf.find(x=>x.id===wid); if(it){ Object.assign(it, upd); saveShelf(); renderShelf(); } }, onCancel);
+};
+resetShelfBtn.onclick = async ()=>{ if(!await sfConfirm('Reset link shelf to defaults?')) return;
+  widgetShelf = [
+    { id:'w_lichess', label:'Lichess', url:'https://lichess.org', icon:'img', img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+    { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img', img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+    { id:'w_chessable',label:'Chessable', url:'https://www.chessable.com', icon:'emoji', emoji:'📘' }
+  ];
+  saveShelf(); renderShelf();
+};
+
+function widgetCardHTML(w){
+  const iconHtml = (w.icon==='img' && w.img)
+    ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
+    : `<span class="link-icon">${escapeHtml(w.emoji || '🔗')}</span>`;
+  return `
+  <div class="widget" data-wid="${escapeHtml(w.id)}">
+    <div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${escapeHtml(w.id)}" title="${escapeHtml(w.url || '')}" style="cursor:${isEditingSection?'grab':'default'}">
+      ${iconHtml}
+      <div class="min-w-0">
+        <div class="truncate" style="font-size:.95rem">${escapeHtml(w.label || 'Untitled')}</div>
+        <div class="text-xs muted truncate">${escapeHtml(w.url || '')}</div>
+      </div>
+    </div>
+    ${isEditingSection ? `<button class="bin" data-act="del-shelf" title="Delete from shelf">🗑️</button>` : ''}
+  </div>`;
+}
+
+// Widget shelf (edit mode)
+function renderShelf(){
+  linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
+
+  // Click to edit
+  linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
+    card.addEventListener('click', ()=>{ if(!isEditingSection) return;
+      const w = widgetShelf.find(x=>x.id===card.dataset.wid); if(!w) return;
+      openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); saveShelf(); renderShelf(); });
+    });
+
+    // Drag payload
+    card.addEventListener('dragstart', e=>{
+      if(!isEditingSection){ e.preventDefault(); return; }
+      const payloadStr = JSON.stringify({ type:'shelf', id:card.dataset.wid });
+      try{
+        e.dataTransfer.setData('text/plain', payloadStr);
+        const img = new Image(); img.src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+        if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img,0,0);
+      }catch{}
+      e.dataTransfer.effectAllowed='copy';
+      card.classList.add('drag-ghost');
+    });
+    card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+  });
+
+  // Delete from shelf
+  linkShelfDiv.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(!isEditingSection) return;
+      const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid;
+      const idx = widgetShelf.findIndex(x=>x.id===wid);
+      if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); }
+    });
+  });
+}
+
+// Current section links — accepts shelf drops
 function renderCurrentLinks(){
   const sec=currentSectionRef(); const arr=sec?.links||[];
   linksDiv.innerHTML = arr.map((w,i)=>`
@@ -1171,7 +1256,8 @@ function renderCurrentLinks(){
         e.dataTransfer.setData('text/plain', payloadStr);
         const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
         if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
-      }catch{} e.dataTransfer.effectAllowed='move';
+      }catch{}
+      e.dataTransfer.effectAllowed='move';
       card.classList.add('drag-ghost');
     });
     card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
@@ -1202,49 +1288,45 @@ function renderCurrentLinks(){
     });
   }
 
-  ensureLinksDnDBindings();
+  // Accept drops (more permissive)
+  if(isEditingSection){
+    let over=0;
+    linksDiv.addEventListener('dragenter', ()=>{ over++; linksDiv.classList.add('drag-over-outline'); });
+    linksDiv.addEventListener('dragleave', ()=>{ over=Math.max(0,over-1); if(!over) linksDiv.classList.remove('drag-over-outline'); });
+    linksDiv.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+    linksDiv.addEventListener('drop', (e)=>{
+      e.preventDefault(); linksDiv.classList.remove('drag-over-outline');
+      let p=null; try{ p = parseDropPayload(e.dataTransfer); }catch{}
+      if(!p) return;
+
+      if(p.type==='shelf'){
+        const wid = p.id; const w = widgetShelf.find(x=>x.id===wid); if(!w) return;
+        sec.links = sec.links || [];
+        sec.links.push({ label:w.label, url:normalizeUrl(w.url||''), emoji:w.emoji, icon:w.icon, img:w.img });
+      }else if(p.type==='reorder'){
+        const from = Number(p.index);
+        if(!Number.isNaN(from) && from>=0 && from<sec.links.length){
+          sec.links.push( sec.links.splice(from,1)[0] ); // move to end
+        }
+      }
+      saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+    });
+  }
+
   renderFocusLinks();
 }
 
-let linksDnDBound = false;
-function ensureLinksDnDBindings(){
-  if(linksDnDBound) return;
-  // Accept drops persistently
-  linksDiv.addEventListener('dragover', (e)=>{
-    if(!isEditingSection) return;
-    e.preventDefault();
-    linksDiv.classList.add('drag-over-outline');
-    try{ if(e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; }catch{}
-  });
+// Clear all links in current section
+clearSectionLinksBtn.onclick = async ()=>{
+  if(!isEditingSection) return;
+  const sec = currentSectionRef(); if(!sec || !(sec.links||[]).length) return;
+  const ok = await sfConfirm('Clear all links from this mini‑goal?'); if(!ok) return;
+  sec.links.length = 0;
+  saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+};
 
-  linksDiv.addEventListener('dragleave', ()=>{
-    linksDiv.classList.remove('drag-over-outline');
-  });
-
-  linksDiv.addEventListener('drop', (e)=>{
-    if(!isEditingSection) return;
-    e.preventDefault();
-    linksDiv.classList.remove('drag-over-outline');
-
-    const sec = currentSectionRef(); if(!sec) return;
-    let p=null; try{ p = parseDropPayload(e.dataTransfer); }catch{}
-    if(!p) return;
-
-    if(p.type==='shelf'){
-      const wid = p.id; const w = widgetShelf.find(x=>x.id===wid); if(!w) return;
-      sec.links = sec.links || [];
-      sec.links.push({ label:w.label, url:normalizeUrl(w.url||''), emoji:w.emoji, icon:w.icon, img:w.img });
-    }else if(p.type==='reorder'){
-      const from = Number(p.index);
-      if(!Number.isNaN(from) && sec.links && from>=0 && from<sec.links.length){
-        sec.links.push( sec.links.splice(from,1)[0] ); // move to end
-      }
-    }
-    saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
-  });
-
-  linksDnDBound = true;
-}
+const syncSavedFromCurrentDebounced = debounce(()=>{ try{ syncSavedFromCurrent(); }catch{} }, 400);
+sectionDescEl.addEventListener('input', ()=>{ if(sectionDescEl.disabled) return; const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); syncSavedFromCurrentDebounced(); });
 
 /*************** Outline (Home) with reorder + delete ***************/
 function renderOutline(){
@@ -1386,12 +1468,12 @@ const homeSavedScroller = $('#homeSavedScroller');
 function renderHomeSavedBar(){
   const activeId = (timerState && timerState.outlineId) || null;
   homeSavedScroller.innerHTML =
-    (savedOutlines.length
-      ? savedOutlines.map(o=>`
-        <button type="button" class="chip ${o.id===activeId ? 'chip-active' : ''}" data-oid="${escapeHtml(o.id)}" title="${escapeHtml(o.title || 'Outline')}">
-          ${escapeHtml(o.title || 'Untitled')}
-        </button>`).join('')
-      : `<div class="text-xs muted">No saved outlines yet.</div>`);
+  (savedOutlines.length
+    ? savedOutlines.map(o=>`
+      <button type="button" class="chip ${o.id===activeId ? 'chip-active' : ''}" data-oid="${escapeHtml(o.id)}" title="${escapeHtml(o.title || 'Outline')}">
+        ${escapeHtml(o.title || 'Untitled')}
+      </button>`).join('')
+    : `<div class="text-xs muted">No saved outlines yet.</div>`);
   homeSavedScroller.querySelectorAll('[data-oid]').forEach(btn=>{
     btn.onclick = ()=>{ const o = savedOutlines.find(x=>x.id===btn.dataset.oid); if(o){ applyOutlineToCurrent(o); requestAnimationFrame(renderHomeSavedBar); } };
   });
@@ -1468,29 +1550,11 @@ onAuthStateChanged(auth, async (user)=>{
         applyTheme(prefs.theme||{}); applySplitRatio(prefs.splitRatio||56);
         setTimerFromState(timerState); renderAll(); renderHomeSavedBar(); setCloudMode('Saved to cloud ✓');
         if(prefs.focusDefault) showFocus();
-
-// Reveal-on-scroll for Overview
-const revealObserver = new IntersectionObserver((entries)=>{
-  entries.forEach(ent=>{
-    if(ent.isIntersecting){ ent.target.classList.add('in'); revealObserver.unobserve(ent.target); }
-  });
-},{ threshold:.12 });
-document.querySelectorAll('.reveal').forEach(el=> revealObserver.observe(el));
-
       } else { setCloudMode('Cloud sync on'); if(prefs.focusDefault) showFocus(); }
     }catch{ setLocalMode('Cloud read failed'); if(prefs.focusDefault) showFocus(); }
   } else {
     authOpenBtn.classList.remove('hidden'); userBadge.classList.add('hidden'); setLocalMode('Local mode');
     if(prefs.focusDefault) showFocus();
-
-// Reveal-on-scroll for Overview
-const revealObserver = new IntersectionObserver((entries)=>{
-  entries.forEach(ent=>{
-    if(ent.isIntersecting){ ent.target.classList.add('in'); revealObserver.unobserve(ent.target); }
-  });
-},{ threshold:.12 });
-document.querySelectorAll('.reveal').forEach(el=> revealObserver.observe(el));
-
   }
 });
 
@@ -1616,7 +1680,7 @@ function playTone(type='beep', duration=0.6, volume=0.5){
       g.gain.setValueAtTime(volume*0.7, now);
       g2.gain.setValueAtTime(volume*0.4, now); g2.gain.exponentialRampToValueAtTime(0.0001, endT);
       g3.gain.setValueAtTime(volume*0.25, now); g3.gain.exponentialRampToValueAtTime(0.0001, endT);
-      o1.connect(g2); o2.connect(g3); g2.connect(g); g.connect(ctx.destination);
+      o1.connect(g2); o2.connect(g3); g2.connect(g); g3.connect(g); g.connect(ctx.destination);
       o1.start(now); o2.start(now); o1.stop(endT+0.02); o2.stop(endT+0.02);
     } else { // woodblock-ish
       const bufferSize = Math.floor(ctx.sampleRate * duration);
@@ -1638,36 +1702,31 @@ const learnBtn = $('#learnBasicsBtn'); const tourOverlay = $('#tourOverlay');
 const tourTitle = $('#tourStepTitle'); const tourBody = $('#tourStepBody');
 const tourPanel = document.getElementById('tourPanel');
 const tourArrow = document.getElementById('tourArrow');
-const tourSpotbox = document.getElementById('tourSpotbox');
 const tourPrev = $('#tourPrev'); const tourNext = $('#tourNext'); const tourFinish = $('#tourFinish');
+const tourSpot = $('#tourSpotBox');
 
-// Helper
+// Helper to prefer exact element
 const qs = (sel)=> document.querySelector(sel);
-
-// Track tour running state
-let tourRunning = false;
 
 const steps = [
   { tab:'overviewTab', title:'Welcome to Skillflow', body:'A 30‑second tour. You can close any time.', anchor:null },
-  { tab:'homeTab', title:'Progress — click to jump', body:'This live bar shows where you are. Click any segment to jump to that mini‑goal.', anchor:'#progressHost', elevate:['#progressHost','#progressLabel','#progressPct'], spotBoxTargets:['#progressHost','#progressLabel','#progressPct'] },
-  { tab:'homeTab', title:'Your current mini‑goal', body:'This left card is the mini‑goal you’re on. Add links you’ll need and a short description.', anchor:'#leftPane .section-card' },
-  { tab:'homeTab', title:'Session outline', body:'This shows the outline of your session. Drag rows to reorder, click Edit to rename or change durations, and click a row to jump.', anchor:'#rightPane .card' },
-  { tab:'savedTab', title:'+ Create new outline', body:'Start here to make a new outline.', anchor:'#createOutlineBtn', elevate:['#createOutlineBtn'], spotBoxTargets:['#createOutlineBtn'] },
-  { tab:'savedTab', title:'+ New folder', body:'Then, make folders to organize your outlines. You can rename folders and drag outlines into them, or back onto Main to move out.', anchor:'#createFolderBtn', elevate:['#createFolderBtn'], spotBoxTargets:['#createFolderBtn'] },
-  { tab:'savedTab', title:'Drag to organize', body:'Drag an outline card onto a folder. Here’s a quick demo.', anchor:'#foldersWrap', demo:'dnd' },
+  { tab:'homeTab', title:'Progress — click to jump', body:'This live bar shows where you are. Click any segment to jump to that mini‑goal.', anchor:'#progressHost', elevate:['#progressHost','#progressLabel','#progressPct'], spot:['#progressHost','#progressLabel'] },
+  { tab:'homeTab', title:'Your current mini‑goal', body:'This left card is the mini‑goal you\'re on. Add links you\'ll need, jot a quick description or mini‑checklist, and keep momentum.', anchor:'#leftPane .section-card' },
+  { tab:'homeTab', title:'Right‑pane outline', body:'This shows the outline of your session. Drag rows to reorder your current session, click Edit to rename or change durations, and click a row to jump.', anchor:'#rightPane .card' },
+  { tab:'savedTab', title:'Create & organize', body:'Click “+ Create new outline” to start, and “+ New folder” to organize outlines. You can drag any outline card into a folder (or breadcrumb) to move it.', anchor:'#createOutlineBtn', elevate:['#createOutlineBtn','#createFolderBtn'], spot:['#createOutlineBtn','#createFolderBtn'], demo:'dnd' },
 ];
 let stepIndex = 0;
 let currentAnchorEl = null;
 let dndGhostEl = null;
-let createdDemoFolder = null;
+let draggingPanel = false;
+let dragOffset = { x:0, y:0 };
 
-// utilities
 function removeSpotlights(){
   $$('.spotlight').forEach(el=>el.classList.remove('spotlight'));
   $$('.tour-elevate').forEach(el=>el.classList.remove('tour-elevate'));
-  tourSpotbox.classList.add('hidden');
+  document.body.classList.remove('is-tour-progress');
   if(dndGhostEl){ dndGhostEl.remove(); dndGhostEl = null; }
-  if(createdDemoFolder){ createdDemoFolder.remove(); createdDemoFolder = null; }
+  if(tourSpot){ tourSpot.classList.add('hidden'); }
 }
 
 function clamp(val, min, max){ return Math.max(min, Math.min(max, val)); }
@@ -1675,9 +1734,37 @@ function rectsOverlap(a, b, pad=8){
   return !(a.right + pad < b.left || a.left - pad > b.right || a.bottom + pad < b.top || a.top - pad > b.bottom);
 }
 
+/* Draw a single rounded rectangle around multiple elements (used for progress + label) */
+function drawSpotbox(selectors){
+  if(!tourSpot) return;
+  const els = (selectors||[]).map(sel=> qs(sel)).filter(Boolean);
+  if(!els.length){ tourSpot.classList.add('hidden'); return; }
+  const pad = 10;
+  let l=Infinity, t=Infinity, r=-Infinity, b=-Infinity;
+  els.forEach(el=>{
+    const rr = el.getBoundingClientRect();
+    l = Math.min(l, rr.left); t = Math.min(t, rr.top);
+    r = Math.max(r, rr.right); b = Math.max(b, rr.bottom);
+  });
+  const W = r - l, H = b - t;
+  Object.assign(tourSpot.style, {
+    left: (l - pad) + 'px',
+    top:  (t - pad) + 'px',
+    width: (W + pad*2) + 'px',
+    height:(H + pad*2) + 'px'
+  });
+  tourSpot.classList.remove('hidden');
+}
+
 function placePanelNear(anchorEl){
-  if(!tourRunning) return;
+  // Default center-top
   const vpW = window.innerWidth, vpH = window.innerHeight, pad = 12;
+
+  // reset to measure
+  Object.assign(tourPanel.style, { left:'', top:'', transform:'', right:'', bottom:'' });
+  tourPanel.classList.remove('hidden');
+  tourArrow.classList.remove('hidden');
+
   const ph = tourPanel.offsetHeight || 220;
   const pw = tourPanel.offsetWidth || 360;
 
@@ -1714,15 +1801,17 @@ function placePanelNear(anchorEl){
     tourPanel.style.top = `${Math.max(pad, Math.min(vpH - ph - pad, cy - ph/2))}px`;
     tourArrow.style.display='block';
     Object.assign(tourArrow.style, { transform:'rotate(45deg)', top:`${cy - 7}px`, left:`${r.right + pad - 7}px` });
-  }else{
+  }else{ // left
     tourPanel.style.left = `${Math.max(pad, r.left - pw - pad)}px`;
     tourPanel.style.top = `${Math.max(pad, Math.min(vpH - ph - pad, cy - ph/2))}px`;
     tourArrow.style.display='block';
     Object.assign(tourArrow.style, { transform:'rotate(45deg)', top:`${cy - 7}px`, left:`${r.left - pad - 7}px` });
   }
 
+  // final nudge if overlapping
   const panelRect = tourPanel.getBoundingClientRect();
   if(rectsOverlap(panelRect, r, 8)){
+    // Nudge vertically if we can
     const shiftDown = Math.max(0, (r.bottom + pad) - panelRect.top);
     const shiftUp = Math.max(0, (panelRect.bottom) - (r.top - pad));
     if(spaces.bottom > spaces.top){
@@ -1733,60 +1822,64 @@ function placePanelNear(anchorEl){
   }
 }
 
-function placeSpotbox(selectors){
-  tourSpotbox.classList.add('hidden');
-  if(!selectors || !selectors.length) return;
-  const rects = selectors.map(sel=> qs(sel)?.getBoundingClientRect()).filter(Boolean);
-  if(!rects.length) return;
-  const combined = rects.reduce((acc,r)=>{
-    return {
-      top: Math.min(acc.top, r.top),
-      left: Math.min(acc.left, r.left),
-      right: Math.max(acc.right, r.right),
-      bottom: Math.max(acc.bottom, r.bottom)
-    };
-  }, {top:Infinity,left:Infinity,right:-Infinity,bottom:-Infinity});
-  const pad = 8;
-  Object.assign(tourSpotbox.style, {
-    top: `${Math.max(8, combined.top - pad)}px`,
-    left:`${Math.max(8, combined.left - pad)}px`,
-    width:`${Math.min(window.innerWidth-16, (combined.right - combined.left) + pad*2)}px`,
-    height:`${Math.min(window.innerHeight-16, (combined.bottom - combined.top) + pad*2)}px`,
-  });
-  tourSpotbox.classList.remove('hidden');
-}
-
 function showDndDemo(){
   if(dndGhostEl){ dndGhostEl.remove(); dndGhostEl=null; }
   const savedList = qs('#savedList'); const folderGrid = qs('#folderGrid');
-  if(!savedList || !folderGrid) return;
+  if(!savedList) return;
 
-  // Ensure there is at least one folder card visible; create a demo one if needed
-  let toCard = folderGrid.querySelector('.folder-card');
-  if(!toCard){
-    createdDemoFolder = document.createElement('div');
-    createdDemoFolder.className = 'folder-card';
-    createdDemoFolder.innerHTML = '<div class="folder-icon"></div><div class="folder-name">Demo folder</div>';
-    folderGrid.appendChild(createdDemoFolder);
-    toCard = createdDemoFolder;
+  // Try to find a real outline card to highlight/clone
+  let srcCard = savedList.querySelector('.card[data-oid]');
+  if(!srcCard){
+    // Force render outlines list if empty and user has saved outlines
+    // Otherwise, create a fake outline card that looks real
+    const fake = document.createElement('div');
+    fake.className = 'card p-4';
+    fake.innerHTML = `<div class="flex items-center gap-2" data-role="outline-head">
+      <div class="flex-1 font-bold text-lg truncate">Demo outline</div>
+      <button class="btn-xs">Load</button>
+    </div>`;
+    fake.style.position = 'absolute'; fake.style.left='-9999px'; document.body.appendChild(fake);
+    srcCard = fake;
+  } else {
+    srcCard.classList.add('spotlight');
   }
 
-  const fromRect = savedList.getBoundingClientRect();
-  const toRect = toCard.getBoundingClientRect();
+  // Destination: a real folder, else a fake folder target near top right
+  let toCard = folderGrid?.querySelector('.folder-card');
+  let cleanupFakeFolder = null;
+  if(!toCard){
+    const fakeFolder = document.createElement('div');
+    fakeFolder.className = 'folder-card tour-fake-folder';
+    fakeFolder.style.position = 'fixed';
+    fakeFolder.style.right = '24px'; fakeFolder.style.top = '120px';
+    fakeFolder.innerHTML = `<div class="folder-icon"></div><div class="folder-name">Folder</div>`;
+    document.body.appendChild(fakeFolder);
+    toCard = fakeFolder;
+    cleanupFakeFolder = ()=> fakeFolder.remove();
+  }
 
-  const start = { x: fromRect.left + 16, y: fromRect.top + 16 };
-  const end = { x: toRect.left + toRect.width/2 - 40, y: toRect.top + toRect.height/2 - 12 };
+  // Build a floating clone that matches outline card size
+  const r1 = srcCard.getBoundingClientRect();
+  const r2 = toCard.getBoundingClientRect();
+  const start = { x: r1.left, y: r1.top };
+  const end   = { x: r2.left + r2.width/2 - Math.min(220, r1.width)/2, y: r2.top + r2.height/2 - 24 };
 
-  dndGhostEl = document.createElement('div');
-  dndGhostEl.className = 'tour-ghost chip';
-  dndGhostEl.textContent = 'Demo outline';
+  dndGhostEl = srcCard.cloneNode(true);
+  dndGhostEl.classList.add('tour-ghost','tour-fake-outline');
   Object.assign(dndGhostEl.style, {
     left: `${start.x}px`,
     top: `${start.y}px`,
+    width: Math.min(360, r1.width) + 'px',
     '--dx': `${end.x - start.x}px`,
     '--dy': `${end.y - start.y}px`
   });
   document.body.appendChild(dndGhostEl);
+
+  // Cleanup on next step
+  dndGhostEl._cleanup = ()=>{
+    if(cleanupFakeFolder) cleanupFakeFolder();
+    if(srcCard && srcCard.parentElement) srcCard.classList.remove('spotlight');
+  };
 }
 
 function showStep(i){
@@ -1806,15 +1899,20 @@ function showStep(i){
   if(s.anchor){
     currentAnchorEl = qs(s.anchor);
     if(currentAnchorEl){
+      // Keep the anchor crisp and above the blur
       currentAnchorEl.classList.add('tour-elevate','spotlight');
       (s.elevate||[]).forEach(sel => qs(sel)?.classList.add('tour-elevate'));
+      (s.spot||[]).forEach(sel => qs(sel)?.classList.add('tour-elevate')); // keep both visible
       currentAnchorEl.scrollIntoView({ behavior:'smooth', block:'center' });
-      // Single big spot box for union of targets
-      placeSpotbox(s.spotBoxTargets || []);
     }
   }
 
-  // Make sure visible then place
+  // Draw grouped spotbox for certain steps
+  if(s.spot && s.spot.length){ drawSpotbox(s.spot); }
+  // Make label brighter on progress demo
+  document.body.classList.toggle('is-tour-progress', s.title.startsWith('Progress'));
+
+  // Place panel smartly near the anchor
   tourOverlay.classList.remove('hidden');
   tourPanel.classList.remove('hidden');
   tourArrow.classList.remove('hidden');
@@ -1825,32 +1923,66 @@ function showStep(i){
 }
 
 function startTour(){
-  tourRunning = true;
   tourOverlay.classList.remove('hidden');
   tourPanel.classList.remove('hidden');
   tourArrow.classList.remove('hidden');
   showStep(0);
 }
 function endTour(){
-  tourRunning = false;
   tourOverlay.classList.add('hidden');
   tourPanel.classList.add('hidden');
   tourArrow.classList.add('hidden');
-  tourArrow.style.display = 'none';
   removeSpotlights();
+  if(dndGhostEl && dndGhostEl._cleanup) dndGhostEl._cleanup();
+  if(dndGhostEl) dndGhostEl.remove();
 }
 
-// Wire button robustly
-learnBtn && (learnBtn.onclick = (e)=>{ e.preventDefault(); startTour(); });
-
-tourPrev.onclick   = ()=> showStep(stepIndex-1);
-tourNext.onclick   = ()=> showStep(stepIndex+1);
+learnBtn && (learnBtn.onclick = ()=> startTour());
+tourPrev.onclick = ()=> showStep(stepIndex-1);
+tourNext.onclick = ()=> showStep(stepIndex+1);
 tourFinish.onclick = endTour;
 tourOverlay.addEventListener('click', (e)=>{ if(e.target.classList.contains('tour-backdrop')) endTour(); });
 
 // Keep panel placed as user scrolls
-window.addEventListener('scroll', ()=>{ if(!tourRunning) return; placePanelNear(currentAnchorEl||qs(steps[stepIndex].anchor||'')); if(steps[stepIndex].spotBoxTargets) placeSpotbox(steps[stepIndex].spotBoxTargets); }, { passive:true });
-window.addEventListener('resize', ()=>{ if(!tourRunning) return; placePanelNear(currentAnchorEl||qs(steps[stepIndex].anchor||'')); if(steps[stepIndex].spotBoxTargets) placeSpotbox(steps[stepIndex].spotBoxTargets); });
+window.addEventListener('scroll', ()=>{ if(!draggingPanel) placePanelNear(currentAnchorEl||qs(steps[stepIndex].anchor||'')); if(steps[stepIndex]?.spot) drawSpotbox(steps[stepIndex].spot); }, { passive:true });
+window.addEventListener('resize', ()=> { placePanelNear(currentAnchorEl||qs(steps[stepIndex].anchor||'')); if(steps[stepIndex]?.spot) drawSpotbox(steps[stepIndex].spot); });
+
+// Drag the tour panel (avoid overlapping anchor)
+function onPointerDown(e){
+  draggingPanel = true; tourPanel.dataset.dragging = '1';
+  const rect = tourPanel.getBoundingClientRect();
+  dragOffset.x = e.clientX - rect.left;
+  dragOffset.y = e.clientY - rect.top;
+  tourPanel.setPointerCapture(e.pointerId);
+}
+function onPointerMove(e){
+  if(!draggingPanel) return;
+  const vpW = window.innerWidth, vpH = window.innerHeight; const pad=8;
+  const pw = tourPanel.offsetWidth, ph = tourPanel.offsetHeight;
+  let nx = clamp(e.clientX - dragOffset.x, pad, vpW - pw - pad);
+  let ny = clamp(e.clientY - dragOffset.y, pad, vpH - ph - pad);
+  const panelRect = { left:nx, top:ny, right:nx+pw, bottom:ny+ph };
+  if(currentAnchorEl){
+    const r = currentAnchorEl.getBoundingClientRect();
+    if(rectsOverlap(panelRect, r, 8)){
+      // Snap horizontally if overlapping
+      if(panelRect.left < r.left){ nx = r.left - pw - pad; }
+      else { nx = r.right + pad; }
+      nx = clamp(nx, pad, vpW - pw - pad);
+    }
+  }
+  tourPanel.style.left = `${nx}px`;
+  tourPanel.style.top = `${ny}px`;
+}
+function onPointerUp(e){
+  if(!draggingPanel) return;
+  draggingPanel = false; tourPanel.dataset.dragging = '0';
+  try{ tourPanel.releasePointerCapture(e.pointerId); }catch{}
+}
+tourPanel.addEventListener('pointerdown', onPointerDown);
+tourPanel.addEventListener('pointermove', onPointerMove);
+tourPanel.addEventListener('pointerup', onPointerUp);
+tourPanel.addEventListener('pointercancel', onPointerUp);
 
 /*************** Initial render ***************/
 function renderCurrent(){ const s=currentSession[currentIndex];
@@ -1862,17 +1994,9 @@ function renderCurrent(){ const s=currentSession[currentIndex];
 function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
 
 setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
+// Land on Overview by default
 showTab('overviewTab');
 if(prefs.focusDefault) showFocus();
-
-// Reveal-on-scroll for Overview
-const revealObserver = new IntersectionObserver((entries)=>{
-  entries.forEach(ent=>{
-    if(ent.isIntersecting){ ent.target.classList.add('in'); revealObserver.unobserve(ent.target); }
-  });
-},{ threshold:.12 });
-document.querySelectorAll('.reveal').forEach(el=> revealObserver.observe(el));
-
 
 /*************** Folders UI helpers (Saved tab container) ***************/
 const folderGrid = $('#folderGrid'); const createFolderBtn = $('#createFolderBtn');
@@ -1888,7 +2012,6 @@ if(createOutlineFromHome){
 }
 
 let currentFolderId = null;
-let selectedFolderId = null;
 
 createFolderBtn.onclick = ()=>{ createFolderForm.classList.toggle('hidden'); if(!createFolderForm.classList.contains('hidden')){ newFolderName.value=''; newFolderName.focus(); } };
 createFolderCancel.onclick = ()=> createFolderForm.classList.add('hidden');
@@ -1924,25 +2047,15 @@ function renderFoldersUI(){
     });
   });
 
-  // Folder grid
+  // Folder icons grid (with delete bins)
   folderGrid.innerHTML = savedFolders.map(f=>`
-    <div class="folder-card ${selectedFolderId===f.id ? 'folder-selected' : ''}" data-fid="${f.id}" title="${escapeHtml(f.name)}" draggable="false">
+    <div class="folder-card" data-fid="${f.id}" title="${escapeHtml(f.name)}" draggable="false">
       <button class="folder-del" data-act="del-folder" title="Delete folder">🗑️</button>
-      <button class="folder-rename" data-act="ren-folder" title="Rename folder">✎</button>
       <div class="folder-icon"></div>
       <div class="folder-name truncate">${escapeHtml(f.name)}</div>
     </div>`).join('');
-
   folderGrid.querySelectorAll('.folder-card').forEach(card=>{
-    // single click = select (highlight)
-    card.addEventListener('click', (e)=>{
-      if(e.target.closest('[data-act]')) return; // ignore clicks on icons
-      selectedFolderId = card.dataset.fid;
-      renderFoldersUI();
-    });
-    // double click = open folder
     card.addEventListener('dblclick', ()=>{ currentFolderId = card.dataset.fid; renderFoldersUI(); renderSavedOutlines(); });
-
     // Allow dropping outline onto folder
     card.addEventListener('dragover', e=>{ if(window.__draggingOutlineId){ e.preventDefault(); card.classList.add('folder-drop'); }});
     card.addEventListener('dragleave', ()=> card.classList.remove('folder-drop'));
@@ -1970,40 +2083,16 @@ function renderFoldersUI(){
       if(idx>=0){ savedFolders.splice(idx,1); }
       saveFoldersLocal(); saveOutlinesLocal(); touchCloud();
       if(currentFolderId===fid) currentFolderId=null;
-      if(selectedFolderId===fid) selectedFolderId=null;
       renderFoldersUI(); renderSavedOutlines();
     });
   });
-  // Rename handlers
-  folderGrid.querySelectorAll('[data-act="ren-folder"]').forEach(btn=>{
-    btn.addEventListener('click', async (e)=>{
-      e.stopPropagation();
-      const card = btn.closest('.folder-card');
-      const fid = card?.dataset.fid;
-      if(!fid) return;
-      const f = savedFolders.find(x=>x.id===fid); if(!f) return;
-      const name = await sfPrompt('Rename folder', f.name || '');
-      if(name==null) return;
-      f.name = (name||'').trim() || 'Untitled folder';
-      saveFoldersLocal(); touchCloud(); renderFoldersUI(); renderSavedOutlines();
-    });
-  });
 }
-// Expose for Saved Outlines module
+// Expose for Saved Outlines module to query current folder
 window.__getCurrentFolderId = ()=> currentFolderId;
 renderFoldersUI();
-
-/*************** Reveal-on-scroll (Overview + How‑to) — retrigger on re‑entry ***************/
-const io = new IntersectionObserver((entries)=>{
-  for(const e of entries){
-    if(e.isIntersecting){ e.target.classList.add('in'); }
-    else { e.target.classList.remove('in'); }
-  }
-},{ threshold: 0.18, rootMargin: "0px 0px -10% 0px" });
-document.querySelectorAll('.reveal, .howto-step').forEach(el => io.observe(el));
 </script>
 
-<!-- Pricing tab (mount-only). Put next to index.html. -->
-<script defer src="./pricing-tab.js"></script>
+<!-- Pricing tab (kept; it can enhance #pricingTab if needed) -->
+<script src="./pricing-tab.js"></script>
 </body>
 </html>
