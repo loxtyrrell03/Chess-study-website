@@ -4,6 +4,10 @@
 --panel:#ffffff; --panel-muted:#f8fafc;
 --accent:#0ea5e9; --accent-600:#0284c7; --accent-100:#e0f2fe;
 
+/* NEW: restrained warm accent (amber/yellow) */
+--sun-50:#fffbeb; --sun-100:#fef3c7; --sun-200:#fde68a;
+--sun-300:#fcd34d; --sun-400:#fbbf24; --sun-500:#f59e0b; --sun-600:#d97706;
+
 /* Design system tokens */
 --radius-sm:8px; --radius-md:12px; --radius-lg:14px; --radius-xl:18px;
 --space-1:4px; --space-2:6px; --space-3:8px; --space-4:12px; --space-5:16px; --space-6:20px; --space-8:28px;
@@ -22,12 +26,17 @@ html,body{background:var(--bg);color:var(--fg)}
 position:sticky; top:0; z-index:70;
 display:flex; align-items:center; justify-content:space-between; gap:14px;
 padding:10px 20px;
-background: linear-gradient(90deg, color-mix(in srgb,var(--accent-100) 75%, transparent), #fff);
+/* subtle sky→amber wash */
+background: linear-gradient(
+90deg,
+color-mix(in srgb, var(--accent-100) 80%, transparent),
+color-mix(in srgb, var(--sun-100) 24%, #fff)
+);
 border-bottom: var(--borderW) solid var(--border);
 box-shadow: var(--shadow-2);
 }
 .brand{display:flex; align-items:center; gap:.55rem; min-width:0}
-.brand .logo{font-size:1.35rem}
+.brand .logo{display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px}
 .brand-text{display:flex; flex-direction:column}
 .brand-title{font-weight:800; letter-spacing:.2px}
 .brand-sub{font-size:.72rem; color:var(--muted); margin-top:-2px}

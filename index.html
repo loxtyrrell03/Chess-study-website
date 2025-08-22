@@ -12,7 +12,12 @@
 #progressSegments{ z-index:0 !important; }
 #progressFill{
 z-index:2 !important;
-background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
+/* add a subtle warm tail to the fill */
+background:
+linear-gradient(90deg,
+var(--accent-100) 0%,
+color-mix(in srgb, var(--accent) 55%, transparent) 70%,
+color-mix(in srgb, var(--sun-300) 30%, transparent) 100%) !important;
 border-right:2px solid var(--accent-600) !important;
 }
 #progressTicks{ z-index:3 !important; }
@@ -21,7 +26,11 @@ border-right:2px solid var(--accent-600) !important;
 #focusProgressSegments{ z-index:0 !important; }
 #focusProgressFill{
 z-index:2 !important;
-background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
+background:
+linear-gradient(90deg,
+var(--accent-100) 0%,
+color-mix(in srgb, var(--accent) 55%, transparent) 70%,
+color-mix(in srgb, var(--sun-300) 30%, transparent) 100%) !important;
 border-right:2px solid var(--accent-600) !important;
 }
 #focusProgressTicks{ z-index:3 !important; }
@@ -64,7 +73,23 @@ vertical-align: middle;
 <!-- ======= TOP BAR ======= -->
 <header id="topbar" class="topbar">
 <div class="brand">
-<span class="logo">📁</span>
+<!-- New inline SVG logo: simple progress ring + flowing 'S' stroke -->
+<span class="logo" aria-hidden="true">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" role="img" focusable="false">
+<defs>
+<linearGradient id="g-sf" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="var(--accent-600)"/>
+<stop offset="1" stop-color="var(--sun-500)"/>
+</linearGradient>
+</defs>
+<!-- faint ring -->
+<circle cx="12" cy="12" r="9.25" stroke="color-mix(in srgb, var(--border) 70%, transparent)" stroke-width="1.5" />
+<!-- progress arc -->
+<path d="M12 2.75a9.25 9.25 0 0 1 8.32 5.23" stroke="url(#g-sf)" stroke-width="3" stroke-linecap="round"/>
+<!-- flowing S -->
+<path d="M6.2 8.2C8.6 6.1 13.3 6.1 15.7 8.2c1.7 1.5.4 3-2.2 3.6-2.5.6-3.9 1-3.9 2.5 0 1.7 2.7 2.5 5.1 1.3" stroke="url(#g-sf)" stroke-width="1.7" stroke-linecap="round" fill="none"/>
+</svg>
+</span>
 <div class="brand-text">
 <div class="brand-title">Skillflow</div>
 <div class="brand-sub">Structure your training. Master any skill.</div>
@@ -280,7 +305,9 @@ vertical-align: middle;
 <div class="card p-4 h-full flex flex-col">
 <div id="homeSavedRow" class="mb-3">
 <div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
 <h4 class="block-title">Saved Outlines</h4>
+</div>
 <div class="flex items-center gap-2">
 <button id="createOutlineFromHome" class="text-xs underline">+ Create</button>
 <button id="manageOutlinesLink" class="text-xs underline" data-tab-jump="savedTab">Manage</button>
@@ -335,15 +362,20 @@ Skillflow — minimal, keyboard-friendly session manager. ♟️
 </div>
 </div>
 
-<!-- Create outline button (form is now an overlay-styled panel via CSS) -->
+<!-- Create outline popup (now overlay-styled and consistent) -->
 <div class="mb-3 flex items-center gap-2">
 <button id="createOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Create new outline</button>
-<div id="createOutlineForm" class="card p-4 mb-0 hidden">
-<label class="text-sm">Outline title</label>
+
+<!-- Overlay panel -->
+<div id="createOutlineForm" class="card p-4 hidden">
+<div class="flex items-center justify-between mb-2">
+<h3 class="block-title">Create new outline</h3>
+<button id="createOutlineCancel" class="btn-xxs">✕</button>
+</div>
+<p class="text-sm muted mb-2">Give your outline a clear, motivating title.</p>
 <div class="mt-2 flex items-center gap-2">
-<input id="newOutlineTitle" class="input flex-1" placeholder="e.g., 90-min Balanced Plan"/>
+<input id="newOutlineTitle" class="input flex-1" placeholder="e.g., 90‑min Balanced Plan"/>
 <button id="createOutlineConfirm" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Create</button>
-<button id="createOutlineCancel" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Cancel</button>
 </div>
 </div>
 </div>
@@ -356,13 +388,20 @@ Skillflow — minimal, keyboard-friendly session manager. ♟️
 <button id="createFolderBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ New folder</button>
 </div>
 </div>
-<div id="createFolderForm" class="mt-2 hidden">
+
+<!-- Overlay panel -->
+<div id="createFolderForm" class="mt-2 hidden card p-4">
+<div class="flex items-center justify-between mb-2">
+<h3 class="block-title">Create folder</h3>
+<button id="createFolderCancel" class="btn-xxs">✕</button>
+</div>
+<p class="text-sm muted mb-2">Use folders to group your outlines by goal or context.</p>
 <div class="flex items-center gap-2">
 <input id="newFolderName" class="input flex-1" placeholder="Folder name"/>
 <button id="createFolderConfirm" class="btn-xs">Create</button>
-<button id="createFolderCancel" class="btn-xs">Cancel</button>
 </div>
 </div>
+
 <div id="folderGrid" class="folder-grid mt-3"></div>
 </div>
 
@@ -1391,13 +1430,13 @@ const edtTitle=li.querySelector('#edtTitle'), edtValue=li.querySelector('#edtVal
 const saveInline = ()=>{
 const prevMin = cur.minutes, prevTotal = minsToSecs(prevMin);
 const elapsedSec = currentSession[currentIndex]?.id===cur.id ? Math.max(0, prevTotal - secondsLeft) : 0;
-cur.name = (edtTitle.value.trim() || cur.name);
+cur.name = (edtTitle.value.trim() || 'Untitled section');
 cur.minutes = Math.max(0.01, toMinutesValue(edtValue.value, edtUnit.value));
 if(currentSession[currentIndex]?.id===cur.id){ const newTotal = minsToSecs(cur.minutes); secondsLeft = Math.max(0, newTotal - elapsedSec); if(running) syncEnd(); }
 saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent(); updateStartBtnLabel(); markTimer(); syncSavedFromCurrent();
 };
 li.querySelector('#edtSave').onclick = saveInline;
-[edtTitle, edtValue].forEach(el=> el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveInline(); }}));
+[edtTitle, edtValue].forEach(el=> el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); saveInline(); }}));
 });
 });
 
@@ -1505,8 +1544,16 @@ btn.onclick = ()=>{ const o = savedOutlines.find(x=>x.id===btn.dataset.oid); if(
 function applyOutlineToCurrent(outlineObj){
 const clone = outlineObj.sections.map(s=>({ id:s.id||('S'+Math.random().toString(16).slice(2)), name:s.name, minutes:s.minutes, links:structuredClone(s.links||[]) }));
 currentSession = clone; sectionNotes = {}; clone.forEach(sec=>{ const src = outlineObj.sections.find(ss=>ss.id===sec.id); if(src && src.desc!=null) sectionNotes[sec.id] = src.desc; });
-timerState = { sessionStarted:false, running:false, currentIndex:0, secondsLeft:minsToSecs((clone[0]||{}).minutes||0), outlineId: outlineObj.id, lastSyncTs: Date.now(), awaitingNext:false };
-awaitingNext=false; hideNextGate(); saveCurrentSession(); saveNotes(); saveTimerLocal(); renderAll(); updateStartBtnLabel();
+
+// ✅ Reset timer/progress to the very start of the first subsection
+currentIndex = 0;
+secondsLeft = minsToSecs((clone[0]||{}).minutes||0);
+sessionStarted = false;
+running = false;
+totalSessionSecs = scheduleTotalSecs(currentSession);
+timerState = { sessionStarted:false, running:false, currentIndex, secondsLeft, outlineId: outlineObj.id, lastSyncTs: Date.now(), awaitingNext:false };
+
+awaitingNext=false; hideNextGate(); saveCurrentSession(); saveNotes(); saveTimerLocal(); renderAll(); updateStartBtnLabel(); markTimer();
 }
 
 const { renderSavedOutlines } = setupSavedOutlines({
@@ -1738,8 +1785,10 @@ const steps = [
 { tab:'overviewTab', title:'Welcome to Skillflow', body:'A 30‑second tour. You can close any time.', anchor:null },
 { tab:'homeTab', title:'Progress — click to jump', body:'This live bar shows where you are. Click any segment to jump to that mini‑goal.', anchor:'#progressHost', elevate:['#progressHost','#progressLabel','#progressPct'], spot:['#progressHost','#progressLabel'] },
 { tab:'homeTab', title:'Your current mini‑goal', body:'This left card is the mini‑goal you\'re on. Add links you\'ll need, jot a quick description or mini‑checklist, and keep momentum.', anchor:'#leftPane .section-card' },
-{ tab:'homeTab', title:'Right‑pane outline', body:'This shows the outline of your session. Drag rows to reorder your current session, click Edit to rename or change durations, and click a row to jump.', anchor:'#rightPane .card' },
-{ tab:'savedTab', title:'Create & organize', body:'Click “+ Create new outline” to start, and “+ New folder” to organize outlines. You can drag any outline card into a folder (or breadcrumb) to move it.', anchor:'#createOutlineBtn', elevate:['#createOutlineBtn','#createFolderBtn'], spot:['#createOutlineBtn','#createFolderBtn'], demo:'dnd' },
+{ tab:'homeTab', title:'Session outline', body:'This shows the outline of your session. Drag rows to reorder your current session, click Edit to rename or change durations, and click a row to jump.', anchor:'#rightPane .card' },
+{ tab:'savedTab', title:'+ Create new outline', body:'Click here to create a new outline. Give it a clear, motivating title.', anchor:'#createOutlineBtn', elevate:['#createOutlineBtn'], spot:['#createOutlineBtn'] },
+{ tab:'savedTab', title:'+ New folder', body:'Use folders to group related outlines. Double‑click a folder to open it.', anchor:'#createFolderBtn', elevate:['#createFolderBtn','#folderGrid'], spot:['#createFolderBtn','#folderGrid'] },
+{ tab:'savedTab', title:'Drag to organize', body:'Drag any outline onto a folder (or onto the “Main” breadcrumb) to move it between places.', anchor:'#folderGrid', demo:'dnd' },
 ];
 let stepIndex = 0;
 let currentAnchorEl = null;
@@ -2072,4 +2121,4 @@ document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 <!-- Pricing tab (kept; enhances #pricingTab). Put next to index.html. -->
 <script defer src="./pricing-tab.js"></script>
 </body>
-</html>
+</html>s
