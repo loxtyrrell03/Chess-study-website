@@ -4,10 +4,6 @@
 --panel:#ffffff; --panel-muted:#f8fafc;
 --accent:#0ea5e9; --accent-600:#0284c7; --accent-100:#e0f2fe;
 
-/* NEW: restrained warm accent (amber/yellow) */
---sun-50:#fffbeb; --sun-100:#fef3c7; --sun-200:#fde68a;
---sun-300:#fcd34d; --sun-400:#fbbf24; --sun-500:#f59e0b; --sun-600:#d97706;
-
 /* Design system tokens */
 --radius-sm:8px; --radius-md:12px; --radius-lg:14px; --radius-xl:18px;
 --space-1:4px; --space-2:6px; --space-3:8px; --space-4:12px; --space-5:16px; --space-6:20px; --space-8:28px;
@@ -26,17 +22,12 @@ html,body{background:var(--bg);color:var(--fg)}
 position:sticky; top:0; z-index:70;
 display:flex; align-items:center; justify-content:space-between; gap:14px;
 padding:10px 20px;
-/* subtle sky→amber wash */
-background: linear-gradient(
-90deg,
-color-mix(in srgb, var(--accent-100) 80%, transparent),
-color-mix(in srgb, var(--sun-100) 24%, #fff)
-);
+background: linear-gradient(90deg, color-mix(in srgb,var(--accent-100) 75%, transparent), #fff);
 border-bottom: var(--borderW) solid var(--border);
 box-shadow: var(--shadow-2);
 }
 .brand{display:flex; align-items:center; gap:.55rem; min-width:0}
-.brand .logo{display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px}
+.brand .logo{font-size:1.35rem}
 .brand-text{display:flex; flex-direction:column}
 .brand-title{font-weight:800; letter-spacing:.2px}
 .brand-sub{font-size:.72rem; color:var(--muted); margin-top:-2px}
@@ -327,3 +318,36 @@ z-index:-1; /* behind the panel, above the page */
 
 /* Utils */
 .no-select{ user-select:none }
+
+/* ==== Saved outline selection highlight (matches .outline-active) ==== */
+#savedList > .card.outline-selected{
+  background: var(--accent-100) !important;
+  box-shadow: inset 0 0 0 1px rgba(14,165,233,.5), var(--shadow-1);
+}
+
+/* ==== Overview: less boxy panels ==== */
+.feature-panel{
+  padding: 24px 20px;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--accent-100) 40%, transparent));
+  box-shadow: var(--shadow-1);
+  border: none;
+}
+.feature-panel .block-title{ font-size: clamp(1.4rem, 2.4vw, 1.75rem); }
+
+/* ==== Tour demo: shelf drag ghost (from shelf → links) ==== */
+.tour-ghost.mouse{
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #111827; color: #fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size: 12px; box-shadow: 0 6px 16px rgba(15,23,42,.25);
+}
+
+/* Optional: demo rails used only for tour */
+#shelfDemoWrap{
+  border: var(--borderW) dashed color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 12px;
+  padding: 10px;
+}
+#shelfDemoFrom .link-card{ cursor: default }
+#shelfDemoFrom .link-card .link-icon{ margin-right: 2px }
