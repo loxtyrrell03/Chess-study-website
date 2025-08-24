@@ -107,6 +107,9 @@ export function setupSavedOutlines({
   const askConfirm = (msg)=> (window.sfConfirm ? window.sfConfirm(msg) : Promise.resolve(confirm(msg)));
   const askPrompt  = (label, def)=> (window.sfPrompt  ? window.sfPrompt(label, def) : Promise.resolve(prompt(label, def)));
 
+  // Bridge to global editor defined in index.html (module-safe)
+  const openWidgetEditor = (...args)=> (window.openWidgetEditor ? window.openWidgetEditor(...args) : null);
+
   // ---------- renderers ----------
   function outlineCardHtml(o, isExpanded){
     const chevron = isExpanded ? '▾' : '▸';
@@ -160,7 +163,6 @@ export function setupSavedOutlines({
   }
 
   function inlineShelfHtml(shelf){
-    const add = `<button class="add-pill" data-act="add-shelf" title="Add widget"> Add</button>`;
     const items = (shelf||[]).map(w=>{
       const iconHtml = (w.icon==='img' && w.img)
         ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
@@ -179,8 +181,14 @@ export function setupSavedOutlines({
     }).join('');
     return `
       <div data-role="inline-shelf">
-        <div class="text-xs muted mb-1" style="font-weight:600">Widget shelf</div>
-        <div class="editor-shelf" data-role="shelf-row">${add}${items || ''}</div>
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-xs muted" style="font-weight:600">Widget shelf</div>
+          <div class="flex items-center gap-2">
+            <button class="btn-xs" data-act="add-shelf" type="button">+ New Widget</button>
+            <button class="btn-xs" data-act="reset-shelf" type="button">Reset Shelf</button>
+          </div>
+        </div>
+        <div class="mt-2 editor-shelf" data-role="shelf-row">${items || ''}</div>
         <div class="text-xs muted mt-1">Drag from shelf → drop into the “Links” bar below. Click any shelf item to edit.</div>
       </div>`;
   }
@@ -470,6 +478,55 @@ export function setupSavedOutlines({
               renderSavedOutlines();
             }, onCancel);
           });
+          // Reset shelf (same defaults as Planner)
+          shelfWrap.querySelector('[data-act="reset-shelf"]')?.addEventListener('click', async ()=>{
+            if(!setWidgetShelf) return;
+            if(!await askConfirm('Reset link shelf to defaults?')) return;
+            const defaults = [
+              { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',           icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+              { id:'w_analysis', label:'Lichess Analysis',  url:'https://lichess.org/analysis',  icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+              { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',     icon:'emoji', emoji:'�Y"~' }
+            ];
+            setWidgetShelf(defaults);
+            renderSavedOutlines();
+          });
+
+          // Delegated click fallback for shelf actions
+          shelfWrap.addEventListener('click', async (e)=>{
+            const addBtn = e.target.closest('[data-act="add-shelf"]');
+            const resetBtn = e.target.closest('[data-act="reset-shelf"]');
+            if(addBtn){
+              if(!setWidgetShelf) return;
+              const shelf = (getWidgetShelf && getWidgetShelf()) || [];
+              const wid = 'W'+Date.now().toString(36);
+              const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'�Y"-', img:'' };
+              setWidgetShelf([...shelf, placeholder]);
+              const onCancel = ()=>{
+                const s2 = (getWidgetShelf && getWidgetShelf()) || [];
+                const i  = s2.findIndex(x=>x.id===wid);
+                if(i>=0){ s2.splice(i,1); setWidgetShelf([...s2]); }
+                renderSavedOutlines();
+              };
+              openWidgetEditor(placeholder, (upd)=>{
+                const s2 = (getWidgetShelf && getWidgetShelf()) || [];
+                const it = s2.find(x=>x.id===wid);
+                if(it){ upd.url = normalizeUrl(upd.url); Object.assign(it, upd); setWidgetShelf([...s2]); }
+                renderSavedOutlines();
+              }, onCancel);
+              return;
+            }
+            if(resetBtn){
+              if(!setWidgetShelf) return;
+              if(!await askConfirm('Reset link shelf to defaults?')) return;
+              const defaults = [
+                { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',           icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+                { id:'w_analysis', label:'Lichess Analysis',  url:'https://lichess.org/analysis',  icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+                { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',     icon:'emoji', emoji:'�Y"~' }
+              ];
+              setWidgetShelf(defaults);
+              renderSavedOutlines();
+            }
+          });
 
           shelfWrap.querySelectorAll('.draggable-shelf').forEach(card=>{
             card.addEventListener('dragstart', (e)=>{ const id = card.dataset.wid; try{
@@ -510,6 +567,45 @@ export function setupSavedOutlines({
 
   // initial render
   renderSavedOutlines();
+
+  // Global delegated handlers for inline shelf buttons within Saved
+  if (savedListEl) {
+    savedListEl.addEventListener('click', async (e)=>{
+      const addBtn = e.target.closest('[data-act="add-shelf"]');
+      const resetBtn = e.target.closest('[data-act="reset-shelf"]');
+      if(addBtn){
+        if(!setWidgetShelf) return;
+        const shelf = (getWidgetShelf && getWidgetShelf()) || [];
+        const wid = 'W'+Date.now().toString(36);
+        const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
+        setWidgetShelf([...shelf, placeholder]);
+        const onCancel = ()=>{
+          const s2 = (getWidgetShelf && getWidgetShelf()) || [];
+          const i  = s2.findIndex(x=>x.id===wid);
+          if(i>=0){ s2.splice(i,1); setWidgetShelf([...s2]); }
+          renderSavedOutlines();
+        };
+        openWidgetEditor(placeholder, (upd)=>{
+          const s2 = (getWidgetShelf && getWidgetShelf()) || [];
+          const it = s2.find(x=>x.id===wid);
+          if(it){ upd.url = normalizeUrl(upd.url); Object.assign(it, upd); setWidgetShelf([...s2]); }
+          renderSavedOutlines();
+        }, onCancel);
+        return;
+      }
+      if(resetBtn){
+        if(!setWidgetShelf) return;
+        if(!await askConfirm('Reset link shelf to defaults?')) return;
+        const defaults = [
+          { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',           icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+          { id:'w_analysis', label:'Lichess Analysis',  url:'https://lichess.org/analysis',  icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+          { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',     icon:'emoji', emoji:'♟️' }
+        ];
+        setWidgetShelf(defaults);
+        renderSavedOutlines();
+      }
+    });
+  }
 
   // expose renderer (index calls it after folder ops)
   return { renderSavedOutlines };

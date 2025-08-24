@@ -8,23 +8,29 @@
 
   function renderPricing(mount){
     if(!mount) return;
-    // Build two clean cards, no page title
+    // Two clean cards side-by-side
     mount.innerHTML = [
       '<div class="pricing-grid">',
-      '  <div class="pricing-card">',
-      '    <h3>Free</h3>',
+      '  <div class="pricing-card card aurora-frame p-4">',
+      '    <div class="pricing-head">',
+      '      <div class="pricing-title">Free</div>',
+      '      <div class="pricing-pill">Good start</div>',
+      '    </div>',
       '    <div class="price">$0<span class="text-sm muted">/mo</span></div>',
-      '    <ul class="space-y-2 text-sm muted">',
+      '    <ul class="pricing-list">',
       '      <li>Manual session planning</li>',
       '      <li>Up to 3 saved outlines</li>',
       '      <li>Links & descriptions in sections</li>',
       '      <li>Local save</li>',
       '    </ul>',
       '  </div>',
-      '  <div class="pricing-card pricing-pro">',
-      '    <h3>Pro</h3>',
+      '  <div class="pricing-card pricing-pro card aurora-frame p-4">',
+      '    <div class="pricing-head">',
+      '      <div class="pricing-title">Pro</div>',
+      '      <div class="pricing-pill accent">Best value</div>',
+      '    </div>',
       '    <div class="price">$4.99<span class="text-sm muted">/month</span></div>',
-      '    <ul class="space-y-2 text-sm muted">',
+      '    <ul class="pricing-list">',
       '      <li><strong>AI‑generated outlines</strong> — describe what you want to do, get a ready session</li>',
       '      <li><strong>Unlimited saved outlines</strong></li>',
       '      <li><strong>File upload</strong> for quick reference</li>',

@@ -15,18 +15,19 @@
 }
 *{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--fg)}
+body{position:relative}
 *{-webkit-tap-highlight-color:transparent}
 
 /* ===== Aurora edges (vibrant gradient glow across the site) ===== */
 body::before{
   content:"";
-  position:fixed; inset:-10% -15% -10% -15%; pointer-events:none; z-index:-1;
+  position:fixed; inset:-10% -15% -10% -15%; pointer-events:none; z-index:0;
   background:
     radial-gradient(70% 50% at -10% 10%, rgba(253, 224, 71, .30), transparent 60%),
     radial-gradient(55% 55% at 110% 15%, rgba(56, 189, 248, .28), transparent 62%),
     radial-gradient(50% 60% at 15% 105%, rgba(168, 85, 247, .22), transparent 64%),
     conic-gradient(from 210deg at 60% 40%, rgba(16,185,129,.14), rgba(59,130,246,.10), rgba(236,72,153,.12), rgba(16,185,129,.14));
-  filter: blur(34px) saturate(1.1);
+  filter: blur(26px) saturate(1.45);
   opacity:.95;
   transform: translateZ(0);
 }
@@ -75,17 +76,21 @@ body::before{
 
 @media (max-width:900px){
   .brand-sub{display:none}
-  .topnav-links{order:3; width:100%; justify-content:flex-start; overflow:auto}
+  .topnav-links{order:3; width:100%; justify-content:flex-start; overflow:auto; flex-direction:column}
   /* collapsed by default */
   .topnav-links{ display:none; }
   .topbar.nav-open .topnav-links{
-    display:flex;
+    display:flex; flex-direction:column;
     position:absolute; left:0; right:0; top:100%;
     padding:8px 12px;
     background:linear-gradient(180deg,#ffffff, var(--panel-muted));
     border-bottom: var(--borderW) solid var(--border);
     gap:6px; box-shadow:0 10px 30px rgba(15,23,42,.12);
   }
+  /* mobile: slim actions */
+  #cloudStatus{ display:none !important; }
+  #settingsBtn{ font-size:.8rem; padding:.3rem .55rem; }
+  .topbar-actions{ gap:.35rem }
 }
 
 /* ===== Common UI ===== */
@@ -360,6 +365,7 @@ body::before{
 /* ===== Pricing cards ===== */
 .pricing-grid{display:grid;grid-template-columns:1fr;gap:16px}
 @media (min-width:900px){ .pricing-grid{grid-template-columns:1fr 1fr} }
+.price{font-weight:900;font-size:1.75rem;letter-spacing:-.015em;margin:4px 0 10px}
 .pricing-card .pricing-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .pricing-title{font-weight:900;font-size:1.4rem}
 .pricing-pill{font-size:.75rem;border-radius:9999px;padding:.2rem .6rem;border:var(--borderW) solid var(--border);color:var(--muted)}
