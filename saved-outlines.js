@@ -459,75 +459,10 @@ export function setupSavedOutlines({
         // Inline shelf actions
         const shelfWrap = secEl?.querySelector('[data-role="inline-shelf"]');
         if(shelfWrap){
-          shelfWrap.querySelector('[data-act="add-shelf"]')?.addEventListener('click', ()=>{
-            if(!setWidgetShelf) return;
-            const shelf = (getWidgetShelf && getWidgetShelf()) || [];
-            const wid = 'W'+Date.now().toString(36);
-            const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
-            setWidgetShelf([...shelf, placeholder]);
-            const onCancel = ()=>{
-              const s2 = (getWidgetShelf && getWidgetShelf()) || [];
-              const i  = s2.findIndex(x=>x.id===wid);
-              if(i>=0){ s2.splice(i,1); setWidgetShelf([...s2]); }
-              renderSavedOutlines();
-            };
-            openWidgetEditor(placeholder, (upd)=>{
-              const s2 = (getWidgetShelf && getWidgetShelf()) || [];
-              const it = s2.find(x=>x.id===wid);
-              if(it){ upd.url = normalizeUrl(upd.url); Object.assign(it, upd); setWidgetShelf([...s2]); }
-              renderSavedOutlines();
-            }, onCancel);
-          });
-          // Reset shelf (same defaults as Planner)
-          shelfWrap.querySelector('[data-act="reset-shelf"]')?.addEventListener('click', async ()=>{
-            if(!setWidgetShelf) return;
-            if(!await askConfirm('Reset link shelf to defaults?')) return;
-            const defaults = [
-              { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',           icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-              { id:'w_analysis', label:'Lichess Analysis',  url:'https://lichess.org/analysis',  icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-              { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',     icon:'emoji', emoji:'�Y"~' }
-            ];
-            setWidgetShelf(defaults);
-            renderSavedOutlines();
-          });
+          // Only bind per-card interactions here (drag/edit/delete).
+          // Add/reset shelf are handled by ONE delegated listener on savedListEl to avoid duplicate prompts.
 
-          // Delegated click fallback for shelf actions
-          shelfWrap.addEventListener('click', async (e)=>{
-            const addBtn = e.target.closest('[data-act="add-shelf"]');
-            const resetBtn = e.target.closest('[data-act="reset-shelf"]');
-            if(addBtn){
-              if(!setWidgetShelf) return;
-              const shelf = (getWidgetShelf && getWidgetShelf()) || [];
-              const wid = 'W'+Date.now().toString(36);
-              const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'�Y"-', img:'' };
-              setWidgetShelf([...shelf, placeholder]);
-              const onCancel = ()=>{
-                const s2 = (getWidgetShelf && getWidgetShelf()) || [];
-                const i  = s2.findIndex(x=>x.id===wid);
-                if(i>=0){ s2.splice(i,1); setWidgetShelf([...s2]); }
-                renderSavedOutlines();
-              };
-              openWidgetEditor(placeholder, (upd)=>{
-                const s2 = (getWidgetShelf && getWidgetShelf()) || [];
-                const it = s2.find(x=>x.id===wid);
-                if(it){ upd.url = normalizeUrl(upd.url); Object.assign(it, upd); setWidgetShelf([...s2]); }
-                renderSavedOutlines();
-              }, onCancel);
-              return;
-            }
-            if(resetBtn){
-              if(!setWidgetShelf) return;
-              if(!await askConfirm('Reset link shelf to defaults?')) return;
-              const defaults = [
-                { id:'w_lichess',  label:'Lichess',          url:'https://lichess.org',           icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-                { id:'w_analysis', label:'Lichess Analysis',  url:'https://lichess.org/analysis',  icon:'img',   img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
-                { id:'w_chessable',label:'Chessable',        url:'https://www.chessable.com',     icon:'emoji', emoji:'�Y"~' }
-              ];
-              setWidgetShelf(defaults);
-              renderSavedOutlines();
-            }
-          });
-
+          // Drag shelf card to links bar
           shelfWrap.querySelectorAll('.draggable-shelf').forEach(card=>{
             card.addEventListener('dragstart', (e)=>{ const id = card.dataset.wid; try{
               e.dataTransfer.setData('text/plain', JSON.stringify({type:'shelf', id}));
@@ -539,6 +474,8 @@ export function setupSavedOutlines({
               openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); setWidgetShelf([...shelf]); renderSavedOutlines(); });
             });
           });
+
+          // Delete from shelf
           shelfWrap.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
             btn.addEventListener('click', (e)=>{ e.stopPropagation(); if(!setWidgetShelf) return; const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid;
               const shelf = (getWidgetShelf && getWidgetShelf()) || []; const idx = shelf.findIndex(x=>x.id===wid);
@@ -551,8 +488,22 @@ export function setupSavedOutlines({
   } // end renderSavedOutlines
 
   // ---------- create outline wiring ----------
-  if(createBtn){ createBtn.onclick = ()=>{ createForm?.classList.toggle('hidden'); if(createForm && !createForm.classList.contains('hidden')){ createTitle.value=''; createTitle.focus(); } }; }
-  if(createCancel){ createCancel.onclick = ()=> createForm?.classList.add('hidden'); }
+  // Replace the "+ Create new outline" button with the popover while open (prevents layout shift)
+  if(createBtn){
+    createBtn.onclick = ()=>{
+      if(!createForm) return;
+      createBtn.classList.add('hidden');
+      createForm.classList.remove('hidden');
+      createTitle.value='';
+      createTitle.focus();
+    };
+  }
+  if(createCancel){
+    createCancel.onclick = ()=>{
+      createForm?.classList.add('hidden');
+      createBtn?.classList.remove('hidden');
+    };
+  }
   if(createOk){
     createOk.onclick = ()=>{
       const t = (createTitle?.value || '').trim() || 'New outline';
@@ -561,14 +512,16 @@ export function setupSavedOutlines({
       list.push({ id:'O'+Date.now().toString(36), title:t, sections:[], folderId: currentFolderId || null });
       setSavedOutlines(list);
       saveOutlinesLocal && saveOutlinesLocal(); renderHomeSavedBar && renderHomeSavedBar(); touchCloud && touchCloud();
-      createForm?.classList.add('hidden'); renderSavedOutlines();
+      createForm?.classList.add('hidden');
+      createBtn?.classList.remove('hidden');
+      renderSavedOutlines();
     };
   }
 
   // initial render
   renderSavedOutlines();
 
-  // Global delegated handlers for inline shelf buttons within Saved
+  // ---------- ONE delegated handler for shelf add/reset across the Saved tab ----------
   if (savedListEl) {
     savedListEl.addEventListener('click', async (e)=>{
       const addBtn = e.target.closest('[data-act="add-shelf"]');

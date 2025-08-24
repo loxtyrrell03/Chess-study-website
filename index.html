@@ -2010,11 +2010,22 @@ if(createOutlineFromHome){
 
 let currentFolderId = null;
 
-createFolderBtn.onclick = ()=>{ createFolderForm.classList.toggle('hidden'); if(!createFolderForm.classList.contains('hidden')){ newFolderName.value=''; newFolderName.focus(); } };
-createFolderCancel.onclick = ()=> createFolderForm.classList.add('hidden');
+// Replace the "+ New folder" button with its popover while open (prevents layout shift)
+createFolderBtn.onclick = ()=>{
+  createFolderBtn.classList.add('hidden');
+  createFolderForm.classList.remove('hidden');
+  newFolderName.value='';
+  newFolderName.focus();
+};
+createFolderCancel.onclick = ()=>{
+  createFolderForm.classList.add('hidden');
+  createFolderBtn.classList.remove('hidden');
+};
 createFolderConfirm.onclick = ()=>{
   const name = (newFolderName.value||'').trim() || 'New folder';
-  savedFolders.push({ id:'F'+Date.now().toString(36), name }); saveFoldersLocal(); renderFoldersUI(); createFolderForm.classList.add('hidden');
+  savedFolders.push({ id:'F'+Date.now().toString(36), name }); saveFoldersLocal(); renderFoldersUI();
+  createFolderForm.classList.add('hidden');
+  createFolderBtn.classList.remove('hidden');
 };
 
 function renderFoldersUI(){
@@ -2071,19 +2082,17 @@ function renderFoldersUI(){
       e.stopPropagation();
       const fid = btn.closest('.folder-card')?.dataset.fid;
       if(!fid) return;
-      const ok = await sfConfirm('Delete this folder? Outlines inside will be moved to Main.');
-      if(!ok) return;
-      // Move outlines out of the folder
-      savedOutlines.forEach(o => { if(o.folderId === fid) o.folderId = null; });
-      // Delete folder
-      const idx = savedFolders.findIndex(f=>f.id===fid);
-      if(idx>=0){ savedFolders.splice(idx,1); }
-      saveFoldersLocal(); saveOutlinesLocal(); touchCloud();
-      if(currentFolderId===fid) currentFolderId=null;
+      if(!await sfConfirm('Delete this folder (its outlines will move to Main)?')) return;
+      // Move outlines back to Main
+      savedOutlines.forEach(o=>{ if(o.folderId===fid) o.folderId=null; });
+      // Delete the folder
+      const i = savedFolders.findIndex(f=>f.id===fid);
+      if(i>=0){ savedFolders.splice(i,1); saveFoldersLocal(); }
       renderFoldersUI(); renderSavedOutlines();
     });
   });
 }
+
 // Expose for Saved Outlines module to query current folder
 window.__getCurrentFolderId = ()=> currentFolderId;
 renderFoldersUI();

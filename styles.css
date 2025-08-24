@@ -18,17 +18,17 @@ html,body{background:var(--bg);color:var(--fg)}
 body{position:relative}
 *{-webkit-tap-highlight-color:transparent}
 
-/* ===== Aurora edges (vibrant gradient glow across the site) ===== */
+/* ===== Aurora edges (softened) ===== */
 body::before{
   content:"";
   position:fixed; inset:-10% -15% -10% -15%; pointer-events:none; z-index:0;
   background:
-    radial-gradient(70% 50% at -10% 10%, rgba(253, 224, 71, .30), transparent 60%),
-    radial-gradient(55% 55% at 110% 15%, rgba(56, 189, 248, .28), transparent 62%),
-    radial-gradient(50% 60% at 15% 105%, rgba(168, 85, 247, .22), transparent 64%),
-    conic-gradient(from 210deg at 60% 40%, rgba(16,185,129,.14), rgba(59,130,246,.10), rgba(236,72,153,.12), rgba(16,185,129,.14));
-  filter: blur(26px) saturate(1.45);
-  opacity:.95;
+    radial-gradient(70% 50% at -10% 10%, rgba(253,224,71,.20), transparent 60%),
+    radial-gradient(55% 55% at 110% 15%, rgba(56,189,248,.18), transparent 62%),
+    radial-gradient(50% 60% at 15% 105%, rgba(168,85,247,.15), transparent 64%),
+    conic-gradient(from 210deg at 60% 40%, rgba(16,185,129,.10), rgba(59,130,246,.08), rgba(236,72,153,.09), rgba(16,185,129,.10));
+  filter: blur(22px) saturate(1.20);
+  opacity:.62;
   transform: translateZ(0);
 }
 
