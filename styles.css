@@ -126,6 +126,13 @@ body::before{
 .chip:hover{background:var(--panel-muted); transform:translateY(-1px)}
 .chip-active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(14,165,233,.2);background:var(--accent-100);color:#0b4661}
 
+/* Keep Saved Outlines chips fixed-size in Planner right pane */
+#homeSavedScroller .chip{
+  flex: none;            /* no grow/shrink; keep intrinsic width */
+  white-space: nowrap;   /* prevent wrapping that would change height/width */
+}
+
+
 .link-card{
   display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;border-radius:.75rem;border:var(--borderW) solid var(--border);background:var(--panel);
   transition:background var(--fast) var(--ease), transform var(--fast) var(--ease);
