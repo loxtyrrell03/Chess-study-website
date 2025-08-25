@@ -2128,6 +2128,7 @@ renderFoldersUI();
     const authArea = document.getElementById('authArea');
     const actionsHost = document.querySelector('.topbar-actions');
     const mobileHost = document.getElementById('mobileExtraMenu');
+    const topnav = document.querySelector('.topnav-links');
 
     function isPhone(){
       try{
@@ -2177,12 +2178,32 @@ renderFoldersUI();
       }
     }
 
-    window.addEventListener('resize', ()=>{ applyPhoneClass(); placeExtras(); });
-    window.addEventListener('orientationchange', ()=>{ applyPhoneClass(); placeExtras(); });
-    window.addEventListener('DOMContentLoaded', ()=>{ applyPhoneClass(); placeExtras(); });
+    function positionMobileDrawer(){
+      if (!document.body.classList.contains('is-phone')) return;
+      if (!topbar || !topnav) return;
+      const h = Math.ceil(topbar.getBoundingClientRect().height);
+      // Feed CSS var for top offset
+      topbar.style.setProperty('--mobile-menu-top', h + 'px');
+      // Also set explicit inline styles to ensure correct position
+      if (topbar.classList.contains('nav-open')){
+        topnav.style.top = h + 'px';
+        topnav.style.height = `calc(100vh - ${h}px)`;
+      } else {
+        topnav.style.top = '';
+        topnav.style.height = '';
+      }
+    }
 
-    if (navToggle){ navToggle.addEventListener('click', ()=> topbar.classList.toggle('nav-open')); }
-    const topnav = document.querySelector('.topnav-links');
+    window.addEventListener('resize', ()=>{ applyPhoneClass(); placeExtras(); positionMobileDrawer(); });
+    window.addEventListener('orientationchange', ()=>{ applyPhoneClass(); placeExtras(); positionMobileDrawer(); });
+    window.addEventListener('DOMContentLoaded', ()=>{ applyPhoneClass(); placeExtras(); positionMobileDrawer(); });
+
+    if (navToggle){
+      navToggle.addEventListener('click', ()=>{
+        topbar.classList.toggle('nav-open');
+        positionMobileDrawer();
+      });
+    }
     if (topnav){ topnav.addEventListener('click', closeOnNavClick); }
   })();
 </script>

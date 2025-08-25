@@ -73,17 +73,19 @@ body.is-phone #navToggle{display:inline-flex; align-items:center; justify-conten
 .topbar-actions{display:flex; align-items:center; gap:.5rem}
 
 /* Phone layout (never activates on desktop, even if narrow) */
-body.is-phone .brand-sub{display:none}
+body.is-phone .brand-text{display:none}
 body.is-phone .topnav-links{order:3; width:100%; justify-content:flex-start; overflow:auto; flex-direction:column}
 /* collapsed by default */
-body.is-phone .topnav-links{ display:none; }
+body.is-phone .topnav-links{ display:none !important; }
 body.is-phone .topbar.nav-open .topnav-links{
-  display:flex; flex-direction:column;
-  position:absolute; left:0; right:0; top:100%;
-  padding:8px 12px;
+  display:flex !important; flex-direction:column;
+  position:fixed; left:0; top:var(--mobile-menu-top, 60px); bottom:0;
+  width:50vw;
+  padding:10px 12px;
   background:linear-gradient(180deg,#ffffff, var(--panel-muted));
-  border-bottom: var(--borderW) solid var(--border);
-  gap:6px; box-shadow:0 10px 30px rgba(15,23,42,.12);
+  border-right: var(--borderW) solid var(--border);
+  gap:6px; box-shadow:0 12px 36px rgba(15,23,42,.18);
+  z-index:80; overflow-y:auto;
 }
 body.is-phone .topnav-links .tab-sep{ display:none; }
 /* phone: slim actions */
