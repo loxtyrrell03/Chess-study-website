@@ -112,6 +112,10 @@ body.is-phone #mobileNavOverlay{
 }
 body.is-phone.drawer-open #mobileNavOverlay{ opacity:1; pointer-events:auto; }
 
+/* Legend tickbox and done state */
+.legend-tick{ width:12px; height:12px; margin-left:.35rem; accent-color: var(--accent-600); }
+.chip.legend-done{ text-decoration: line-through; opacity:.75; }
+
 /* ===== Common UI ===== */
 .muted{color:var(--muted)}
 .card{

@@ -969,12 +969,15 @@ resetBtn.onclick = async ()=>{
   currentIndex=0; secondsLeft=minsToSecs((currentSession[0]||{}).minutes||0); renderAll(); updateStartBtnLabel(); markTimer();
 };
 
+// Manual completion flags for legend (persist during this session)
+window.__sectionDone = window.__sectionDone || {};
+const sectionDone = window.__sectionDone;
 function buildProgress(){
   const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
   progressSegments.innerHTML=''; legend.innerHTML=''; progressTicks.innerHTML='';
   sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; progressSegments.appendChild(seg); });
   let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); progressTicks.appendChild(tick); }
-  sched.forEach((sec,i)=>{ const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); chip.innerHTML=`${escapeHtml(sec.name||'')} <span class="opacity-80">(${sec.minutes||0}m)</span>`; chip.onclick=()=>jumpToSection(i); legend.appendChild(chip); });
+  sched.forEach((sec,i)=>{ const key=(sec&&sec.id)?('id:'+sec.id):('idx:'+i); const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); const nameSpan=document.createElement('span'); nameSpan.textContent=String(sec?.name||''); const timeSpan=document.createElement('span'); timeSpan.className='opacity-80'; timeSpan.textContent=`(${sec.minutes||0}m)`; const box=document.createElement('input'); box.type='checkbox'; box.className='legend-tick'; box.checked=!!sectionDone[key]; if(box.checked) chip.classList.add('legend-done'); box.addEventListener('click',(e)=>{ e.stopPropagation(); }); box.addEventListener('change',()=>{ sectionDone[key]=!!box.checked; chip.classList.toggle('legend-done', box.checked); }); chip.onclick=()=>jumpToSection(i); chip.appendChild(nameSpan); chip.appendChild(timeSpan); chip.appendChild(box); legend.appendChild(chip); });
   updateProgress(); buildFocusProgress();
 }
 function buildFocusProgress(){
@@ -2206,7 +2209,23 @@ renderFoldersUI();
     function openDrawer(){ if(!document.body.classList.contains('is-phone')) return; topbar.classList.add('nav-open'); document.body.classList.add('drawer-open'); positionMobileDrawer(); }
     function closeDrawer(){ topbar.classList.remove('nav-open'); document.body.classList.remove('drawer-open'); positionMobileDrawer(); }
 
-    if (navToggle){ navToggle.addEventListener('click', ()=>{ if(topbar.classList.contains('nav-open')) closeDrawer(); else openDrawer(); }); }
+    if (navToggle){
+      let lastToggleAt = 0;
+      const onToggle = (e)=>{
+        e.preventDefault(); e.stopPropagation();
+        const now = Date.now();
+        if(now - lastToggleAt < 250) return; // debounce multi-events (touch/click)
+        lastToggleAt = now;
+        if(topbar.classList.contains('nav-open')) closeDrawer(); else openDrawer();
+      };
+      navToggle.addEventListener('click', onToggle);
+      navToggle.addEventListener('touchend', onToggle, { passive:false });
+    }
+    // Fallback: delegate on document (in case of re-renders)
+    document.addEventListener('click', (e)=>{
+      const tgt = e.target && (e.target.id === 'navToggle' ? e.target : (e.target.closest ? e.target.closest('#navToggle') : null));
+      if(tgt){ e.preventDefault(); e.stopPropagation(); if(topbar.classList.contains('nav-open')) closeDrawer(); else openDrawer(); }
+    });
     if (topnav){ topnav.addEventListener('click', (e)=>{ closeOnNavClick(e); if(e.target && e.target.classList && e.target.classList.contains('tab-link')) closeDrawer(); }); }
     if (overlay){ overlay.addEventListener('click', closeDrawer); }
     window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeDrawer(); });
