@@ -247,6 +247,24 @@ body::before{
 }
 .popover.hidden{ display:none; }
 
+/* Create Outline: inline, replaces the button (not off to side) */
+#createOutlineWrap .popover{
+  position:static; top:auto; right:auto;
+  width:auto; max-width:100%; display:inline-block;
+  padding:10px;
+}
+
+/* New Folder: smaller popover footprint */
+#createFolderForm{
+  width:min(280px, 80vw);
+  padding:8px 10px;
+  border-radius:10px;
+}
+#createFolderForm .input{
+  padding:6px 8px;
+  font-size:.9rem;
+}
+
 /* ===== Modals (shared in-app editor, auth, settings) ===== */
 .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:80}
 .modal.hidden{display:none}
@@ -276,12 +294,12 @@ body::before{
   position:fixed; max-width:420px; width:min(420px, calc(100% - 28px));
   background:var(--panel); border:var(--borderW) solid var(--border);
   border-radius:14px; padding:16px; box-shadow:0 30px 80px rgba(15,23,42,.35);
-  z-index:140; cursor:grab;
+  z-index:140; cursor:auto;
 }
-.tour-panel[data-dragging="1"]{ cursor:grabbing; }
+.tour-panel[data-dragging="1"] .tour-title{ cursor:grabbing; }
 
 /* Typography */
-.tour-title{font-weight:800;margin-bottom:.25rem;font-size:1.15rem}
+.tour-title{font-weight:800;margin-bottom:.25rem;font-size:1.15rem; cursor:grab}
 .tour-body{color:var(--muted);font-size:1.05rem;line-height:1.5}
 .tour-actions{display:flex;align-items:center;gap:.5rem;margin-top:.75rem}
 .tour-actions .spacer{flex:1}

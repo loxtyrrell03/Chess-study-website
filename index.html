@@ -1710,7 +1710,7 @@ const steps = [
   { tab:'homeTab', title:'Progress — click to jump', body:'This live bar shows where you are. Click any segment to jump to that mini‑goal.', anchor:'#progressHost', elevate:['#progressHost','#progressLabel','#progressPct'], spot:['#progressHost','#progressLabel'] },
   { tab:'homeTab', title:'Your current mini‑goal', body:'This left card is the mini‑goal you\'re on. Add links you\'ll need, jot a quick description or mini‑checklist, and keep momentum.', anchor:'#leftPane .section-card' },
   { tab:'homeTab', title:'Right‑pane outline', body:'This shows the outline of your session. Drag rows to reorder your current session, click Edit to rename or change durations, and click a row to jump.', anchor:'#rightPane .card' },
-  { tab:'savedTab', title:'Create & organize', body:'Click “+ Create new outline” to start, and “+ New folder” to organize outlines. You can drag any outline card into a folder (or breadcrumb) to move it.', anchor:'#createOutlineBtn', elevate:['#createOutlineBtn','#createFolderBtn'], spot:['#createOutlineBtn','#createFolderBtn'], demo:'dnd' },
+  { tab:'savedTab', title:'Create & organize', body:'Click "+ Create new outline" to start, and "+ New folder" to organize outlines. You can drag any outline card into a folder (or breadcrumb) to move it.', anchor:'#createOutlineBtn', elevate:['#createOutlineBtn','#createFolderBtn'], spot:['#createOutlineBtn','#createFolderBtn'] },
 ];
 let stepIndex = 0;
 let currentAnchorEl = null;
@@ -1722,7 +1722,11 @@ function removeSpotlights(){
   $$('.spotlight').forEach(el=>el.classList.remove('spotlight'));
   $$('.tour-elevate').forEach(el=>el.classList.remove('tour-elevate'));
   document.body.classList.remove('is-tour-progress');
+  // Remove any demo ghost and its extras
+  if(dndGhostEl && dndGhostEl._cleanup) { try{ dndGhostEl._cleanup(); }catch{} }
   if(dndGhostEl){ dndGhostEl.remove(); dndGhostEl = null; }
+  // Hard cleanup in case any fakes linger
+  document.querySelectorAll('.tour-fake-folder, .tour-fake-outline').forEach(el=> el.remove());
   if(tourSpot){ tourSpot.classList.add('hidden'); }
 }
 
@@ -1926,12 +1930,18 @@ function startTour(){
   showStep(0);
 }
 function endTour(){
+  // Hide UI immediately
   tourOverlay.classList.add('hidden');
   tourPanel.classList.add('hidden');
   tourArrow.classList.add('hidden');
+  // Also override inline display states for safety
+  try{ tourArrow.style.display = 'none'; }catch{}
+  // Clean up demo artifacts before clearing refs
+  if(dndGhostEl && dndGhostEl._cleanup) { try{ dndGhostEl._cleanup(); }catch{} }
+  if(dndGhostEl) { try{ dndGhostEl.remove(); }catch{} }
+  // Belt-and-suspenders: remove any lingering fakes
+  document.querySelectorAll('.tour-fake-folder, .tour-fake-outline').forEach(el=> el.remove());
   removeSpotlights();
-  if(dndGhostEl && dndGhostEl._cleanup) dndGhostEl._cleanup();
-  if(dndGhostEl) dndGhostEl.remove();
 }
 
 learnBtn && (learnBtn.onclick = ()=> startTour());
@@ -1946,6 +1956,14 @@ window.addEventListener('resize', ()=> { placePanelNear(currentAnchorEl||qs(step
 
 // Drag the tour panel (avoid overlapping anchor)
 function onPointerDown(e){
+  // Only start dragging when grabbing the panel title, not buttons/links
+  if (e.button !== 0) return; // left button / primary pointer only
+  const t = e.target;
+  // Disallow drag when interacting with controls
+  if (t.closest('.tour-actions, button, a, input, textarea, select, [contenteditable]')) return;
+  // Restrict drag start to the title area for clearer UX
+  if (!t.closest('#tourStepTitle')) return;
+
   draggingPanel = true; tourPanel.dataset.dragging = '1';
   const rect = tourPanel.getBoundingClientRect();
   dragOffset.x = e.clientX - rect.left;
