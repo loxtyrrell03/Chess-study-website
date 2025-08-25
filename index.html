@@ -84,6 +84,9 @@ vertical-align: middle;
     <div class="tab-sep"></div>
     <!-- NEW: visible Pricing button wired into showTab -->
     <button class="tab-link" data-tab="pricingTab">Pricing</button>
+
+    <!-- Mobile-only container: settings + auth moved here via JS on small screens -->
+    <div id="mobileExtraMenu"></div>
   </nav>
 
   <div class="topbar-actions">
@@ -2114,6 +2117,46 @@ function renderFoldersUI(){
 // Expose for Saved Outlines module to query current folder
 window.__getCurrentFolderId = ()=> currentFolderId;
 renderFoldersUI();
+</script>
+
+<!-- Mobile nav + actions wiring (moves settings/auth into mobile menu) -->
+<script>
+  (function(){
+    const topbar = document.getElementById('topbar');
+    const navToggle = document.getElementById('navToggle');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const authArea = document.getElementById('authArea');
+    const actionsHost = document.querySelector('.topbar-actions');
+    const mobileHost = document.getElementById('mobileExtraMenu');
+
+    function isMobile(){ return window.matchMedia('(max-width: 900px)').matches; }
+
+    function placeExtras(){
+      if (!settingsBtn || !authArea || !actionsHost || !mobileHost) return;
+      if (isMobile()){
+        if (settingsBtn.parentElement !== mobileHost){ mobileHost.appendChild(settingsBtn); }
+        if (authArea.parentElement !== mobileHost){ mobileHost.appendChild(authArea); }
+      } else {
+        if (settingsBtn.parentElement !== actionsHost){ actionsHost.insertBefore(settingsBtn, actionsHost.firstChild); }
+        if (authArea.parentElement !== actionsHost){ actionsHost.insertBefore(authArea, settingsBtn.nextSibling); }
+        topbar.classList.remove('nav-open');
+      }
+    }
+
+    function closeOnNavClick(e){
+      const t = e.target;
+      if (t && t.classList && t.classList.contains('tab-link')){
+        topbar.classList.remove('nav-open');
+      }
+    }
+
+    window.addEventListener('resize', placeExtras);
+    window.addEventListener('DOMContentLoaded', placeExtras);
+
+    if (navToggle){ navToggle.addEventListener('click', ()=> topbar.classList.toggle('nav-open')); }
+    const topnav = document.querySelector('.topnav-links');
+    if (topnav){ topnav.addEventListener('click', closeOnNavClick); }
+  })();
 </script>
 
 <!-- Pricing tab (kept; it can enhance #pricingTab if needed) -->

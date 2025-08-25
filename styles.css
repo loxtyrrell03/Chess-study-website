@@ -87,10 +87,20 @@ body::before{
     border-bottom: var(--borderW) solid var(--border);
     gap:6px; box-shadow:0 10px 30px rgba(15,23,42,.12);
   }
+  .topnav-links .tab-sep{ display:none; }
   /* mobile: slim actions */
   #cloudStatus{ display:none !important; }
   #settingsBtn{ font-size:.8rem; padding:.3rem .55rem; }
-  .topbar-actions{ gap:.35rem }
+  .topbar-actions{ gap:.35rem; display:none; }
+  /* move burger to far right */
+  #navToggle{ order:4; margin-left:auto; }
+  /* mobile-only container inside dropdown */
+  #mobileExtraMenu{ display:flex; flex-direction:column; gap:6px; margin-top:6px; padding-top:6px; border-top: var(--borderW) solid var(--border); }
+}
+
+/* Hide mobile-only extras on desktop */
+@media (min-width:901px){
+  #mobileExtraMenu{ display:none !important; }
 }
 
 /* ===== Common UI ===== */
