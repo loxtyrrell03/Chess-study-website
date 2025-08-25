@@ -488,24 +488,33 @@ export function setupSavedOutlines({
   } // end renderSavedOutlines
 
   // ---------- create outline wiring ----------
-  // Replace the "+ Create new outline" button with the popover while open (prevents layout shift)
+  // Ensure default (hidden form, visible button) on init
+  try{
+    if(createForm) createForm.classList.add('hidden');
+    if(createBtn)  createBtn.classList.remove('hidden');
+  }catch{}
+
+  // Show popover in place of the button
   if(createBtn){
     createBtn.onclick = ()=>{
       if(!createForm) return;
       createBtn.classList.add('hidden');
       createForm.classList.remove('hidden');
-      createTitle.value='';
-      createTitle.focus();
+      if(createTitle){ createTitle.value=''; createTitle.focus(); }
     };
   }
+  // Hide popover on Cancel
   if(createCancel){
-    createCancel.onclick = ()=>{
+    createCancel.onclick = (e)=>{
+      e?.preventDefault?.(); e?.stopPropagation?.();
       createForm?.classList.add('hidden');
       createBtn?.classList.remove('hidden');
     };
   }
+  // Confirm create and hide popover
   if(createOk){
-    createOk.onclick = ()=>{
+    createOk.onclick = (e)=>{
+      e?.preventDefault?.();
       const t = (createTitle?.value || '').trim() || 'New outline';
       const list = (getSavedOutlines && getSavedOutlines()) || [];
       const currentFolderId = (window.__getCurrentFolderId ? window.__getCurrentFolderId() : null);
@@ -517,6 +526,19 @@ export function setupSavedOutlines({
       renderSavedOutlines();
     };
   }
+  // Support Enter to create, Esc to cancel while popover focused
+  if(createTitle){
+    createTitle.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ e.preventDefault(); createOk?.click(); }
+      if(e.key==='Escape'){ e.preventDefault(); createCancel?.click(); }
+    });
+  }
+  // Delegated safety net (in case direct binding misses)
+  document.addEventListener('click', (e)=>{
+    const t = e.target;
+    if(t && t.id === 'createOutlineCancel'){ e.preventDefault(); createCancel?.click(); }
+    if(t && t.id === 'createOutlineConfirm'){ e.preventDefault(); createOk?.click(); }
+  }, true);
 
   // initial render
   renderSavedOutlines();
