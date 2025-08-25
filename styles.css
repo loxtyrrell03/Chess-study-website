@@ -65,43 +65,38 @@ body::before{
 .brand-title{font-weight:800; letter-spacing:.2px}
 .brand-sub{font-size:.72rem; color:var(--muted); margin-top:-2px}
 
-/* Mobile nav toggle */
+/* Mobile nav toggle (phones only; gated by body.is-phone) */
 #navToggle{display:none; border:var(--borderW) solid var(--border); background:#fff; padding:.4rem .55rem; border-radius:.6rem;}
-@media (max-width:900px){
-  #navToggle{display:inline-flex; align-items:center; justify-content:center}
-}
+body.is-phone #navToggle{display:inline-flex; align-items:center; justify-content:center}
 
 .topnav-links{flex:1 1 auto; justify-content:center}
 .topbar-actions{display:flex; align-items:center; gap:.5rem}
 
-@media (max-width:900px){
-  .brand-sub{display:none}
-  .topnav-links{order:3; width:100%; justify-content:flex-start; overflow:auto; flex-direction:column}
-  /* collapsed by default */
-  .topnav-links{ display:none; }
-  .topbar.nav-open .topnav-links{
-    display:flex; flex-direction:column;
-    position:absolute; left:0; right:0; top:100%;
-    padding:8px 12px;
-    background:linear-gradient(180deg,#ffffff, var(--panel-muted));
-    border-bottom: var(--borderW) solid var(--border);
-    gap:6px; box-shadow:0 10px 30px rgba(15,23,42,.12);
-  }
-  .topnav-links .tab-sep{ display:none; }
-  /* mobile: slim actions */
-  #cloudStatus{ display:none !important; }
-  #settingsBtn{ font-size:.8rem; padding:.3rem .55rem; }
-  .topbar-actions{ gap:.35rem; display:none; }
-  /* move burger to far right */
-  #navToggle{ order:4; margin-left:auto; }
-  /* mobile-only container inside dropdown */
-  #mobileExtraMenu{ display:flex; flex-direction:column; gap:6px; margin-top:6px; padding-top:6px; border-top: var(--borderW) solid var(--border); }
+/* Phone layout (never activates on desktop, even if narrow) */
+body.is-phone .brand-sub{display:none}
+body.is-phone .topnav-links{order:3; width:100%; justify-content:flex-start; overflow:auto; flex-direction:column}
+/* collapsed by default */
+body.is-phone .topnav-links{ display:none; }
+body.is-phone .topbar.nav-open .topnav-links{
+  display:flex; flex-direction:column;
+  position:absolute; left:0; right:0; top:100%;
+  padding:8px 12px;
+  background:linear-gradient(180deg,#ffffff, var(--panel-muted));
+  border-bottom: var(--borderW) solid var(--border);
+  gap:6px; box-shadow:0 10px 30px rgba(15,23,42,.12);
 }
+body.is-phone .topnav-links .tab-sep{ display:none; }
+/* phone: slim actions */
+body.is-phone #cloudStatus{ display:none !important; }
+body.is-phone #settingsBtn{ font-size:.8rem; padding:.3rem .55rem; }
+body.is-phone .topbar-actions{ gap:.35rem; display:none; }
+/* move burger to far right */
+body.is-phone #navToggle{ order:4; margin-left:auto; }
+/* mobile-only container inside dropdown */
+body.is-phone #mobileExtraMenu{ display:flex; flex-direction:column; gap:6px; margin-top:6px; padding-top:6px; border-top: var(--borderW) solid var(--border); }
 
-/* Hide mobile-only extras on desktop */
-@media (min-width:901px){
-  #mobileExtraMenu{ display:none !important; }
-}
+/* Hide mobile-only extras when not on phone */
+body:not(.is-phone) #mobileExtraMenu{ display:none !important; }
 
 /* ===== Common UI ===== */
 .muted{color:var(--muted)}

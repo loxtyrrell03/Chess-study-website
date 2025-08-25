@@ -2119,7 +2119,7 @@ window.__getCurrentFolderId = ()=> currentFolderId;
 renderFoldersUI();
 </script>
 
-<!-- Mobile nav + actions wiring (moves settings/auth into mobile menu) -->
+<!-- Mobile nav + actions wiring (moves settings/auth into mobile menu on phones only) -->
 <script>
   (function(){
     const topbar = document.getElementById('topbar');
@@ -2129,11 +2129,38 @@ renderFoldersUI();
     const actionsHost = document.querySelector('.topbar-actions');
     const mobileHost = document.getElementById('mobileExtraMenu');
 
-    function isMobile(){ return window.matchMedia('(max-width: 900px)').matches; }
+    function isPhone(){
+      try{
+        if (navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean'){
+          return navigator.userAgentData.mobile; // true on phones
+        }
+      }catch{}
+      const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toString();
+      const isIphone = /iPhone|iPod/i.test(ua);
+      const isAndroidPhone = /Android/i.test(ua) && /Mobile/i.test(ua);
+      const isWindowsPhone = /IEMobile|Windows Phone/i.test(ua);
+      const isBlackBerry = /BlackBerry|BB10/i.test(ua);
+      // Detect tablets (exclude from phone)
+      const isIpad = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+      const isAndroidTablet = /Android/i.test(ua) && !/Mobile/i.test(ua);
+      const isTabletUA = /Tablet/i.test(ua) || isIpad || isAndroidTablet;
+      // Fallback heuristic: touch-first + physically small screen
+      const coarse = window.matchMedia('(pointer:coarse)').matches;
+      const smallSide = Math.min(window.screen.width, window.screen.height);
+      const looksPhone = coarse && smallSide <= 820 && !/Windows NT|Macintosh|Linux x86_64/i.test(ua);
+      return ((isIphone || isAndroidPhone || isWindowsPhone || isBlackBerry) && !isTabletUA) || looksPhone;
+    }
+
+    function applyPhoneClass(){
+      const phone = isPhone();
+      document.body.classList.toggle('is-phone', phone);
+      return phone;
+    }
 
     function placeExtras(){
+      const phone = document.body.classList.contains('is-phone') || applyPhoneClass();
       if (!settingsBtn || !authArea || !actionsHost || !mobileHost) return;
-      if (isMobile()){
+      if (phone){
         if (settingsBtn.parentElement !== mobileHost){ mobileHost.appendChild(settingsBtn); }
         if (authArea.parentElement !== mobileHost){ mobileHost.appendChild(authArea); }
       } else {
@@ -2150,8 +2177,9 @@ renderFoldersUI();
       }
     }
 
-    window.addEventListener('resize', placeExtras);
-    window.addEventListener('DOMContentLoaded', placeExtras);
+    window.addEventListener('resize', ()=>{ applyPhoneClass(); placeExtras(); });
+    window.addEventListener('orientationchange', ()=>{ applyPhoneClass(); placeExtras(); });
+    window.addEventListener('DOMContentLoaded', ()=>{ applyPhoneClass(); placeExtras(); });
 
     if (navToggle){ navToggle.addEventListener('click', ()=> topbar.classList.toggle('nav-open')); }
     const topnav = document.querySelector('.topnav-links');
