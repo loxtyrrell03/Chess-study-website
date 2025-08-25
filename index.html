@@ -102,6 +102,9 @@ vertical-align: middle;
   </div>
 </header>
 
+<!-- Mobile drawer overlay (phones only) -->
+<div id="mobileNavOverlay" class="mobile-overlay" aria-hidden="true"></div>
+
 <!-- ======= MAIN WRAPPER ======= -->
 <div class="max-w-7xl mx-auto px-5 py-6">
 
@@ -2129,6 +2132,7 @@ renderFoldersUI();
     const actionsHost = document.querySelector('.topbar-actions');
     const mobileHost = document.getElementById('mobileExtraMenu');
     const topnav = document.querySelector('.topnav-links');
+    const overlay = document.getElementById('mobileNavOverlay');
 
     function isPhone(){
       try{
@@ -2168,6 +2172,7 @@ renderFoldersUI();
         if (settingsBtn.parentElement !== actionsHost){ actionsHost.insertBefore(settingsBtn, actionsHost.firstChild); }
         if (authArea.parentElement !== actionsHost){ actionsHost.insertBefore(authArea, settingsBtn.nextSibling); }
         topbar.classList.remove('nav-open');
+        document.body.classList.remove('drawer-open');
       }
     }
 
@@ -2182,8 +2187,8 @@ renderFoldersUI();
       if (!document.body.classList.contains('is-phone')) return;
       if (!topbar || !topnav) return;
       const h = Math.ceil(topbar.getBoundingClientRect().height);
-      // Feed CSS var for top offset
-      topbar.style.setProperty('--mobile-menu-top', h + 'px');
+      // Feed CSS var for top offset (set globally so overlay can use it)
+      document.documentElement.style.setProperty('--mobile-menu-top', h + 'px');
       // Also set explicit inline styles to ensure correct position
       if (topbar.classList.contains('nav-open')){
         topnav.style.top = h + 'px';
@@ -2198,13 +2203,13 @@ renderFoldersUI();
     window.addEventListener('orientationchange', ()=>{ applyPhoneClass(); placeExtras(); positionMobileDrawer(); });
     window.addEventListener('DOMContentLoaded', ()=>{ applyPhoneClass(); placeExtras(); positionMobileDrawer(); });
 
-    if (navToggle){
-      navToggle.addEventListener('click', ()=>{
-        topbar.classList.toggle('nav-open');
-        positionMobileDrawer();
-      });
-    }
-    if (topnav){ topnav.addEventListener('click', closeOnNavClick); }
+    function openDrawer(){ if(!document.body.classList.contains('is-phone')) return; topbar.classList.add('nav-open'); document.body.classList.add('drawer-open'); positionMobileDrawer(); }
+    function closeDrawer(){ topbar.classList.remove('nav-open'); document.body.classList.remove('drawer-open'); positionMobileDrawer(); }
+
+    if (navToggle){ navToggle.addEventListener('click', ()=>{ if(topbar.classList.contains('nav-open')) closeDrawer(); else openDrawer(); }); }
+    if (topnav){ topnav.addEventListener('click', (e)=>{ closeOnNavClick(e); if(e.target && e.target.classList && e.target.classList.contains('tab-link')) closeDrawer(); }); }
+    if (overlay){ overlay.addEventListener('click', closeDrawer); }
+    window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeDrawer(); });
   })();
 </script>
 

@@ -74,19 +74,22 @@ body.is-phone #navToggle{display:inline-flex; align-items:center; justify-conten
 
 /* Phone layout (never activates on desktop, even if narrow) */
 body.is-phone .brand-text{display:none}
-body.is-phone .topnav-links{order:3; width:100%; justify-content:flex-start; overflow:auto; flex-direction:column}
-/* collapsed by default */
-body.is-phone .topnav-links{ display:none !important; }
-body.is-phone .topbar.nav-open .topnav-links{
-  display:flex !important; flex-direction:column;
+body.is-phone .topnav-links{
+  order:3;
   position:fixed; left:0; top:var(--mobile-menu-top, 60px); bottom:0;
-  width:50vw;
+  width:50vw; max-width:50vw; min-width:280px;
+  display:flex; flex-direction:column; justify-content:flex-start;
+  overflow:auto;
   padding:10px 12px;
   background:linear-gradient(180deg,#ffffff, var(--panel-muted));
   border-right: var(--borderW) solid var(--border);
   gap:6px; box-shadow:0 12px 36px rgba(15,23,42,.18);
-  z-index:80; overflow-y:auto;
+  z-index:80;
+  transform: translateX(-102%);
+  opacity: 0; pointer-events: none;
+  transition: transform var(--normal) var(--ease), opacity var(--normal) var(--ease);
 }
+body.is-phone .topbar.nav-open .topnav-links{ transform: translateX(0); opacity: 1; pointer-events: auto; }
 body.is-phone .topnav-links .tab-sep{ display:none; }
 /* phone: slim actions */
 body.is-phone #cloudStatus{ display:none !important; }
@@ -99,6 +102,15 @@ body.is-phone #mobileExtraMenu{ display:flex; flex-direction:column; gap:6px; ma
 
 /* Hide mobile-only extras when not on phone */
 body:not(.is-phone) #mobileExtraMenu{ display:none !important; }
+
+/* Mobile overlay */
+body.is-phone #mobileNavOverlay{
+  position:fixed; left:0; right:0; top:var(--mobile-menu-top, 60px); bottom:0;
+  background: rgba(15,23,42,.38);
+  opacity:0; pointer-events:none; z-index:70;
+  transition: opacity var(--normal) var(--ease);
+}
+body.is-phone.drawer-open #mobileNavOverlay{ opacity:1; pointer-events:auto; }
 
 /* ===== Common UI ===== */
 .muted{color:var(--muted)}
