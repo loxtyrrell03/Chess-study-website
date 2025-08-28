@@ -107,7 +107,7 @@ body:not(.is-phone) #mobileExtraMenu{ display:none !important; }
 body.is-phone #mobileNavOverlay{
   position:fixed; left:0; right:0; top:var(--mobile-menu-top, 60px); bottom:0;
   background: rgba(15,23,42,.38);
-  opacity:0; pointer-events:none; z-index:70;
+  opacity:0; pointer-events:none; z-index:60;
   transition: opacity var(--normal) var(--ease);
 }
 body.is-phone.drawer-open #mobileNavOverlay{ opacity:1; pointer-events:auto; }

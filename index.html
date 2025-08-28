@@ -616,10 +616,9 @@ const loadJSON = (k)=> { try{ return JSON.parse(localStorage.getItem(k)); }catch
 const $ = (q)=> document.querySelector(q);
 const $$ = (q)=> Array.from(document.querySelectorAll(q));
 
-/* Mobile nav toggle */
+/* Mobile nav toggle handled later in dedicated section. */
 const navToggle = $('#navToggle');
 const topbar = $('#topbar');
-navToggle?.addEventListener('click', ()=> topbar.classList.toggle('nav-open'));
 
 // Primary state
 let currentSession = loadJSON('current_session_v1') || [];
