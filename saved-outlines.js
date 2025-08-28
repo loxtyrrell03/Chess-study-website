@@ -534,10 +534,12 @@ export function setupSavedOutlines({
     });
   }
   // Delegated safety net (in case direct binding misses)
+  // Guard against double-trigger when clicking the actual buttons.
+  // Only proxy if the click did NOT originate from the bound element (safety net).
   document.addEventListener('click', (e)=>{
     const t = e.target;
-    if(t && t.id === 'createOutlineCancel'){ e.preventDefault(); createCancel?.click(); }
-    if(t && t.id === 'createOutlineConfirm'){ e.preventDefault(); createOk?.click(); }
+    if(t && t.id === 'createOutlineCancel' && t !== createCancel){ e.preventDefault(); createCancel?.click(); }
+    if(t && t.id === 'createOutlineConfirm' && t !== createOk){ e.preventDefault(); createOk?.click(); }
   }, true);
 
   // initial render

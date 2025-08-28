@@ -1111,6 +1111,9 @@ function openWidgetEditor(widget, onSave, onCancel){
   };
 }
 
+// Expose for modules (Saved tab uses window.openWidgetEditor)
+window.openWidgetEditor = openWidgetEditor;
+
 /*************** Current panel (Home) ***************/
 let isEditingSection=false;
 
