@@ -358,6 +358,9 @@ body.is-phone.drawer-open #mobileNavOverlay{ opacity:1; pointer-events:auto; }
 .tour-elevate{ position:relative; z-index:120 !important }
 .spotlight{ outline:3px solid var(--accent); outline-offset:2px; border-radius:12px }
 
+/* Progress step: hide anchor outline; keep outer spotbox */
+.is-tour-progress #progressHost.spotlight{ outline:none; outline-offset:0 }
+
 /* Single big spotlight box for grouped elements (progress bar + label) */
 .tour-spotbox{
   position:fixed; z-index:130; pointer-events:none;

@@ -1716,6 +1716,9 @@ const tourSpot = $('#tourSpotBox');
 // Helper to prefer exact element
 const qs = (sel)=> document.querySelector(sel);
 
+// Track whether the tour is active to prevent re-opening on scroll/resize
+let tourActive = false;
+
 const steps = [
   { tab:'overviewTab', title:'Welcome to Skillflow', body:'A 30‑second tour. You can close any time.', anchor:null },
   { tab:'homeTab', title:'Progress — click to jump', body:'This live bar shows where you are. Click any segment to jump to that mini‑goal.', anchor:'#progressHost', elevate:['#progressHost','#progressLabel','#progressPct'], spot:['#progressHost','#progressLabel'] },
@@ -1728,6 +1731,41 @@ let currentAnchorEl = null;
 let dndGhostEl = null;
 let draggingPanel = false;
 let dragOffset = { x:0, y:0 };
+
+// Tour tweaks per request: rename and split Saved steps
+try{
+  // Rename Right-pane step to Saved outlines and retarget to the saved row
+  if (Array.isArray(steps) && steps[3]){
+    steps[3] = {
+      tab: 'homeTab',
+      title: 'Saved outlines',
+      body: 'Quick access to your saved outlines. Click to load one into your current session.',
+      anchor: '#homeSavedRow'
+    };
+  }
+  // Replace combined Create & organize with two separate steps
+  if (Array.isArray(steps) && steps[4]){
+    const createStep = {
+      tab: 'savedTab',
+      title: '+ Create new outline',
+      body: 'Create a brand new outline. Give it a name now or later, then add sections and links as you plan.',
+      anchor: '#createOutlineBtn',
+      elevate: ['#createOutlineBtn'],
+      spot: ['#createOutlineBtn'],
+      noSpotlight: true
+    };
+    const folderStep = {
+      tab: 'savedTab',
+      title: '+ New folder',
+      body: 'Create a folder to organize your saved outlines. Drag outline cards into a folder or breadcrumb to move them.',
+      anchor: '#createFolderBtn',
+      elevate: ['#createFolderBtn','#folderCrumbs'],
+      spot: ['#createFolderBtn'],
+      noSpotlight: true
+    };
+    steps.splice(4, 1, createStep, folderStep);
+  }
+}catch{}
 
 function removeSpotlights(){
   $$('.spotlight').forEach(el=>el.classList.remove('spotlight'));
@@ -1912,7 +1950,8 @@ function showStep(i){
     currentAnchorEl = qs(s.anchor);
     if(currentAnchorEl){
       // Keep the anchor crisp and above the blur
-      currentAnchorEl.classList.add('tour-elevate','spotlight');
+      currentAnchorEl.classList.add('tour-elevate');
+      if(!s.noSpotlight){ currentAnchorEl.classList.add('spotlight'); }
       (s.elevate||[]).forEach(sel => qs(sel)?.classList.add('tour-elevate'));
       (s.spot||[]).forEach(sel => qs(sel)?.classList.add('tour-elevate')); // keep both visible
       currentAnchorEl.scrollIntoView({ behavior:'smooth', block:'center' });
@@ -1935,12 +1974,14 @@ function showStep(i){
 }
 
 function startTour(){
+  tourActive = true;
   tourOverlay.classList.remove('hidden');
   tourPanel.classList.remove('hidden');
   tourArrow.classList.remove('hidden');
   showStep(0);
 }
 function endTour(){
+  tourActive = false;
   // Hide UI immediately
   tourOverlay.classList.add('hidden');
   tourPanel.classList.add('hidden');
@@ -1962,8 +2003,16 @@ tourFinish.onclick = endTour;
 tourOverlay.addEventListener('click', (e)=>{ if(e.target.classList.contains('tour-backdrop')) endTour(); });
 
 // Keep panel placed as user scrolls
-window.addEventListener('scroll', ()=>{ if(!draggingPanel) placePanelNear(currentAnchorEl||qs(steps[stepIndex].anchor||'')); if(steps[stepIndex]?.spot) drawSpotbox(steps[stepIndex].spot); }, { passive:true });
-window.addEventListener('resize', ()=> { placePanelNear(currentAnchorEl||qs(steps[stepIndex].anchor||'')); if(steps[stepIndex]?.spot) drawSpotbox(steps[stepIndex].spot); });
+window.addEventListener('scroll', ()=>{
+  if(!tourActive) return;
+  if(!draggingPanel) placePanelNear(currentAnchorEl||qs(steps[stepIndex].anchor||''));
+  if(steps[stepIndex]?.spot) drawSpotbox(steps[stepIndex].spot);
+}, { passive:true });
+window.addEventListener('resize', ()=>{
+  if(!tourActive) return;
+  placePanelNear(currentAnchorEl||qs(steps[stepIndex].anchor||''));
+  if(steps[stepIndex]?.spot) drawSpotbox(steps[stepIndex].spot);
+});
 
 // Drag the tour panel (avoid overlapping anchor)
 function onPointerDown(e){
