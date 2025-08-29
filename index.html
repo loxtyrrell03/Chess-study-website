@@ -435,6 +435,14 @@ vertical-align: middle;
       <div class="mt-4 flex flex-col items-center text-center gap-5">
         <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
 
+        <!-- Focus controls: mirror main controls (Start/Ready/Prev/Next) -->
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <button id="focusStartBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm">Start Study Session</button>
+          <button id="focusReadyNextBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm hidden">I’m ready — start next ▶</button>
+          <button id="focusPrevBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">◀ Prev</button>
+          <button id="focusNextBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Next ▶</button>
+        </div>
+
         <!-- Progress -->
         <div class="w-full">
           <div class="mb-1 flex items-center justify-between">
@@ -872,6 +880,8 @@ const focusClockEl = $('#focusClock');
 const focusStartBtn= $('#focusStartBtn');
 const focusPauseBtn= $('#focusPauseBtn');
 const focusReadyBtn= $('#focusReadyNextBtn');
+const focusPrevBtn = $('#focusPrevBtn');
+const focusNextBtn = $('#focusNextBtn');
 
 const focusProgressHost=$('#focusProgressHost'), focusProgressFill=$('#focusProgressFill'),
 focusProgressSegments=$('#focusProgressSegments'), focusProgressTicks=$('#focusProgressTicks'),
@@ -1014,6 +1024,8 @@ startBtn.onclick = async ()=>{
 };
 focusStartBtn && (focusStartBtn.onclick = ()=> startBtn.click());
 focusPauseBtn && (focusPauseBtn.onclick = ()=>{ if(running) stopTimer(); });
+focusPrevBtn && (focusPrevBtn.onclick = ()=> prevBtn.click());
+focusNextBtn && (focusNextBtn.onclick = ()=> nextBtn.click());
 
 
 
@@ -1058,17 +1070,18 @@ function updateLegendActive(){ legend.querySelectorAll('.chip').forEach((el, i)=
 function updateProgress(){
   const sched = currentSession;
   const total = scheduleTotalSecs(sched);
-  // Update total time label beside the Progress header
+  // Update time-left label beside the Progress header
   try{
     const tEl = document.getElementById("totalTimeText");
     if (tEl) {
-      const secs = total || 0;
+      const elapsed = Math.max(0, Math.min(total || 0, elapsedSeconds(sched, currentIndex, secondsLeft)));
+      const secs = Math.max(0, (total || 0) - elapsed);
       const h = Math.floor(secs / 3600);
       const m = Math.round((secs % 3600) / 60);
       const parts = [];
       if (h > 0) parts.push(h + " hr" + (h > 1 ? "s" : ""));
       parts.push(m + " min" + (m !== 1 ? "s" : ""));
-      tEl.textContent = "total time: " + parts.join(" ");
+      tEl.textContent = "time left: " + parts.join(" ");
     }
   } catch {}
   if (!total) {
