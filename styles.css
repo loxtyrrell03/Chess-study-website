@@ -119,6 +119,9 @@ body.is-phone #mobileNavOverlay{
 /* Do not dim background when drawer is open */
 body.is-phone.drawer-open #mobileNavOverlay{ opacity:0; pointer-events:none; }
 
+/* Hard-disable the overlay entirely (no darken, no intercept) */
+#mobileNavOverlay{ display:none !important; }
+
 /* Legend tickbox and done state */
 .legend-tick{ width:12px; height:12px; margin-left:.35rem; accent-color: var(--accent-600); }
 .chip.legend-done{ text-decoration: line-through; opacity:.75; }

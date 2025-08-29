@@ -250,14 +250,32 @@ export function setupSavedOutlines({
       });
       card.querySelector('[data-act="toggle-expand"]')?.addEventListener('click', ()=>{ if(expandedOutlines.has(o.id)) expandedOutlines.delete(o.id); else expandedOutlines.add(o.id); renderSavedOutlines(); });
       card.querySelector('[data-act="add-section"]')?.addEventListener('click', ()=>{
-        // Inline add row at top of sections list
+        // Create, immediately enter edit mode, and focus the title input.
         expandedOutlines.add(o.id);
         const me = byId((getSavedOutlines && getSavedOutlines()) || [], o.id); if(!me) return;
         me.sections = me.sections || [];
-        me.sections.push({ id:'S'+Date.now().toString(36), name:'New section', minutes:5, desc:'', links:[] });
+        const newId = 'S'+Date.now().toString(36);
+        me.sections.push({ id:newId, name:'', minutes:5, desc:'', links:[] });
+        // Mark this section as editing so render shows the edit card
+        const secKey = keyOf(o.id, newId);
+        editingSections.add(secKey);
         setSavedOutlines && setSavedOutlines(me ? [...(getSavedOutlines && getSavedOutlines())] : []);
         persist(o.id);
         renderSavedOutlines();
+
+        // Focus the title input and save on Enter or blur
+        try{
+          const listRoot = card.closest('[data-oid]') || card;
+          const secEl = listRoot?.querySelector(`li[data-sid="${escSel(newId)}"]`);
+          const titleInp = secEl?.querySelector('[data-role="edit-title"]');
+          const saveBtn  = secEl?.querySelector('[data-act="save-section"]');
+          if(titleInp){
+            titleInp.focus(); titleInp.select();
+            const finish = (commit=true)=>{ if(commit && saveBtn){ saveBtn.click(); } };
+            titleInp.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); finish(true); } if(e.key==='Escape'){ e.preventDefault(); finish(true); } });
+            titleInp.addEventListener('blur', ()=> finish(true));
+          }
+        }catch{}
       });
 
       // Make title draggable for merge + for folder move indicator
