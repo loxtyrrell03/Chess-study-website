@@ -59,7 +59,7 @@ body::before{
   box-shadow: var(--shadow-2);
 }
 .brand{display:flex; align-items:center; gap:.55rem; min-width:0}
-.brand .logo{display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px}
+.brand .logo{display:none !important}
 .logo-svg{width:28px;height:28px; display:block}
 .brand-text{display:flex; flex-direction:column}
 .brand-title{font-weight:800; letter-spacing:.2px}
@@ -73,7 +73,13 @@ body.is-phone #navToggle{display:inline-flex; align-items:center; justify-conten
 .topbar-actions{display:flex; align-items:center; gap:.5rem}
 
 /* Phone layout (never activates on desktop, even if narrow) */
-body.is-phone .brand-text{display:none}
+/* Show logo wordmark instead of text */
+.brand-text{ position:relative; justify-content:center; }
+.brand-text .brand-title, .brand-text .brand-sub{ display:none !important; }
+.brand-text{ width:min(50vw, 320px); height:42px; background:url('./logo.png') no-repeat left center / contain; }
+
+/* Ensure the wordmark shows on phones too (slightly smaller) */
+body.is-phone .brand-text{ display:inline-flex !important; width:min(70vw, 240px); height:34px; }
 body.is-phone .topnav-links{
   order:3;
   position:fixed; left:0; top:var(--mobile-menu-top, 60px); bottom:0;
