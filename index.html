@@ -76,9 +76,9 @@ vertical-align: middle;
   <nav class="tabs-bar topnav-links">
     <button class="tab-link active" data-tab="overviewTab">Overview</button>
     <div class="tab-sep"></div>
-    <button class="tab-link" data-tab="homeTab">Planner</button>
+    <button class="tab-link" data-tab="homeTab">Session</button>
     <div class="tab-sep"></div>
-    <button class="tab-link" data-tab="savedTab">Saved</button>
+    <button class="tab-link" data-tab="savedTab">Outlines</button>
     <div class="tab-sep"></div>
     <button class="tab-link" data-tab="helpTab">How to use</button>
     <div class="tab-sep"></div>
@@ -653,6 +653,27 @@ const markDirty = ()=> { dirty = true; };
 const setLocalMode = (m='Local mode')=> cloudStatus.textContent = m;
 const setCloudMode = (m='Cloud sync on')=> cloudStatus.textContent = m;
 
+async function saveCloudNow(){
+  if(!currentUser) return;
+  try{
+    await setDoc(userDocRef(currentUser.uid), {
+      currentSession,
+      notes: sectionNotes,
+      prefs,
+      widgetShelf,
+      savedOutlines,
+      folders: savedFolders,
+      sectionDone: (window.__sectionDone || {}),
+      timer: timerState,
+      updatedAt: serverTimestamp(),
+      sessions: deleteField(),
+      activePreset: deleteField()
+    }, { merge:true });
+    cloudStatus.textContent = 'Saved to cloud ?';
+    dirty = false;
+  }catch(e){ cloudStatus.textContent='Cloud save failed'; }
+}
+
 const saveCloudDebounced = debounce(async ()=>{
   if(!currentUser) return;
   try{
@@ -665,12 +686,12 @@ const saveCloudDebounced = debounce(async ()=>{
   }catch(e){ cloudStatus.textContent='Cloud save failed'; }
 }, 1200);
 
-const touchCloud = ()=> { if(currentUser){ saveCloudDebounced(); } };
+const touchCloud = ()=> { if(currentUser){ saveCloudNow(); } };
 
 // Periodic flush
-setInterval(()=>{ if(currentUser && dirty) saveCloudDebounced(); }, 5000);
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ if(currentUser) saveCloudDebounced(); } });
-window.addEventListener('beforeunload', ()=>{ if(currentUser) saveCloudDebounced(); });
+// Immediate save model: no interval
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ if(currentUser) saveCloudNow(); } });
+window.addEventListener('beforeunload', ()=>{ if(currentUser) saveCloudNow(); });
 
 // Local save wrappers
 const saveCurrentSession = ()=>{ saveJSON('current_session_v1', currentSession); markDirty(); touchCloud(); };
@@ -976,7 +997,7 @@ function buildProgress(){
   progressSegments.innerHTML=''; legend.innerHTML=''; progressTicks.innerHTML='';
   sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; progressSegments.appendChild(seg); });
   let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); progressTicks.appendChild(tick); }
-  sched.forEach((sec,i)=>{ const key=(sec&&sec.id)?('id:'+sec.id):('idx:'+i); const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); const nameSpan=document.createElement('span'); nameSpan.textContent=String(sec?.name||''); const timeSpan=document.createElement('span'); timeSpan.className='opacity-80'; timeSpan.textContent=`(${sec.minutes||0}m)`; const box=document.createElement('input'); box.type='checkbox'; box.className='legend-tick'; box.checked=!!sectionDone[key]; if(box.checked) chip.classList.add('legend-done'); box.addEventListener('click',(e)=>{ e.stopPropagation(); }); box.addEventListener('change',()=>{ sectionDone[key]=!!box.checked; chip.classList.toggle('legend-done', box.checked); }); chip.onclick=()=>jumpToSection(i); chip.appendChild(nameSpan); chip.appendChild(timeSpan); chip.appendChild(box); legend.appendChild(chip); });
+  sched.forEach((sec,i)=>{ const key=(sec&&sec.id)?('id:'+sec.id):('idx:'+i); const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); const nameSpan=document.createElement('span'); nameSpan.textContent=String(sec?.name||''); const timeSpan=document.createElement('span'); timeSpan.className='opacity-80'; timeSpan.textContent=`(${sec.minutes||0}m)`; const box=document.createElement('input'); box.type='checkbox'; box.className='legend-tick'; box.checked=!!sectionDone[key]; if(box.checked) chip.classList.add('legend-done'); box.addEventListener('click',(e)=>{ e.stopPropagation(); }); box.addEventListener('change',()=>{ sectionDone[key]=!!box.checked; chip.classList.toggle('legend-done', box.checked); try{ markDirty(); saveCloudNow(); }catch{} }); chip.onclick=()=>jumpToSection(i); chip.appendChild(nameSpan); chip.appendChild(timeSpan); chip.appendChild(box); legend.appendChild(chip); });
   updateProgress(); buildFocusProgress();
 }
 function buildFocusProgress(){
@@ -1554,6 +1575,12 @@ onAuthStateChanged(auth, async (user)=>{
         if(d.widgetShelf) widgetShelf = d.widgetShelf;
         if(d.savedOutlines) savedOutlines = d.savedOutlines;
         if(d.folders) savedFolders = d.folders;
+        if(d.sectionDone && typeof d.sectionDone === 'object'){
+          try{
+            window.__sectionDone = window.__sectionDone || {};
+            const tgt = window.__sectionDone; Object.keys(tgt).forEach(k=> delete tgt[k]); Object.assign(tgt, d.sectionDone);
+          }catch{}
+        }
         if(d.timer) timerState = d.timer;
         applyTheme(prefs.theme||{}); applySplitRatio(prefs.splitRatio||56);
         setTimerFromState(timerState); renderAll(); renderHomeSavedBar(); setCloudMode('Saved to cloud ✓');
@@ -2101,7 +2128,8 @@ createFolderCancel.onclick = ()=>{
 };
 createFolderConfirm.onclick = ()=>{
   const name = (newFolderName.value||'').trim() || 'New folder';
-  savedFolders.push({ id:'F'+Date.now().toString(36), name }); saveFoldersLocal(); renderFoldersUI();
+  savedFolders.push({ id:'F'+Date.now().toString(36), name, parentId: (currentFolderId||null) });
+  saveFoldersLocal(); renderFoldersUI();
   createFolderForm.classList.add('hidden');
   createFolderBtn.classList.remove('hidden');
 };
@@ -2119,39 +2147,72 @@ function renderFoldersUI(){
     const child=document.createElement('span'); child.className='crumb active'; child.textContent=f?f.name:'Folder';
     child.onclick = ()=>{ /* stay */ }; folderCrumbs.appendChild(child);
   }
+  // Build full breadcrumb path (root → ... → current)
+  try{
+    const path=[]; let fidWalk=currentFolderId; while(fidWalk){ const f=savedFolders.find(x=>x.id===fidWalk); if(!f) break; path.unshift(f); fidWalk=f.parentId||null; }
+    folderCrumbs.innerHTML='';
+    const mainCr=document.createElement('span'); mainCr.className='crumb'; mainCr.textContent='Main'; mainCr.dataset.fid=''; if(currentFolderId===null) mainCr.classList.add('active'); mainCr.onclick=()=>{ currentFolderId=null; renderFoldersUI(); renderSavedOutlines(); }; folderCrumbs.appendChild(mainCr);
+    path.forEach((f, idx)=>{ const sep=document.createElement('span'); sep.className='crumb-sep'; sep.textContent='>'; folderCrumbs.appendChild(sep); const c=document.createElement('span'); c.className='crumb'; c.textContent=f.name; c.dataset.fid=f.id; if(idx===path.length-1) c.classList.add('active'); c.onclick=()=>{ currentFolderId=f.id; renderFoldersUI(); renderSavedOutlines(); }; folderCrumbs.appendChild(c); });
+  }catch{}
   // Dropping onto breadcrumbs to move outline
   folderCrumbs.querySelectorAll('.crumb').forEach((c, idx)=>{
-    c.addEventListener('dragover', e=>{ if(window.__draggingOutlineId){ e.preventDefault(); c.classList.add('crumb-drop'); }});
+    c.addEventListener('dragover', e=>{ if(window.__draggingOutlineId || window.__draggingFolderId){ e.preventDefault(); c.classList.add('crumb-drop'); }});
     c.addEventListener('dragleave', ()=> c.classList.remove('crumb-drop'));
     c.addEventListener('drop', e=>{
-      if(!window.__draggingOutlineId) return;
       e.preventDefault(); c.classList.remove('crumb-drop');
-      const oid = window.__draggingOutlineId;
-      const o = savedOutlines.find(x=>x.id===oid); if(!o) return;
-      o.folderId = (idx===0 ? null : currentFolderId);
-      saveOutlinesLocal(); touchCloud(); renderSavedOutlines();
+      if(window.__draggingOutlineId){
+        const oid = window.__draggingOutlineId; const o = savedOutlines.find(x=>x.id===oid); if(!o) return;
+        o.folderId = (idx===0 ? null : currentFolderId);
+        saveOutlinesLocal(); touchCloud(); renderSavedOutlines();
+      }
+      if(window.__draggingFolderId){
+        const srcId = window.__draggingFolderId; const src = savedFolders.find(x=>x.id===srcId); if(!src) return;
+        const targetFid = (idx===0 ? null : currentFolderId);
+        // prevent cycles
+        let p = targetFid, blocked=false; while(p){ if(p===srcId){ blocked=true; break } const pf=savedFolders.find(x=>x.id===p); p=pf?.parentId||null; }
+        if(!blocked){ src.parentId = targetFid; saveFoldersLocal(); renderFoldersUI(); }
+        window.__draggingFolderId = null;
+      }
     });
   });
 
   // Folder icons grid (with delete bins)
-  folderGrid.innerHTML = savedFolders.map(f=>`
-    <div class="folder-card" data-fid="${f.id}" title="${escapeHtml(f.name)}" draggable="false">
+  folderGrid.innerHTML = savedFolders.filter(f=> (f.parentId||null) === (currentFolderId||null)).map(f=>`
+    <div class="folder-card" data-fid="${f.id}" title="${escapeHtml(f.name)}" draggable="true">
       <button class="folder-del" data-act="del-folder" title="Delete folder">🗑️</button>
       <div class="folder-icon"></div>
       <div class="folder-name truncate">${escapeHtml(f.name)}</div>
     </div>`).join('');
   folderGrid.querySelectorAll('.folder-card').forEach(card=>{
-    card.addEventListener('dblclick', ()=>{ currentFolderId = card.dataset.fid; renderFoldersUI(); renderSavedOutlines(); });
+    // Drag start for folder
+    card.addEventListener('dragstart', (e)=>{ window.__draggingFolderId = card.dataset.fid; try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'folder', id:card.dataset.fid})); }catch{} });
+    // Inject rename button to the card header area
+    try{
+      const delBtn = card.querySelector('[data-act="del-folder"]');
+      if(delBtn){
+        const r=document.createElement('button'); r.className='folder-rename'; r.setAttribute('data-act','rename-folder'); r.title='Rename folder'; r.textContent='✎';
+        delBtn.parentElement.insertBefore(r, delBtn);
+        r.addEventListener('click', (ev)=>{
+          ev.stopPropagation();
+          const fid=card.dataset.fid; const f=savedFolders.find(x=>x.id===fid); if(!f) return;
+          const nameEl=card.querySelector('.folder-name'); if(!nameEl) return;
+          const input=document.createElement('input'); input.className='input'; input.value=f.name||''; input.style.width='90%'; input.style.padding='4px 8px'; input.style.fontSize='0.95rem';
+          nameEl.replaceWith(input); input.focus(); input.select();
+          const finish=(commit)=>{ const val=(input.value||'').trim()||f.name||'Folder'; if(commit){ f.name=val; saveFoldersLocal(); } renderFoldersUI(); };
+          input.addEventListener('keydown',(ke)=>{ if(ke.key==='Enter'){ ke.preventDefault(); finish(true);} if(ke.key==='Escape'){ ke.preventDefault(); finish(false);} });
+          input.addEventListener('blur', ()=> finish(true));
+        });
+      }
+    }catch{}
+    card.addEventListener('click', (e)=>{ if(e.target.closest('[data-act]')) return; currentFolderId = card.dataset.fid; renderFoldersUI(); renderSavedOutlines(); });
     // Allow dropping outline onto folder
-    card.addEventListener('dragover', e=>{ if(window.__draggingOutlineId){ e.preventDefault(); card.classList.add('folder-drop'); }});
+    card.addEventListener('dragover', e=>{ if(window.__draggingOutlineId || window.__draggingFolderId){ e.preventDefault(); card.classList.add('folder-drop'); }});
     card.addEventListener('dragleave', ()=> card.classList.remove('folder-drop'));
     card.addEventListener('drop', e=>{
-      if(!window.__draggingOutlineId) return;
       e.preventDefault(); card.classList.remove('folder-drop');
-      const oid = window.__draggingOutlineId;
-      const o = savedOutlines.find(x=>x.id===oid); if(!o) return;
-      o.folderId = card.dataset.fid;
-      saveOutlinesLocal(); touchCloud(); renderSavedOutlines();
+      const targetId = card.dataset.fid;
+      if(window.__draggingOutlineId){ const oid = window.__draggingOutlineId; const o = savedOutlines.find(x=>x.id===oid); if(o){ o.folderId = targetId; saveOutlinesLocal(); touchCloud(); renderSavedOutlines(); } }
+      if(window.__draggingFolderId){ const srcId = window.__draggingFolderId; const src = savedFolders.find(x=>x.id===srcId); if(src){ let p=targetId, blocked=false; while(p){ if(p===srcId){ blocked=true; break } const pf=savedFolders.find(x=>x.id===p); p=pf?.parentId||null; } if(!blocked){ src.parentId = targetId; saveFoldersLocal(); renderFoldersUI(); } } window.__draggingFolderId = null; }
     });
   });
   // Delete handlers
@@ -2240,13 +2301,10 @@ renderFoldersUI();
     function positionMobileDrawer(){
       if (!document.body.classList.contains('is-phone')) return;
       if (!topbar || !topnav) return;
-      const h = Math.ceil(topbar.getBoundingClientRect().height);
-      // Feed CSS var for top offset (set globally so overlay can use it)
-      document.documentElement.style.setProperty('--mobile-menu-top', h + 'px');
-      // Also set explicit inline styles to ensure correct position
+      // Drawer should occupy from the very top (covering the topbar)
       if (topbar.classList.contains('nav-open')){
-        topnav.style.top = h + 'px';
-        topnav.style.height = `calc(100vh - ${h}px)`;
+        topnav.style.top = '0px';
+        topnav.style.height = '100vh';
       } else {
         topnav.style.top = '';
         topnav.style.height = '';
@@ -2287,3 +2345,5 @@ renderFoldersUI();
 <script src="./pricing-tab.js"></script>
 </body>
 </html>
+
+

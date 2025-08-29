@@ -82,7 +82,7 @@ body.is-phone #navToggle{display:inline-flex; align-items:center; justify-conten
 body.is-phone .brand-text{ display:inline-flex !important; width:min(70vw, 240px); height:34px; }
 body.is-phone .topnav-links{
   order:3;
-  position:fixed; left:0; top:var(--mobile-menu-top, 60px); bottom:0;
+  position:fixed; left:0; top:0; bottom:0;
   width:50vw; max-width:50vw; min-width:280px;
   display:flex; flex-direction:column; justify-content:flex-start;
   overflow:auto;
@@ -111,9 +111,9 @@ body:not(.is-phone) #mobileExtraMenu{ display:none !important; }
 
 /* Mobile overlay */
 body.is-phone #mobileNavOverlay{
-  position:fixed; left:0; right:0; top:var(--mobile-menu-top, 60px); bottom:0;
+  position:fixed; left:0; right:0; top:0; bottom:0;
   background: rgba(15,23,42,.38);
-  opacity:0; pointer-events:none; z-index:60;
+  opacity:0; pointer-events:none; z-index:78;
   transition: opacity var(--normal) var(--ease);
 }
 body.is-phone.drawer-open #mobileNavOverlay{ opacity:1; pointer-events:auto; }
@@ -258,6 +258,7 @@ body.is-phone.drawer-open #mobileNavOverlay{ opacity:1; pointer-events:auto; }
 .folder-card .folder-name{margin-top:8px;font-weight:700;max-width:100%;text-align:center}
 .folder-drop{outline:2px dashed var(--accent);outline-offset:4px}
 .folder-card .folder-del{position:absolute;top:-7px;right:-7px;border-radius:9999px;border:var(--borderW) solid var(--border);background:#fff;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.folder-card .folder-rename{position:absolute;top:-7px;right:14px;border-radius:9999px;border:var(--borderW) solid var(--border);background:#fff;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px}
 
 /* Breadcrumbs (UI text says "Main" not "breadcrumbs") */
 .breadcrumbs{display:flex;align-items:center;gap:.5rem;font-size:.9rem}
