@@ -1022,7 +1022,7 @@ nextBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex<curr
 
 // Full reset: restore from Saved if an active outline exists
 resetBtn.onclick = async ()=>{
-  awaitingNext=false; hideNextGate(); stopTimer(); sessionStarted=false;
+  awaitingNext=false; hideNextGate(); stopTimer(); sessionStarted=false; try{ window.__sectionDone = window.__sectionDone || {}; const sd = window.__sectionDone; for(const k in sd){ if(Object.prototype.hasOwnProperty.call(sd,k)) delete sd[k]; } markDirty(); if(typeof saveCloudNow=="function") saveCloudNow(); }catch{}
   const activeId = (timerState && timerState.outlineId) || null;
   if(activeId){
     const o = savedOutlines.find(x=>x.id===activeId);
@@ -2469,6 +2469,11 @@ renderFoldersUI();
 <script src="./pricing-tab.js"></script>
 </body>
 </html>
+
+
+
+
+
 
 
 
