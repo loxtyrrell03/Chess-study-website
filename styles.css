@@ -199,7 +199,12 @@ body.is-phone.drawer-open #mobileNavOverlay{ opacity:1; pointer-events:auto; }
 
 /* Remove ghost copy while dragging (keep element in flow) */
 .drag-ghost{opacity:.35}
-.outline-row.dragging,.section-preview.dragging{opacity:.35}
+/* Hide the original row while dragging (we add a placeholder in JS) */
+.outline-row.dragging,
+.section-preview.dragging{opacity:.35}
+
+/* Do not create a visible gap for the placeholder while dragging */
+/* (Reverted) Let the JS placeholder control spacing; no special styling */
 
 /* ===== Horizontal widget shelves ===== */
 .editor-shelf{display:flex;flex-wrap:nowrap;gap:.5rem;overflow-x:auto;overflow-y:hidden;padding:.5rem;border:var(--borderW) solid var(--border);border-radius:.75rem;background:#fff;scroll-snap-type:x proximity;width:100%;min-width:0;scrollbar-gutter:stable both-edges;overscroll-behavior-x:contain}

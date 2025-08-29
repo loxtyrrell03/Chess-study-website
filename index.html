@@ -2347,7 +2347,14 @@ renderFoldersUI();
       const tgt = e.target && (e.target.id === 'navToggle' ? e.target : (e.target.closest ? e.target.closest('#navToggle') : null));
       if(tgt){ e.preventDefault(); e.stopPropagation(); if(topbar.classList.contains('nav-open')) closeDrawer(); else openDrawer(); }
     });
-    if (topnav){ topnav.addEventListener('click', (e)=>{ closeOnNavClick(e); if(e.target && e.target.classList && e.target.classList.contains('tab-link')) closeDrawer(); }); }
+    // Ensure tab clicks actually switch tabs on phones (fallback if other handlers miss)
+    function mobileShowTab(id){
+      const ids = ['overviewTab','homeTab','savedTab','helpTab','pricingTab'];
+      ids.forEach(secId=>{ const el = document.getElementById(secId); if(el) el.classList.toggle('hidden', secId !== id); });
+      document.querySelectorAll('.tab-link').forEach(b=> b.classList.remove('active'));
+      const btn = document.querySelector(`.tab-link[data-tab="${id}"]`); if(btn) btn.classList.add('active');
+    }
+    if (topnav){ topnav.addEventListener('click', (e)=>{ const btn=e.target && (e.target.closest ? e.target.closest('.tab-link') : null); if(btn){ e.preventDefault(); mobileShowTab(btn.dataset.tab); closeDrawer(); } }); }
     if (overlay){ overlay.addEventListener('click', closeDrawer); }
     window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeDrawer(); });
   })();
