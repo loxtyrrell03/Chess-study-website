@@ -58,7 +58,7 @@ body::before{
   border-bottom: var(--borderW) solid var(--border);
   box-shadow: var(--shadow-2);
 }
-.brand{display:flex; align-items:center; gap:.55rem; min-width:0}
+.brand{display:flex; align-items:center; gap:.55rem; min-width:0; cursor:pointer}
 .brand .logo{display:none !important}
 .logo-svg{width:28px;height:28px; display:block}
 .brand-text{display:flex; flex-direction:column}

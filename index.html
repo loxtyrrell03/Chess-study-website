@@ -735,6 +735,18 @@ if(tabsBar){
   const dup = tabsBar.querySelectorAll('.tab-link[data-tab="pricingTab"]');
   if(dup.length > 1){ dup.forEach((el,i)=>{ if(i>0) el.remove(); }); }
 }
+
+// Clickable brand logo → Overview (desktop + phone)
+try{
+  const brandEl = document.querySelector('#topbar .brand');
+  const goOverview = (e)=>{ e.preventDefault(); showTab('overviewTab'); document.getElementById('topbar')?.classList.remove('nav-open'); document.body.classList.remove('drawer-open'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  if(brandEl){
+    brandEl.addEventListener('click', goOverview);
+    brandEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ goOverview(e); } });
+    brandEl.setAttribute('role','button');
+    brandEl.setAttribute('tabindex','0');
+  }
+}catch{}
 document.querySelectorAll('[data-tab-jump]').forEach(b=> b.onclick = ()=> showTab(b.dataset.tabJump));
 
 /*************** Reveal-on-scroll for Overview ***************/
@@ -2196,7 +2208,7 @@ function renderFoldersUI(){
           ev.stopPropagation();
           const fid=card.dataset.fid; const f=savedFolders.find(x=>x.id===fid); if(!f) return;
           const nameEl=card.querySelector('.folder-name'); if(!nameEl) return;
-          const input=document.createElement('input'); input.className='input'; input.value=f.name||''; input.style.width='90%'; input.style.padding='4px 8px'; input.style.fontSize='0.95rem';
+          const input=document.createElement('input'); input.className='input'; input.value=f.name||''; input.style.width='90%'; input.style.padding='4px 8px'; input.style.fontSize='0.95rem'; input.style.textAlign='center';
           nameEl.replaceWith(input); input.focus(); input.select();
           const finish=(commit)=>{ const val=(input.value||'').trim()||f.name||'Folder'; if(commit){ f.name=val; saveFoldersLocal(); } renderFoldersUI(); };
           input.addEventListener('keydown',(ke)=>{ if(ke.key==='Enter'){ ke.preventDefault(); finish(true);} if(ke.key==='Escape'){ ke.preventDefault(); finish(false);} });
