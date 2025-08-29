@@ -116,7 +116,8 @@ body.is-phone #mobileNavOverlay{
   opacity:0; pointer-events:none; z-index:78;
   transition: opacity var(--normal) var(--ease);
 }
-body.is-phone.drawer-open #mobileNavOverlay{ opacity:1; pointer-events:auto; }
+/* Do not dim background when drawer is open */
+body.is-phone.drawer-open #mobileNavOverlay{ opacity:0; pointer-events:none; }
 
 /* Legend tickbox and done state */
 .legend-tick{ width:12px; height:12px; margin-left:.35rem; accent-color: var(--accent-600); }
