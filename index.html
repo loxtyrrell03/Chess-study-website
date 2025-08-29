@@ -115,7 +115,7 @@ vertical-align: middle;
         <h1 class="hero-title">Turn big goals into <em>mini‑goals</em> and stay on track.</h1>
         <p class="hero-sub">Skillflow is a session‑based planner with a live progress bar that keeps you focused inside a single time block.</p>
         <div class="hero-cta">
-          <button class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm" data-tab-jump="homeTab">Open Planner</button>
+          <button class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm" data-tab-jump="homeTab">start session</button>
           <button id="learnBasicsBtn" class="px-4 py-2 rounded-xl border border-[var(--border)]">Learn the basics ▶</button>
         </div>
       </div>
@@ -2350,6 +2350,15 @@ renderFoldersUI();
     // Ensure tab clicks actually switch tabs on phones using the same showTab()
     if (topnav){ topnav.addEventListener('click', (e)=>{ const btn=e.target && (e.target.closest ? e.target.closest('.tab-link') : null); if(btn){ e.preventDefault(); showTab(btn.dataset.tab); closeDrawer(); } }); }
     if (overlay){ overlay.addEventListener('click', closeDrawer); }
+
+    // Close drawer when clicking anywhere outside the drawer (no overlay)
+    document.addEventListener('click', (e)=>{
+      if(!document.body.classList.contains('is-phone')) return;
+      if(!topbar.classList.contains('nav-open')) return;
+      const inDrawer = e.target && (e.target.closest ? e.target.closest('.topnav-links') : null);
+      const onToggle = e.target && (e.target.id === 'navToggle' || (e.target.closest ? e.target.closest('#navToggle') : null));
+      if(!inDrawer && !onToggle){ closeDrawer(); }
+    }, true);
     window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeDrawer(); });
   })();
 </script>
