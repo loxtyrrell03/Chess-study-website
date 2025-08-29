@@ -187,8 +187,11 @@ vertical-align: middle;
     <!-- Progress -->
     <section class="mb-4">
       <div class="flex items-center justify-between mb-1">
-        <div id="progressLabel" class="block-sub">Progress — click to jump</div>
-        <div id="progressPct" class="text-xs muted">0%</div>
+        <div id="progressLabel" class="block-sub">Progress - click to jump</div>
+        <div class="flex items-center gap-2">
+          <div id="totalTimeText" class="text-xs muted truncate max-w-[40vw] text-right"></div>
+          <div id="progressPct" class="text-xs muted shrink-0">0%</div>
+        </div>
       </div>
       <div id="progressHost" class="relative w-full h-6 rounded-2xl overflow-hidden card">
         <div id="progressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
@@ -509,6 +512,24 @@ vertical-align: middle;
           </div>
         </div>
       </div>
+
+      <div class="card p-3">
+        <h4 class="block-title mb-2">Notifications</h4>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <span class="text-sm">Status:</span>
+            <span id="notifStatusPill" class="px-2 py-1 text-xs rounded-full border border-[var(--border)]">Not asked</span>
+          </div>
+          <label class="flex items-center gap-2">
+            <input id="toggleSectionAlerts" type="checkbox" />
+            <span>Section completion alerts</span>
+          </label>
+          <div class="flex items-center gap-2">
+            <button id="sendTestNotifBtn" class="btn-xxs">Send test</button>
+            <span id="notifHint" class="text-xs muted hidden">If denied, enable notifications in your browser settings.</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="mt-4 flex items-center justify-between">
@@ -632,6 +653,7 @@ let prefs = loadJSON('prefs_v1') || {
   splitRatio:56,
   outlineCollapsed:false,
   focusDefault:false,
+  notifyEnabled:false,
   theme:{ bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 },
   audio:{ volume:0.5, tone:'beep', duration:0.6 }
 };
@@ -927,6 +949,7 @@ function tick(){
   }
   if(secondsLeft <= 0){
     if(currentIndex < currentSession.length - 1){
+      try{ const cur = currentSession[currentIndex]; sendNotify('Section complete', (cur?.name||'Next section ready')); }catch{}
       stopTimer();
       awaitingNext = true;
       showNextGate();
@@ -938,6 +961,7 @@ function tick(){
       tone();
       sessionStarted = false;
       updateStartBtnLabel();
+      try{ sendNotify('Session complete', 'Great work!'); }catch{}
       markTimer();
       showToast('Session complete! 🎉','success', 3500);
       return;
@@ -974,14 +998,24 @@ function showNextGate(){ readyNextBtn.classList.remove('hidden'); if(focusReadyB
 function hideNextGate(){ readyNextBtn.classList.add('hidden'); if(focusReadyBtn) focusReadyBtn.classList.add('hidden'); updateStartBtnLabel(); }
 readyNextBtn.onclick = proceedNext; focusReadyBtn && (focusReadyBtn.onclick = proceedNext);
 
-startBtn.onclick = ()=>{
+startBtn.onclick = async ()=>{
   if(!currentSession.length) return;
   if(awaitingNext) return;
+  // Ask once about notifications before first session
+  try{
+    if(!prefs.notifAsked){
+      prefs.notifAsked = true; savePrefs();
+      const allow = await sfConfirm('Get section-complete alerts?');
+      if(allow){ await enableNotifications(); }
+    }
+  }catch{}
   if(!sessionStarted){ currentIndex=0; secondsLeft=minsToSecs(currentSession[0].minutes||0); totalSessionSecs=scheduleTotalSecs(currentSession); sessionStarted=true; markTimer(); startTimer(); }
   else{ running?stopTimer():startTimer(); }
 };
 focusStartBtn && (focusStartBtn.onclick = ()=> startBtn.click());
 focusPauseBtn && (focusPauseBtn.onclick = ()=>{ if(running) stopTimer(); });
+
+
 
 prevBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } updateStartBtnLabel(); };
 nextBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } else stopTimer(); updateStartBtnLabel(); };
@@ -1022,12 +1056,46 @@ function buildFocusProgress(){
 }
 function updateLegendActive(){ legend.querySelectorAll('.chip').forEach((el, i)=> el.classList.toggle('chip-active', i===currentIndex)); }
 function updateProgress(){
-  const sched=currentSession; const total=scheduleTotalSecs(sched);
-  if(!total){ progressFill.style.width='0%'; progressPctEl.textContent='0%'; return; }
-  const pct=Math.min(100,Math.max(0,(elapsedSeconds(sched,currentIndex,secondsLeft)/total)*100));
-  progressFill.style.width = pct + '%'; progressPctEl.textContent = Math.floor(pct) + '%';
+  const sched = currentSession;
+  const total = scheduleTotalSecs(sched);
+  // Update total time label beside the Progress header
+  try{
+    const tEl = document.getElementById("totalTimeText");
+    if (tEl) {
+      const secs = total || 0;
+      const h = Math.floor(secs / 3600);
+      const m = Math.round((secs % 3600) / 60);
+      const parts = [];
+      if (h > 0) parts.push(h + " hr" + (h > 1 ? "s" : ""));
+      parts.push(m + " min" + (m !== 1 ? "s" : ""));
+      tEl.textContent = "total time: " + parts.join(" ");
+    }
+  } catch {}
+  if (!total) {
+    progressFill.style.width = "0%";
+    progressPctEl.textContent = "0%";
+    return;
+  }
+  const pct = Math.min(100, Math.max(0, (elapsedSeconds(sched, currentIndex, secondsLeft) / total) * 100));
+  progressFill.style.width = pct + "%";
+  progressPctEl.textContent = Math.floor(pct) + "%";
   updateLegendActive(); updateStartBtnLabel(); updateFocusProgress();
 }
+
+// Notifications helper
+function canNotify(){ return typeof Notification !== 'undefined'; }
+async function enableNotifications(){
+  if(!canNotify()) { showToast('Notifications not supported in this browser.','error'); return false; }
+  let perm = Notification.permission;
+  if(perm === 'default'){
+    try{ perm = await Notification.requestPermission(); }catch{ perm='denied'; }
+  }
+  if(perm !== 'granted'){ showToast('Notifications denied. Enable in browser settings.','error'); return false; }
+  prefs.notifyEnabled = true; savePrefs(); updateNotifyBtn(); return true;
+}
+function disableNotifications(){ prefs.notifyEnabled=false; savePrefs(); updateNotifyBtn(); }
+function updateNotifyBtn(){ /* legacy button removed */ }
+function sendNotify(title, body){ try{ if(prefs.notifyEnabled && canNotify() && Notification.permission==='granted'){ new Notification(title, { body, icon:'./logo2.png' }); } }catch{} }
 function updateFocusProgress(){
   if(!focusProgressFill || !focusProgressPctEl) return;
   const sched=currentSession; const total=scheduleTotalSecs(sched);
@@ -1610,6 +1678,7 @@ const settingsModal = $('#settingsModal');
 const setBg=$('#setBg'), setFg=$('#setFg'), setAccent=$('#setAccent'), setBorder=$('#setBorder'), setBorderW=$('#setBorderW'), setFocusDefault=$('#setFocusDefault');
 const settingsSaveBtn=$('#settingsSaveBtn'), settingsResetBtn=$('#settingsResetBtn');
 const setVol=$('#setVol'), setTone=$('#setTone'), setToneDur=$('#setToneDur'), durLabel=$('#durLabel'), tonePreviewBtn=$('#tonePreviewBtn');
+const notifStatusPill=$('#notifStatusPill'); const toggleSectionAlerts=$('#toggleSectionAlerts'); const sendTestNotifBtn=$('#sendTestNotifBtn'); const notifHint=$('#notifHint');
 
 function applyTheme(t){
   document.documentElement.style.setProperty('--bg', t.bg || '#ffffff');
@@ -1629,6 +1698,39 @@ function openSettings(){
   setFocusDefault.checked = !!prefs.focusDefault;
 
   setVol.value = String(prefs.audio?.volume ?? 0.5);
+  // Notifications UI
+  function refreshNotifUI(){
+    const perm = (typeof Notification==='undefined') ? 'unsupported' : Notification.permission;
+    if(notifStatusPill){
+      let txt='Not asked'; let cls='border';
+      if(perm==='granted'){ txt='Allowed'; cls='bg-[var(--accent-100)] border-[var(--accent)]'; }
+      else if(perm==='denied'){ txt='Denied'; cls='border border-rose-400'; }
+      else if(perm==='unsupported'){ txt='Unsupported'; cls='border'; }
+      notifStatusPill.textContent = txt; notifStatusPill.className = `px-2 py-1 text-xs rounded-full ${cls}`;
+    }
+    if(toggleSectionAlerts){
+      const enabled = !!prefs.notifyEnabled;
+      toggleSectionAlerts.checked = enabled;
+      const can = (perm==='granted');
+      toggleSectionAlerts.disabled = !can;
+    }
+    if(notifHint){ notifHint.classList.toggle('hidden', !(perm==='denied')); }
+  }
+  refreshNotifUI();
+  if(toggleSectionAlerts){
+    toggleSectionAlerts.addEventListener('change', async ()=>{
+      if(toggleSectionAlerts.checked){
+        if(typeof Notification==='undefined'){ showToast('Notifications unsupported','error'); toggleSectionAlerts.checked=false; return; }
+        if(Notification.permission!=='granted'){
+          const perm = await Notification.requestPermission();
+          if(perm!=='granted'){ toggleSectionAlerts.checked=false; refreshNotifUI(); return; }
+        }
+        prefs.notifyEnabled = true; savePrefs();
+      } else { prefs.notifyEnabled=false; savePrefs(); }
+      refreshNotifUI();
+    });
+  }
+  if(sendTestNotifBtn){ sendTestNotifBtn.addEventListener('click', ()=>{ if(Notification?.permission==='granted'){ sendNotify('Test notification','You will receive alerts when a section completes.'); } else { showToast('Allow notifications first.','error'); } }); }
   setTone.value = String(prefs.audio?.tone || 'beep');
   setToneDur.value = String(prefs.audio?.duration ?? 0.6);
   durLabel.textContent = `${Number(setToneDur.value).toFixed(1)}s`;
@@ -2367,5 +2469,7 @@ renderFoldersUI();
 <script src="./pricing-tab.js"></script>
 </body>
 </html>
+
+
 
 
