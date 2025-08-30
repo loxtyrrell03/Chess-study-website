@@ -1,122 +1,10 @@
-<!DOCTYPE html>
-
-
-// Helper: map schedule -> outline (flatten subsections)
-function mapScheduleToOutline(d, prefs){
-  const oid = 'O' + Date.now().toString(36);
-  const title = (d && d.title) ? d.title : 'AI Outline';
-  const sessions = Array.isArray(d?.sessions) ? d.sessions : [];
-  function parseMinutes(s){
-    if(typeof s?.duration_min === 'number' && s.duration_min > 0) return Math.round(s.duration_min);
-    const st = s?.start_time, et = s?.end_time;
-    if(st && et){ const [sh,sm] = String(st).split(':').map(n=>parseInt(n,10)||0); const [eh,em] = String(et).split(':').map(n=>parseInt(n,10)||0); let mins=(eh*60+em)-(sh*60+sm); if(mins<0) mins+=1440; return Math.max(1, mins); }
-    return 30;
-  }
-  function isValidUrl(u){ try{ const x = new URL(u); if(!/^https?:$/.test(x.protocol)) return false; return (x.hostname||'').includes('.'); }catch{ return false; } }
-  function labelFromUrl(u){ try{ const x=new URL(u); const host=(x.hostname||'').replace(/^www\./,''); const last=(x.pathname||'').split('/').filter(Boolean).pop()||''; return last? `${host}/${decodeURIComponent(last).slice(0,24)}` : host; }catch{ return u; } }
-
-  const sections = [];
-  sessions.forEach((s, si)=>{
-    const subs = Array.isArray(s?.subsections) ? s.subsections : [];
-    if(subs.length){
-      subs.forEach((sub, j)=>{
-        const id = 'S'+ (Date.now()+sections.length).toString(36);
-        const minutes = parseMinutes(sub);
-        let links = [];
-        if(prefs?.includeLinks && Array.isArray(sub?.materials)){
-          const seen = new Set();
-          for(const raw of sub.materials){ if(!raw) continue; const normalized=normalizeUrl(String(raw||'')); if(!normalized||!isValidUrl(normalized)) continue; if(seen.has(normalized)) continue; seen.add(normalized); links.push({ label: labelFromUrl(normalized), url: normalized, icon:'emoji', emoji:'??' }); if(links.length >= Math.max(0, Number(prefs.maxLinksPerSection||5))) break; }
-        }
-        sections.push({ id, name: sub?.name || `Step ${j+1} � ${s?.topic||('Session '+(si+1))}`, minutes, links, desc: (prefs?.includeDescriptions ? (sub?.description||'') : '') });
-      });
-    } else {
-      const id = 'S'+ (Date.now()+sections.length).toString(36);
-      const minutes = parseMinutes(s);
-      let links = [];
-      if(prefs?.includeLinks && Array.isArray(s?.materials)){
-        const seen = new Set();
-        for(const raw of s.materials){ if(!raw) continue; const normalized=normalizeUrl(String(raw||'')); if(!normalized||!isValidUrl(normalized)) continue; if(seen.has(normalized)) continue; seen.add(normalized); links.push({ label: labelFromUrl(normalized), url: normalized, icon:'emoji', emoji:'??' }); if(links.length >= Math.max(0, Number(prefs.maxLinksPerSection||5))) break; }
-      }
-      sections.push({ id, name: s?.topic || `Session ${si+1}`, minutes, links, desc: (prefs?.includeDescriptions ? (s?.description||'') : '') });
-    }
-  });
-  return { id: oid, title, sections };
-}
-
-// AI Preview modal logic
-let __aiDraft = null;
-function openAiPreview(outline, usedModel){
-  __aiDraft = structuredClone(outline||{ title:'AI Outline', sections:[] });
-  const modal = document.getElementById('aiPreviewModal'); if(!modal) return;
-  const titleInp = document.getElementById('aiPrevTitle');
-  const list = document.getElementById('aiPrevList');
-  const saveBtn = document.getElementById('aiPrevSaveBtn');
-  const cancelBtn = document.getElementById('aiPrevCancelBtn');
-  const reviseBtn = document.getElementById('aiPrevReviseBtn');
-  titleInp.value = __aiDraft.title || 'AI Outline';
-  titleInp.oninput = ()=> { __aiDraft.title = titleInp.value; };
-
-  function renderList(){
-    list.innerHTML = (__aiDraft.sections||[]).map((s, i)=>`
-      <li class="card p-3" data-idx="${i}">
-        <div class="flex items-center gap-2">
-          <input class="input flex-1" data-role="name" placeholder="Section name" value="${escapeHtml(s.name||'')}"/>
-          <label class="text-sm">mins <input class="input w-24 ml-1" data-role="mins" type="number" min="1" step="1" value="${Number(s.minutes||0)}"/></label>
-          <button class="btn-xxs" data-role="del">Delete</button>
-        </div>
-        <textarea class="input mt-2" data-role="desc" placeholder="Description">${escapeHtml(s.desc||'')}</textarea>
-      </li>
-    `).join('');
-    // wire events
-    list.querySelectorAll('li.card').forEach((li)=>{
-      const idx = Number(li.dataset.idx);
-      li.querySelector('[data-role="name"]').addEventListener('input', (e)=>{ __aiDraft.sections[idx].name = e.target.value; });
-      li.querySelector('[data-role="mins"]').addEventListener('input', (e)=>{ const v = Math.max(1, Math.round(Number(e.target.value||0))); __aiDraft.sections[idx].minutes = v; e.target.value = String(v); });
-      li.querySelector('[data-role="desc"]').addEventListener('input', (e)=>{ __aiDraft.sections[idx].desc = e.target.value; });
-      li.querySelector('[data-role="del"]').addEventListener('click', ()=>{ __aiDraft.sections.splice(idx,1); renderList(); });
-    });
-  }
-  renderList();
-
-  function close(){ modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
-  modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false');
-  modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ close(); } });
-  cancelBtn.onclick = close;
-  saveBtn.onclick = ()=>{
-    const outline = structuredClone(__aiDraft);
-    outline.id = 'O'+Date.now().toString(36);
-    outline.sections = (outline.sections||[]).map((s, i)=> ({ id: 'S'+Date.now().toString(36)+i, name: s.name||`Step ${i+1}`, minutes: Math.max(1, Math.round(Number(s.minutes||0))), links: Array.isArray(s.links)?structuredClone(s.links):[], desc: s.desc||'' }));
-    savedOutlines.push(outline);
-    saveOutlinesLocal(); renderHomeSavedBar(); try{ if(typeof renderSavedOutlines==='function') renderSavedOutlines(); }catch{}
-    showToast('AI outline saved.', 'success');
-    close();
-  };
-  reviseBtn.onclick = async ()=>{
-    try{
-      const instruction = await (window.sfPrompt ? window.sfPrompt('Tell AI how to revise this schedule (e.g., make tactics 10m longer, add an openings drill)', '') : Promise.resolve(prompt('Revise instruction:')));
-      if(instruction==null || !String(instruction).trim()) return;
-      const currentJson = JSON.stringify({ title: __aiDraft.title, sections: (__aiDraft.sections||[]).map(s=>({ name:s.name, duration_min:s.minutes, description:s.desc })) }, null, 2);
-      const brief = `Revise the schedule below according to the request. Keep structure and ordering unless the request requires changes.\n\nRequest:\n${instruction}\n\nCurrent schedule (approximate):\n${currentJson}`;
-      const { schedule: data, model: used } = await window.aiGenerateSchedule(brief, {}, { model: aiPrefs.model, controls: {
-        include_descriptions: !!aiPrefs.includeDescriptions,
-        include_links: !!aiPrefs.includeLinks,
-        include_subsections: !!aiPrefs.includeSubsections,
-      }});
-      __aiDraft = mapScheduleToOutline(data, aiPrefs);
-      document.getElementById('aiPrevTitle').value = __aiDraft.title || 'AI Outline';
-      renderList();
-      showToast(`Revised with ${used}.`, 'success');
-    }catch(err){ console.error(err); showToast(err?.message||'Revision failed','error'); }
-  };
-}
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 
 <html lang="en">
 
 <head>
 
 <meta charset="utf-8"/>
-
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 
 <title>Skillflow — Structure your training. Master any skill.</title>
@@ -3327,6 +3215,110 @@ const { renderSavedOutlines } = setupSavedOutlines({
       // Build a draft and open preview modal for review before saving
       const outline = mapScheduleToOutline(data, aiPrefs);
       openAiPreview(outline, usedModel);
+// Helper: map schedule -> outline (flatten subsections)
+function mapScheduleToOutline(d, prefs){
+  const oid = 'O' + Date.now().toString(36);
+  const title = (d && d.title) ? d.title : 'AI Outline';
+  const sessions = Array.isArray(d?.sessions) ? d.sessions : [];
+  function parseMinutes(s){
+    if(typeof s?.duration_min === 'number' && s.duration_min > 0) return Math.round(s.duration_min);
+    const st = s?.start_time, et = s?.end_time;
+    if(st && et){ const [sh,sm] = String(st).split(':').map(n=>parseInt(n,10)||0); const [eh,em] = String(et).split(':').map(n=>parseInt(n,10)||0); let mins=(eh*60+em)-(sh*60+sm); if(mins<0) mins+=1440; return Math.max(1, mins); }
+    return 30;
+  }
+  function isValidUrl(u){ try{ const x = new URL(u); if(!/^https?:$/.test(x.protocol)) return false; return (x.hostname||'').includes('.'); }catch{ return false; } }
+  function labelFromUrl(u){ try{ const x=new URL(u); const host=(x.hostname||'').replace(/^www\./,''); const last=(x.pathname||'').split('/').filter(Boolean).pop()||''; return last? `${host}/${decodeURIComponent(last).slice(0,24)}` : host; }catch{ return u; } }
+  const sections = [];
+  sessions.forEach((s, si)=>{
+    const subs = Array.isArray(s?.subsections) ? s.subsections : [];
+    if(subs.length){
+      subs.forEach((sub, j)=>{
+        const id = 'S'+ (Date.now()+sections.length).toString(36);
+        const minutes = parseMinutes(sub);
+        let links = [];
+        if(prefs?.includeLinks && Array.isArray(sub?.materials)){
+          const seen = new Set();
+          for(const raw of sub.materials){ if(!raw) continue; const normalized=normalizeUrl(String(raw||'')); if(!normalized||!isValidUrl(normalized)) continue; if(seen.has(normalized)) continue; seen.add(normalized); links.push({ label: labelFromUrl(normalized), url: normalized, icon:'emoji', emoji:'🔗' }); if(links.length >= Math.max(0, Number(prefs.maxLinksPerSection||5))) break; }
+        }
+        sections.push({ id, name: sub?.name || `Step ${j+1} — ${s?.topic||('Session '+(si+1))}`, minutes, links, desc: (prefs?.includeDescriptions ? (sub?.description||'') : '') });
+      });
+    } else {
+      const id = 'S'+ (Date.now()+sections.length).toString(36);
+      const minutes = parseMinutes(s);
+      let links = [];
+      if(prefs?.includeLinks && Array.isArray(s?.materials)){
+        const seen = new Set();
+        for(const raw of s.materials){ if(!raw) continue; const normalized=normalizeUrl(String(raw||'')); if(!normalized||!isValidUrl(normalized)) continue; if(seen.has(normalized)) continue; seen.add(normalized); links.push({ label: labelFromUrl(normalized), url: normalized, icon:'emoji', emoji:'🔗' }); if(links.length >= Math.max(0, Number(prefs.maxLinksPerSection||5))) break; }
+      }
+      sections.push({ id, name: s?.topic || `Session ${si+1}`, minutes, links, desc: (prefs?.includeDescriptions ? (s?.description||'') : '') });
+    }
+  });
+  return { id: oid, title, sections };
+}
+
+// AI Preview modal logic
+let __aiDraft = null;
+function openAiPreview(outline, usedModel){
+  __aiDraft = structuredClone(outline||{ title:'AI Outline', sections:[] });
+  const modal = document.getElementById('aiPreviewModal'); if(!modal) return;
+  const titleInp = document.getElementById('aiPrevTitle');
+  const list = document.getElementById('aiPrevList');
+  const saveBtn = document.getElementById('aiPrevSaveBtn');
+  const cancelBtn = document.getElementById('aiPrevCancelBtn');
+  const reviseBtn = document.getElementById('aiPrevReviseBtn');
+  titleInp.value = __aiDraft.title || 'AI Outline';
+  titleInp.oninput = ()=> { __aiDraft.title = titleInp.value; };
+  function renderList(){
+    list.innerHTML = (__aiDraft.sections||[]).map((s, i)=>`
+      <li class="card p-3" data-idx="${i}">
+        <div class="flex items-center gap-2">
+          <input class="input flex-1" data-role="name" placeholder="Section name" value="${escapeHtml(s.name||'')}"/>
+          <label class="text-sm">mins <input class="input w-24 ml-1" data-role="mins" type="number" min="1" step="1" value="${Number(s.minutes||0)}"/></label>
+          <button class="btn-xxs" data-role="del">Delete</button>
+        </div>
+        <textarea class="input mt-2" data-role="desc" placeholder="Description">${escapeHtml(s.desc||'')}</textarea>
+      </li>
+    `).join('');
+    list.querySelectorAll('li.card').forEach((li)=>{
+      const idx = Number(li.dataset.idx);
+      li.querySelector('[data-role=\"name\"]').addEventListener('input', (e)=>{ __aiDraft.sections[idx].name = e.target.value; });
+      li.querySelector('[data-role=\"mins\"]').addEventListener('input', (e)=>{ const v = Math.max(1, Math.round(Number(e.target.value||0))); __aiDraft.sections[idx].minutes = v; e.target.value = String(v); });
+      li.querySelector('[data-role=\"desc\"]').addEventListener('input', (e)=>{ __aiDraft.sections[idx].desc = e.target.value; });
+      li.querySelector('[data-role=\"del\"]').addEventListener('click', ()=>{ __aiDraft.sections.splice(idx,1); renderList(); });
+    });
+  }
+  renderList();
+  function close(){ modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
+  modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false');
+  modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ close(); } });
+  cancelBtn.onclick = close;
+  saveBtn.onclick = ()=>{
+    const outline = structuredClone(__aiDraft);
+    outline.id = 'O'+Date.now().toString(36);
+    outline.sections = (outline.sections||[]).map((s, i)=> ({ id: 'S'+Date.now().toString(36)+i, name: s.name||`Step ${i+1}`, minutes: Math.max(1, Math.round(Number(s.minutes||0))), links: Array.isArray(s.links)?structuredClone(s.links):[], desc: s.desc||'' }));
+    savedOutlines.push(outline);
+    saveOutlinesLocal(); renderHomeSavedBar(); try{ if(typeof renderSavedOutlines==='function') renderSavedOutlines(); }catch{}
+    showToast('AI outline saved.', 'success');
+    close();
+  };
+  reviseBtn.onclick = async ()=>{
+    try{
+      const instruction = await (window.sfPrompt ? window.sfPrompt('Tell AI how to revise this schedule (e.g., make tactics 10m longer, add an openings drill)', '') : Promise.resolve(prompt('Revise instruction:')));
+      if(instruction==null || !String(instruction).trim()) return;
+      const currentJson = JSON.stringify({ title: __aiDraft.title, sections: (__aiDraft.sections||[]).map(s=>({ name:s.name, duration_min:s.minutes, description:s.desc })) }, null, 2);
+      const brief = `Revise the schedule below according to the request. Keep structure and ordering unless the request requires changes.\n\nRequest:\n${instruction}\n\nCurrent schedule (approximate):\n${currentJson}`;
+      const { schedule: data, model: used } = await window.aiGenerateSchedule(brief, {}, { model: aiPrefs.model, controls: {
+        include_descriptions: !!aiPrefs.includeDescriptions,
+        include_links: !!aiPrefs.includeLinks,
+        include_subsections: !!aiPrefs.includeSubsections,
+      }});
+      __aiDraft = mapScheduleToOutline(data, aiPrefs);
+      document.getElementById('aiPrevTitle').value = __aiDraft.title || 'AI Outline';
+      renderList();
+      showToast(`Revised with ${used}.`, 'success');
+    }catch(err){ console.error(err); showToast(err?.message||'Revision failed','error'); }
+  };
+}
     }catch(e){ console.error(e); showToast(e?.message || 'AI generation failed', 'error'); }
     finally{ btn.disabled=false; btn.textContent='🪄 AI Scheduling'; }
   });
@@ -4999,6 +4991,8 @@ renderFoldersUI();
 </body>
 
 </html>
+
+
 
 
 
