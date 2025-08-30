@@ -42,7 +42,7 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
   }
 
   // Model allowlist for safety/cost control
-  const ALLOWED_MODELS = new Set(["gpt-5"]);
+  const ALLOWED_MODELS = new Set(["gpt-5", "gpt-4o", "gpt-4o-mini"]);
   const model = (typeof modelReq === 'string' && ALLOWED_MODELS.has(modelReq.trim()))
     ? modelReq.trim() : "gpt-5";
 
@@ -54,6 +54,7 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
       timezone: { type: "string" },
       sessions: {
         type: "array",
+        minItems: 1,
         items: {
           type: "object",
           additionalProperties: false,
@@ -66,7 +67,7 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
             start_time: { type: "string", description: "HH:mm (24h)" },
             end_time: { type: "string", description: "HH:mm (24h)" },
             // Or provide a relative duration
-            duration_min: { type: "integer", description: "Whole minutes for this section" },
+            duration_min: { type: "integer", minimum: 1, description: "Whole minutes for this section" },
             // Optional learning resources
             materials: { type: "array", items: { type: "string" } },
             // Optional fine-grained breakdown
@@ -79,20 +80,47 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
                   id: { type: "string" },
                   name: { type: "string" },
                   description: { type: "string" },
-                  duration_min: { type: "integer" },
+                  duration_min: { type: "integer", minimum: 1 },
                   materials: { type: "array", items: { type: "string" } }
                 },
                 required: ["id", "name"]
               }
             }
           },
-          required: ["id", "topic"]
+          required: ["id", "topic"],
+          oneOf: [
+            { required: ["duration_min"] },
+            { required: ["start_time", "end_time"] }
+          ]
         }
       },
       notes: { type: "string" }
     },
     required: ["sessions"]
   };
+
+  // Ensure every object in the schema explicitly has additionalProperties: false
+  function enforceNoExtra(obj){
+    if(!obj || typeof obj !== 'object') return;
+    if(obj.type === 'object'){
+      obj.additionalProperties = false;
+      if (obj.properties && typeof obj.properties === 'object'){
+        Object.values(obj.properties).forEach(enforceNoExtra);
+      }
+      if (obj.patternProperties && typeof obj.patternProperties === 'object'){
+        Object.values(obj.patternProperties).forEach(enforceNoExtra);
+      }
+    }
+    if(obj.type === 'array' && obj.items){ enforceNoExtra(obj.items); }
+    if(Array.isArray(obj.anyOf)) obj.anyOf.forEach(enforceNoExtra);
+    if(Array.isArray(obj.oneOf)) obj.oneOf.forEach(enforceNoExtra);
+    if(Array.isArray(obj.allOf)) obj.allOf.forEach(enforceNoExtra);
+  }
+  enforceNoExtra(schema);
+  logger.info("schema additionalProperties checks", {
+    rootAP: schema.additionalProperties === false,
+    sessionAP: schema.properties?.sessions?.items?.additionalProperties === false
+  });
 
   const client = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
 
