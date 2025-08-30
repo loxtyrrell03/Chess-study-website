@@ -74,16 +74,16 @@ vertical-align: middle;
   <button id="navToggle" aria-label="Toggle navigation">☰</button>
 
   <nav class="tabs-bar topnav-links">
-    <button class="tab-link active" data-tab="overviewTab">Overview</button>
+    <a class="tab-link active" data-tab="overviewTab" href="#overview">Overview</a>
     <div class="tab-sep"></div>
-    <button class="tab-link" data-tab="homeTab">Session</button>
+    <a class="tab-link" data-tab="homeTab" href="#home">Session</a>
     <div class="tab-sep"></div>
-    <button class="tab-link" data-tab="savedTab">Outlines</button>
+    <a class="tab-link" data-tab="savedTab" href="#saved">Outlines</a>
     <div class="tab-sep"></div>
-    <button class="tab-link" data-tab="helpTab">How to use</button>
+    <a class="tab-link" data-tab="helpTab" href="#help">How to use</a>
     <div class="tab-sep"></div>
     <!-- NEW: visible Pricing button wired into showTab -->
-    <button class="tab-link" data-tab="pricingTab">Pricing</button>
+    <a class="tab-link" data-tab="pricingTab" href="#pricing">Pricing</a>
 
     <!-- Mobile-only container: settings + auth moved here via JS on small screens -->
     <div id="mobileExtraMenu"></div>
@@ -739,6 +739,18 @@ const saveOutlinesLocal = ()=>{ saveJSON('saved_outlines_v1', savedOutlines); ma
 const saveFoldersLocal = ()=>{ saveJSON('outline_folders_v1', savedFolders); markDirty(); touchCloud(); };
   const saveTimerLocal = ()=>{ saveJSON('timer_state_v2', timerState); markDirty(); touchCloud(); };
 
+// Clear current session-related data (used on sign-out)
+function wipeSessionData(){
+  try{ localStorage.removeItem('current_session_v1'); }catch{}
+  try{ localStorage.removeItem('section_notes_v1'); }catch{}
+  try{ localStorage.removeItem('timer_state_v2'); }catch{}
+  currentSession = [];
+  sectionNotes = {};
+  timerState = { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0, awaitingNext:false };
+  try{ window.__sectionDone = window.__sectionDone || {}; const sd = window.__sectionDone; for(const k in sd){ if(Object.prototype.hasOwnProperty.call(sd,k)) delete sd[k]; } }catch{}
+  renderAll(); updateStartBtnLabel();
+}
+
 /*************** AI Scheduling (callable) ***************/
 async function aiGenerateSchedule(brief, constraints = {}, options = {}){
   const fn = httpsCallable(functions, 'generateSchedule');
@@ -763,7 +775,14 @@ async function aiGenerateSchedule(brief, constraints = {}, options = {}){
 window.aiGenerateSchedule = aiGenerateSchedule;
 
 /*************** Tabs (delegated) ***************/
-function showTab(id){
+const __routeFor = { overviewTab:'overview', homeTab:'home', savedTab:'saved', helpTab:'help', pricingTab:'pricing' };
+const __tabFor = (route)=>{
+  route = String(route||'').replace(/^#/,'').toLowerCase();
+  for(const [tab, r] of Object.entries(__routeFor)){ if(r===route) return tab; }
+  return 'overviewTab';
+};
+
+function showTab(id, skipHash){
   $$('.tab-link').forEach(b=>b.classList.remove('active'));
   const btn = document.querySelector(`.tab-link[data-tab="${id}"]`);
   if(btn) btn.classList.add('active');
@@ -783,11 +802,17 @@ function showTab(id){
       document.dispatchEvent(new CustomEvent('pricing:show', { detail:{ mount: document.getElementById('pricingMount') } }));
     }catch{}
   }
+  // Push route hash for shareable links
+  if(!skipHash){
+    const route = __routeFor[id] || 'overview';
+    if(location.hash.replace(/^#/,'') !== route){ location.hash = '#' + route; }
+  }
 }
 const tabsBar = document.querySelector('.topnav-links');
 if(tabsBar){
   tabsBar.addEventListener('click', (e)=>{
     const btn = e.target.closest('.tab-link'); if(!btn) return;
+    // Let hash routing handle it, but update immediately
     showTab(btn.dataset.tab);
   });
 
@@ -799,7 +824,7 @@ if(tabsBar){
 // Clickable brand logo → Overview (desktop + phone)
 try{
   const brandEl = document.querySelector('#topbar .brand');
-  const goOverview = (e)=>{ e.preventDefault(); showTab('overviewTab'); document.getElementById('topbar')?.classList.remove('nav-open'); document.body.classList.remove('drawer-open'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const goOverview = (e)=>{ e.preventDefault(); location.hash = '#overview'; showTab('overviewTab'); document.getElementById('topbar')?.classList.remove('nav-open'); document.body.classList.remove('drawer-open'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   if(brandEl){
     brandEl.addEventListener('click', goOverview);
     brandEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ goOverview(e); } });
@@ -807,7 +832,11 @@ try{
     brandEl.setAttribute('tabindex','0');
   }
 }catch{}
-document.querySelectorAll('[data-tab-jump]').forEach(b=> b.onclick = ()=> showTab(b.dataset.tabJump));
+document.querySelectorAll('[data-tab-jump]').forEach(b=> b.onclick = ()=>{ const id=b.dataset.tabJump; const route = __routeFor[id]||'overview'; location.hash = '#'+route; showTab(id); });
+
+// Hash routing: show tab from URL
+function applyRouteFromHash(){ const tab = __tabFor(location.hash||'overview'); showTab(tab, true); }
+window.addEventListener('hashchange', applyRouteFromHash);
 
 /*************** Reveal-on-scroll for Overview ***************/
 const revealEls = $$('.reveal');
@@ -1805,7 +1834,7 @@ googleBtn.onclick = ()=> signInWithPopup(auth, provider).catch(err=> showToast(e
 emailSignInBtn.onclick = async ()=>{ try{ await signInWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); } catch(e){ showToast(e.message||'Sign-in failed','error'); } };
 emailSignUpBtn.onclick = async ()=>{ try{ await createUserWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); } catch(e){ showToast(e.message||'Sign-up failed','error'); } };
 emailResetBtn.onclick = async ()=>{ try{ if(!emailInput.value.trim()) return showToast('Enter your email first.','error'); await sendPasswordResetEmail(auth, emailInput.value.trim()); showToast('Reset email sent.','success'); } catch(e){ showToast(e.message||'Reset failed','error'); } };
-signOutBtn.onclick = ()=> signOut(auth);
+signOutBtn.onclick = ()=> signOut(auth).catch(()=>{});
 
 onAuthStateChanged(auth, async (user)=>{
   currentUser = user || null;
@@ -1836,6 +1865,8 @@ onAuthStateChanged(auth, async (user)=>{
     }catch{ setLocalMode('Cloud read failed'); if(prefs.focusDefault) showFocus(); }
   } else {
     authOpenBtn.classList.remove('hidden'); userBadge.classList.add('hidden'); setLocalMode('Local mode');
+    // Wipe session data on sign-out
+    wipeSessionData();
     if(prefs.focusDefault) showFocus();
   }
 });
@@ -2377,8 +2408,8 @@ function renderCurrent(){ const s=currentSession[currentIndex];
 function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
 
 setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
-// Land on Overview by default
-showTab('overviewTab');
+// Land on route from URL (default Overview)
+applyRouteFromHash();
 if(prefs.focusDefault) showFocus();
 
 /*************** Folders UI helpers (Saved tab container) ***************/
