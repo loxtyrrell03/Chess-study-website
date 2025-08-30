@@ -146,7 +146,7 @@ finer steps. Use ISO dates (YYYY-MM-DD) and 24h times. Avoid any undeclared keys
         type: "json_schema",
         json_schema: { name: "StudySchedule", schema, strict: true }
       },
-      temperature: 0.2
+      temperature: 1
     });
 
     const content = completion.choices?.[0]?.message?.content || "{}";
