@@ -87,11 +87,7 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
               }
             }
           },
-          required: ["id", "topic"],
-          oneOf: [
-            { required: ["duration_min"] },
-            { required: ["start_time", "end_time"] }
-          ]
+          required: ["id", "topic"]
         }
       },
       notes: { type: "string" }
