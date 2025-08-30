@@ -36,7 +36,7 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
 
-  const { brief, constraints = {}, model: modelReq, controls = {} } = req.data || {};
+  const { brief, constraints = {}, model: modelReq, controls = {}, history } = req.data || {};
   if (!brief || typeof brief !== "string") {
     throw new HttpsError("invalid-argument", "Provide brief:string");
   }
@@ -120,15 +120,20 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
   const includeDescriptions = !!controls.include_descriptions;
   const includeSubsections = !!controls.include_subsections;
 
-  const system = `You convert user briefs into a study outline and timed sections.
-Return ONLY JSON exactly matching the provided JSON Schema (no extra fields).
-The root object must include title, timezone, sessions, and notes.
-For each session include id, topic, description, duration_min (whole minutes),
-materials (array, can be empty), and subsections (array, can be empty). Each
-subsection includes id, name, description and duration_min. Do not invent keys.
+  const system = `You are an expert study-planning assistant for the Skillflow web app.
+Skillflow uses a single-session outline with ordered sections ("sessions" here) and optional
+subsections for finer steps. The client may flatten subsections into regular sections. Your job:
+- Turn briefs and revision requests into a clean, conflict-free outline.
+- Replace or restructure sections as needed (you may add/remove many sections).
+- Use whole minutes in duration_min. Use clear, action-oriented topics and concise descriptions.
+ - When the user asks to MERGE sections (by name or index), produce ONE merged section with:
+   combined topic, merged description, and duration_min equal to the sum (unless told otherwise).
+   Remove the source sections and keep overall ordering logical.
+Return ONLY JSON that matches the schema (no extra keys). Root must include title, timezone, sessions, notes.
+Each session must include id, topic, description, duration_min, materials[], subsections[].
 
 Output controls (apply strictly):
-- Include descriptions: ${includeDescriptions ? 'YES' : 'NO (set all description to empty string)'}
+- Include descriptions: ${includeDescriptions ? 'YES' : 'NO (set description to empty string)'}
 - Include link suggestions (materials arrays): ${includeLinks ? 'YES' : 'NO (use empty arrays)'}
 - Include subsections: ${includeSubsections ? 'YES' : 'NO (use empty arrays)'}
 `;
@@ -141,10 +146,21 @@ Output controls (apply strictly):
     logger.info("generateSchedule starting", { model, controls: { includeLinks, includeDescriptions, includeSubsections } });
     const reqParams = {
       model,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userPrompt }
-      ],
+      messages: (()=>{
+        const msgs = [{ role: "system", content: system }];
+        try{
+          if (Array.isArray(history)){
+            for (const m of history){
+              if(!m || typeof m !== 'object') continue;
+              const r = (m.role === 'assistant') ? 'assistant' : 'user';
+              const c = (typeof m.content === 'string') ? m.content : '';
+              if(c) msgs.push({ role: r, content: c });
+            }
+          }
+        }catch{}
+        msgs.push({ role: "user", content: userPrompt });
+        return msgs;
+      })(),
       response_format: {
         type: "json_schema",
         json_schema: { name: "StudySchedule", schema, strict: true }

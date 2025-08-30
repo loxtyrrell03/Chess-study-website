@@ -1295,6 +1295,9 @@ let savedFolders = loadJSON('outline_folders_v1') || []; // {id, name}
 let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0, awaitingNext:false };
 // AI generation preferences
 let aiPrefs = loadJSON('ai_prefs_v1') || { includeDescriptions:true, includeLinks:true, includeSubsections:true, maxLinksPerSection: 5, model:'gpt-5-mini' };
+// AI chat context (initial brief + subsequent revision turns)
+var __aiInitialBrief = '';
+var __aiChatHistory = [];
 // AI draft (preview modal state)
 var __aiDraft = null;
 
@@ -1446,7 +1449,8 @@ async function aiGenerateSchedule(brief, constraints = {}, options = {}){
       include_descriptions: !!aiPrefs.includeDescriptions,
       include_links: !!aiPrefs.includeLinks,
       include_subsections: !!aiPrefs.includeSubsections,
-    }
+    },
+    history: (options && Array.isArray(options.history)) ? options.history : undefined
   });
   if(!res?.data?.ok) throw new Error(res?.data?.error || 'Generation failed');
   return { schedule: res.data.schedule, model: res.data.model };
@@ -3210,12 +3214,14 @@ const { renderSavedOutlines } = setupSavedOutlines({
       const brief = await (window.sfPrompt ? window.sfPrompt('Describe your schedule or outline (days, times, goals, duration):', '') : Promise.resolve(prompt('Describe your schedule or outline:')));
       if(brief == null || !String(brief).trim()) return;
       const prev = btn.textContent; btn.disabled=true; btn.textContent='Generating…';
-      // Call backend
-      const { schedule: data, model: usedModel } = await window.aiGenerateSchedule(String(brief).trim(), {}, { model: aiPrefs.model, controls: {
+      // Call backend with conversation history
+      __aiInitialBrief = String(brief).trim();
+      __aiChatHistory = [ { role:'user', content: 'Initial request: ' + __aiInitialBrief } ];
+      const { schedule: data, model: usedModel } = await window.aiGenerateSchedule(__aiInitialBrief, {}, { model: aiPrefs.model, controls: {
         include_descriptions: !!aiPrefs.includeDescriptions,
         include_links: !!aiPrefs.includeLinks,
         include_subsections: !!aiPrefs.includeSubsections,
-      }});
+      }, history: __aiChatHistory });
       // Build a draft and open preview modal for review before saving
       const outline = mapScheduleToOutline(data, aiPrefs);
       openAiPreview(outline, usedModel);
@@ -3297,6 +3303,11 @@ function openAiPreview(outline, usedModel){
             <div class="lbl">Description</div>
             <textarea class="input w-full h-36" data-role="desc" placeholder="Description">${escapeHtml(s.desc||'')}</textarea>
           </div>
+          <div class="row">
+            <div class="lbl">Links</div>
+            <div data-role="links-bar" class="section-links-bar"></div>
+          </div>
+          <div class="row" data-role="inline-shelf"></div>
         </div>
       </li>`;
   }
@@ -3328,6 +3339,49 @@ function openAiPreview(outline, usedModel){
       const minsEl = li.querySelector('[data-role="mins"]');
       const descEl = li.querySelector('[data-role="desc"]');
       const saveBtn2 = li.querySelector('[data-act="save-section"]');
+      // Render links bar from draft
+      const linksHost = li.querySelector('[data-role="links-bar"]');
+      const shelfHost = li.querySelector('[data-role="inline-shelf"]');
+      const renderLinks = ()=>{
+        const s = __aiDraft.sections[i] || { links:[] };
+        const links = Array.isArray(s.links) ? s.links : [];
+        linksHost.innerHTML = links.map((w, idx)=>{
+          const iconHtml = (w.icon==='img' && w.img) ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>` : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`;
+          return `
+            <div class="widget" data-link-idx="${idx}">
+              <div class="link-card section-link" draggable="true" data-idx="${idx}">${iconHtml}<span class="truncate max-w-[12rem]">${escapeHtml(w.label||'Untitled')}</span></div>
+              <button class="bin" data-act="del-link" title="Delete">🗑️</button>
+            </div>`; }).join('');
+
+        // Reorder within links
+        let over=0;
+        linksHost.addEventListener('dragenter', ()=>{ over++; });
+        linksHost.addEventListener('dragleave', ()=>{ over=Math.max(0,over-1); });
+        linksHost.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+        linksHost.addEventListener('drop', (e)=>{
+          e.preventDefault();
+          const payload = (()=>{ try{ return JSON.parse(e.dataTransfer.getData('text/plain')||''); }catch{ return null } })();
+          const s2 = __aiDraft.sections[i]; if(!s2) return;
+          if(payload && payload.type==='reorder'){ const from = Number(payload.index); const cards = [...linksHost.querySelectorAll('.section-link')]; let to=cards.length; for(let k=0;k<cards.length;k++){ const r=cards[k].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=k; break; } } if(!Number.isNaN(from)){ const [m] = s2.links.splice(from,1); s2.links.splice(to,0,m); renderLinks(); } }
+        });
+        linksHost.querySelectorAll('.section-link').forEach(pill=>{
+          pill.addEventListener('dragstart', (e)=>{ const index = Number(pill.dataset.idx); try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'reorder', index})); }catch{} e.dataTransfer.effectAllowed='move'; pill.classList.add('drag-ghost'); });
+          pill.addEventListener('dragend', ()=> pill.classList.remove('drag-ghost'));
+          pill.addEventListener('click', ()=>{ const s3=__aiDraft.sections[i]; if(!s3) return; const idx = Number(pill.dataset.idx); const w = s3.links?.[idx]; if(!w) return; openWidgetEditor && openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); renderLinks(); }); });
+        });
+        linksHost.querySelectorAll('[data-act="del-link"]').forEach(btn=>{ btn.addEventListener('click', ()=>{ const s3=__aiDraft.sections[i]; if(!s3) return; const idx = Number(btn.closest('.widget')?.dataset.linkIdx||-1); if(idx>=0){ s3.links.splice(idx,1); renderLinks(); } }); });
+      };
+      const renderShelf = ()=>{
+        const shelf = Array.isArray(widgetShelf) ? widgetShelf : [];
+        shelfHost.innerHTML = `
+          <div class="text-xs muted mb-1" style="font-weight:600">Widget shelf</div>
+          <div class="mt-1 editor-shelf flex flex-wrap gap-2">${shelf.map(w=>{
+            const icon = (w.icon==='img'&&w.img)?`<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" style="width:18px;height:18px;"/>`:`<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`; return `<div class="link-card draggable-shelf" title="${escapeHtml(w.url||'')}" data-wid="${escapeHtml(w.id)}">${icon}<div class="min-w-0"><div class="truncate" style="font-size:.95rem">${escapeHtml(w.label||'Untitled')}</div><div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div></div></div>`; }).join('')}</div>`;
+        shelfHost.querySelectorAll('.draggable-shelf').forEach(card=>{
+          card.addEventListener('click', ()=>{ const id = card.dataset.wid; const w = (widgetShelf||[]).find(x=>x.id===id); if(!w) return; const s = __aiDraft.sections[i]; if(!s) return; s.links = s.links||[]; s.links.push({ label:w.label, url: normalizeUrl(w.url||''), icon:w.icon, emoji:w.emoji, img:w.img }); renderLinks(); });
+        });
+      };
+      renderLinks(); renderShelf();
       const apply = ()=>{
         const s = __aiDraft.sections[i]; if(!s) return;
         s.name = nameEl.value || 'Untitled';
@@ -3340,6 +3394,27 @@ function openAiPreview(outline, usedModel){
     });
   }
   renderList();
+  // Drag-to-reorder sections
+  let dragging = null;
+  const makePh = (h, titleText)=>{ const ph = document.createElement('li'); ph.className='outline-row drop-placeholder'; ph.style.setProperty('--ph', `${Math.max(36,h)}px`); ph.innerHTML = `<div class="text-xs muted px-2 truncate">${escapeHtml(titleText||'')}</div>`; return ph; };
+  list.addEventListener('dragstart', (e)=>{
+    const li = e.target && e.target.closest ? e.target.closest('li.outline-row') : null; if(!li) return;
+    if(li.dataset.view === 'edit'){ e.preventDefault(); return; }
+    const idx = Number(li.dataset.idx); const title = (li.querySelector('.title')?.textContent||'').trim();
+    dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, title) };
+    li.classList.add('dragging'); li.after(dragging.placeholder);
+    try{ const img = new Image(); img.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%221%22 height=%221%22/%3E'; e.dataTransfer.setDragImage(img,0,0); }catch{}
+    e.dataTransfer.effectAllowed='move';
+  });
+  list.addEventListener('dragend', ()=>{ if(dragging){ dragging.el.classList.remove('dragging'); dragging.placeholder.remove(); dragging=null; } });
+  const overRow = (e)=>{
+    if(!dragging) return; const li = e.target.closest('li.outline-row'); if(!li || li.classList.contains('dragging')) return; e.preventDefault(); const r=li.getBoundingClientRect(); const before = e.clientY < (r.top + r.height/2); const ph = dragging.placeholder; if(!ph) return; if(before){ if(li.previousSibling!==ph) li.parentElement.insertBefore(ph, li); } else { if(li.nextSibling!==ph) li.after(ph); }
+  };
+  list.addEventListener('dragover', overRow); list.addEventListener('dragenter', overRow);
+  list.addEventListener('drop', (e)=>{
+    if(!dragging) return; e.preventDefault(); const rows = Array.from(list.querySelectorAll('li.outline-row')); const phIndex = rows.indexOf(dragging.placeholder); const to = phIndex < 0 ? rows.length-1 : phIndex; const from = dragging.from; const finalTo = (to > from) ? to - 1 : to; if(from!==finalTo && from>=0 && finalTo>=0){ const [m] = __aiDraft.sections.splice(from,1); __aiDraft.sections.splice(finalTo,0,m); }
+    dragging.placeholder.remove(); dragging=null; renderList();
+  });
   function close(){ modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
   modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false');
   modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ close(); } });
@@ -3359,12 +3434,15 @@ function openAiPreview(outline, usedModel){
       if(instruction==null || !String(instruction).trim()) return;
       const prevTxt = reviseBtn.textContent; reviseBtn.textContent = 'Revising...'; reviseBtn.disabled = true;
       const currentJson = JSON.stringify({ title: __aiDraft.title, sections: (__aiDraft.sections||[]).map(s=>({ name:s.name, duration_min:s.minutes, description:s.desc })) }, null, 2);
-      const brief = `Revise the schedule below according to the request. Keep structure and ordering unless the request requires changes.\n\nRequest:\n${instruction}\n\nCurrent schedule (approximate):\n${currentJson}`;
+      const brief = `Revise the schedule for Skillflow. You may add/remove sections, merge or split, and adjust durations to satisfy the request. Return the full, updated schedule.\n\nRequest:\n${instruction}\n\nCurrent draft (approximate):\n${currentJson}`;
+      // Track conversation history for better accuracy
+      __aiChatHistory = Array.isArray(__aiChatHistory) ? __aiChatHistory : [];
+      __aiChatHistory.push({ role:'user', content:`Revision request: ${instruction}` });
       const { schedule: data, model: used } = await window.aiGenerateSchedule(brief, {}, { model: aiPrefs.model, controls: {
         include_descriptions: !!aiPrefs.includeDescriptions,
         include_links: !!aiPrefs.includeLinks,
         include_subsections: !!aiPrefs.includeSubsections,
-      }});
+      }, history: __aiChatHistory });
       __aiDraft = mapScheduleToOutline(data, aiPrefs);
       document.getElementById('aiPrevTitle').value = __aiDraft.title || 'AI Outline';
       aiEditingIdx = -1; renderList();
