@@ -1293,6 +1293,8 @@ let savedFolders = loadJSON('outline_folders_v1') || []; // {id, name}
 let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0, awaitingNext:false };
 // AI generation preferences
 let aiPrefs = loadJSON('ai_prefs_v1') || { includeDescriptions:true, includeLinks:true, includeSubsections:true, maxLinksPerSection: 5, model:'gpt-5-mini' };
+// AI draft (preview modal state)
+var __aiDraft = null;
 
 
 /*************** Cloud ***************/
@@ -3256,8 +3258,7 @@ function mapScheduleToOutline(d, prefs){
   return { id: oid, title, sections };
 }
 
-// AI Preview modal logic
-let __aiDraft = null;
+// AI Preview modal logic\n// __aiDraft declared at top of script
 function openAiPreview(outline, usedModel){
   __aiDraft = structuredClone(outline||{ title:'AI Outline', sections:[] });
   const modal = document.getElementById('aiPreviewModal'); if(!modal) return;
@@ -4991,6 +4992,7 @@ renderFoldersUI();
 </body>
 
 </html>
+
 
 
 
