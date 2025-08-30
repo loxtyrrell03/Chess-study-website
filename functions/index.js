@@ -138,6 +138,7 @@ Output controls (apply strictly):
     `Return ONLY JSON matching the schema.`;
 
   try {
+    logger.info("generateSchedule starting", { model, controls: { includeLinks, includeDescriptions, includeSubsections } });
     const reqParams = {
       model,
       messages: [

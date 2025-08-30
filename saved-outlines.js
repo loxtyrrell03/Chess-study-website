@@ -258,6 +258,8 @@ export function setupSavedOutlines({
         me.sections.push({ id:newId, name:'', minutes:5, desc:'', links:[] });
         // Mark this section as editing so render shows the edit card
         const secKey = keyOf(o.id, newId);
+        // Ensure only one section is in edit mode at a time (across all outlines)
+        try{ editingSections.clear(); }catch{}
         editingSections.add(secKey);
         setSavedOutlines && setSavedOutlines(me ? [...(getSavedOutlines && getSavedOutlines())] : []);
         persist(o.id);
@@ -344,7 +346,13 @@ export function setupSavedOutlines({
 
       sectionsList.querySelectorAll('li.section-row[data-sid]').forEach((li, idx)=>{
         // open inline editor
-        li.addEventListener('click', (e)=>{ if(e.target.closest('[data-act="del-sec"], .link-card, .bin, input, textarea, select, button')) return; editingSections.add(keyOf(o.id, li.dataset.sid)); renderSavedOutlines(); });
+        li.addEventListener('click', (e)=>{
+          if(e.target.closest('[data-act="del-sec"], .link-card, .bin, input, textarea, select, button')) return;
+          // Switch edit focus to this section; close any others
+          try{ editingSections.clear(); }catch{}
+          editingSections.add(keyOf(o.id, li.dataset.sid));
+          renderSavedOutlines();
+        });
         // delete
         li.querySelector('[data-act="del-sec"]')?.addEventListener('click', async (e)=>{ e.stopPropagation(); if(!await askConfirm('Delete this section?')) return;
           const list = (getSavedOutlines && getSavedOutlines()) || []; const me = byId(list, o.id); if(!me) return; const sidx = me.sections.findIndex(se => se.id === li.dataset.sid);
