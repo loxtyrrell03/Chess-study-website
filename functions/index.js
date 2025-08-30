@@ -62,11 +62,7 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
             id: { type: "string" },
             topic: { type: "string" },
             description: { type: "string" },
-            // Optional absolute scheduling info
-            date: { type: "string", description: "YYYY-MM-DD" },
-            start_time: { type: "string", description: "HH:mm (24h)" },
-            end_time: { type: "string", description: "HH:mm (24h)" },
-            // Or provide a relative duration
+            // Relative duration for this session (mandatory in strict mode)
             duration_min: { type: "integer", minimum: 1, description: "Whole minutes for this section" },
             // Optional learning resources
             materials: { type: "array", items: { type: "string" } },
@@ -83,11 +79,11 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
                   duration_min: { type: "integer", minimum: 1 },
                   materials: { type: "array", items: { type: "string" } }
                 },
-                required: ["id", "name"]
+                required: ["id", "name", "description", "duration_min", "materials"]
               }
             }
           },
-          required: ["id", "topic"]
+          required: ["id", "topic", "description", "duration_min", "materials", "subsections"]
         }
       },
       notes: { type: "string" }
@@ -120,12 +116,11 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
 
   const client = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
 
-  const system = `You convert user briefs into a study outline and time plan.
-Return ONLY data that matches the provided JSON Schema exactly (no extra fields).
-If start/end times are provided, use them. Otherwise, infer duration_min per item.
-For each top-level session include: id, topic, description, and either duration_min
-or (start_time and end_time). Optionally include a subsections[] breakdown for
-finer steps. Use ISO dates (YYYY-MM-DD) and 24h times. Avoid any undeclared keys.`;
+  const system = `You convert user briefs into a study outline and timed sections.
+Return ONLY JSON exactly matching the provided JSON Schema (no extra fields).
+For each session: include id, topic, description, duration_min (whole minutes),
+materials (array, can be empty), and subsections (array, can be empty). Each
+subsection includes id, name, description and duration_min. Do not invent keys.`;
 
   const userPrompt =
     `Brief:\n${brief}\n\nConstraints:\n${JSON.stringify(constraints, null, 2)}\n` +
