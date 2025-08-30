@@ -27,6 +27,9 @@ export function setupSavedOutlines({
   setFolders,
   saveFoldersLocal,
 }) {
+  // --- auth helpers ---
+  const isAuthed = ()=> !!(typeof window !== 'undefined' && window.currentUser);
+  const requireAuth = ()=>{ if(!isAuthed()){ try{ window.openAuthModal && window.openAuthModal(); }catch{} return false; } return true; };
   // ---------- DOM ----------
   const savedListEl   = document.getElementById('savedList');
   const createBtn     = document.getElementById('createOutlineBtn');
@@ -240,6 +243,7 @@ export function setupSavedOutlines({
         saveOutlinesLocal && saveOutlinesLocal(); renderHomeSavedBar && renderHomeSavedBar(); touchCloud && touchCloud(); renderSavedOutlines();
       });
       card.querySelector('[data-act="delete"]')?.addEventListener('click', async ()=>{
+        if(!requireAuth()) return;
         if(!await askConfirm('Delete this outline?')) return;
         const list = (getSavedOutlines && getSavedOutlines()) || [];
         const idx = list.findIndex(x=>x.id===o.id);
@@ -248,8 +252,9 @@ export function setupSavedOutlines({
           saveOutlinesLocal && saveOutlinesLocal(); renderHomeSavedBar && renderHomeSavedBar(); touchCloud && touchCloud(); renderSavedOutlines();
         }
       });
-      card.querySelector('[data-act="toggle-expand"]')?.addEventListener('click', ()=>{ if(expandedOutlines.has(o.id)) expandedOutlines.delete(o.id); else expandedOutlines.add(o.id); renderSavedOutlines(); });
+      card.querySelector('[data-act="toggle-expand"]')?.addEventListener('click', ()=>{ if(!requireAuth()) return; if(expandedOutlines.has(o.id)) expandedOutlines.delete(o.id); else expandedOutlines.add(o.id); renderSavedOutlines(); });
       card.querySelector('[data-act="add-section"]')?.addEventListener('click', ()=>{
+        if(!requireAuth()) return;
         // Create, immediately enter edit mode, and focus the title input.
         expandedOutlines.add(o.id);
         const me = byId((getSavedOutlines && getSavedOutlines()) || [], o.id); if(!me) return;
@@ -348,18 +353,20 @@ export function setupSavedOutlines({
         // open inline editor
         li.addEventListener('click', (e)=>{
           if(e.target.closest('[data-act="del-sec"], .link-card, .bin, input, textarea, select, button')) return;
+          if(!requireAuth()) return;
           // Switch edit focus to this section; close any others
           try{ editingSections.clear(); }catch{}
           editingSections.add(keyOf(o.id, li.dataset.sid));
           renderSavedOutlines();
         });
         // delete
-        li.querySelector('[data-act="del-sec"]')?.addEventListener('click', async (e)=>{ e.stopPropagation(); if(!await askConfirm('Delete this section?')) return;
+        li.querySelector('[data-act="del-sec"]')?.addEventListener('click', async (e)=>{ e.stopPropagation(); if(!requireAuth()) return; if(!await askConfirm('Delete this section?')) return;
           const list = (getSavedOutlines && getSavedOutlines()) || []; const me = byId(list, o.id); if(!me) return; const sidx = me.sections.findIndex(se => se.id === li.dataset.sid);
           if(sidx>=0){ me.sections.splice(sidx,1); setSavedOutlines(list); persist(o.id); renderSavedOutlines(); }
         });
         // drag row
         li.addEventListener('dragstart', (e)=>{
+          if(!requireAuth()) { e.preventDefault(); return; }
           if(li.classList.contains('editing')){ e.preventDefault(); return; }
           const titleText = (li.querySelector('.title')?.textContent || '').trim();
           dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) };
@@ -379,6 +386,7 @@ export function setupSavedOutlines({
       sectionsList.addEventListener('dragover', (e)=>{ if(!dragging) return; e.preventDefault(); if(!sectionsList.contains(dragging.placeholder)) sectionsList.appendChild(dragging.placeholder); });
 
       sectionsList.addEventListener('drop', (e)=>{
+        if(!requireAuth()) return;
         if(!dragging) return; e.preventDefault();
         const from = dragging.from;
         const rows = Array.from(sectionsList.querySelectorAll('li.outline-row'));
@@ -574,6 +582,10 @@ export function setupSavedOutlines({
   // ---------- ONE delegated handler for shelf add/reset across the Saved tab ----------
   if (savedListEl) {
     savedListEl.addEventListener('click', async (e)=>{
+      if(!isAuthed()){
+        const clickable = e.target && (e.target.closest ? e.target.closest('button, [data-act], .btn-xs, .btn-xxs') : null);
+        if(clickable){ e.preventDefault(); e.stopPropagation(); try{ window.openAuthModal && window.openAuthModal(); }catch{} return; }
+      }
       const addBtn = e.target.closest('[data-act="add-shelf"]');
       const resetBtn = e.target.closest('[data-act="reset-shelf"]');
       if(addBtn){

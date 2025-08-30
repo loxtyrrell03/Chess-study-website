@@ -906,6 +906,9 @@ function sfPrompt(label, initial=''){
 // make available to Saved Outlines module
 window.sfConfirm = sfConfirm;
 window.sfPrompt = sfPrompt;
+// Auth helpers usable from other modules
+window.openAuthModal = ()=>{ try{ showModal(authModal); }catch{} };
+window.requireAuth = ()=>{ if(!currentUser){ try{ showModal(authModal); }catch{} return false; } return true; };
 
 /*************** Progress / Timer ***************/
 const startBtn = $('#startBtn'); const prevBtn=$('#prevBtn'); const nextBtn=$('#nextBtn'); const resetBtn=$('#resetBtn');
@@ -1745,7 +1748,7 @@ const { renderSavedOutlines } = setupSavedOutlines({
   btn.addEventListener('click', async ()=>{
     try{
       if(!window.aiGenerateSchedule){ showToast('AI not ready. Reload the page.', 'error'); return; }
-      if(!currentUser){ showToast('Sign in to use AI scheduling.', 'error'); return; }
+      if(!currentUser){ try{ window.openAuthModal && window.openAuthModal(); }catch{} showToast('Sign in to use AI scheduling.', 'error'); return; }
       // Prompt for a brief
       const brief = await (window.sfPrompt ? window.sfPrompt('Describe your schedule or outline (days, times, goals, duration):', '') : Promise.resolve(prompt('Describe your schedule or outline:')));
       if(brief == null || !String(brief).trim()) return;
@@ -1838,6 +1841,7 @@ signOutBtn.onclick = ()=> signOut(auth).catch(()=>{});
 
 onAuthStateChanged(auth, async (user)=>{
   currentUser = user || null;
+  try{ window.currentUser = currentUser; }catch{}
   if(user){
     authOpenBtn.classList.add('hidden'); userBadge.classList.remove('hidden'); userEmail.textContent = user.email || user.uid; setCloudMode('Syncing…');
     hideModal(authModal);
@@ -1865,6 +1869,16 @@ onAuthStateChanged(auth, async (user)=>{
     }catch{ setLocalMode('Cloud read failed'); if(prefs.focusDefault) showFocus(); }
   } else {
     authOpenBtn.classList.remove('hidden'); userBadge.classList.add('hidden'); setLocalMode('Local mode');
+    // Clear outlines and folders when signed out
+    try{
+      savedOutlines = [];
+      savedFolders = [];
+      saveOutlinesLocal();
+      saveFoldersLocal();
+      if(typeof renderSavedOutlines==='function') renderSavedOutlines();
+      if(typeof renderFoldersUI==='function') renderFoldersUI();
+      renderHomeSavedBar();
+    }catch{}
     // Wipe session data on sign-out
     wipeSessionData();
     if(prefs.focusDefault) showFocus();
@@ -2429,6 +2443,7 @@ let currentFolderId = null;
 
 // Replace the "+ New folder" button with its popover while open (prevents layout shift)
 createFolderBtn.onclick = ()=>{
+  if(!(window.requireAuth ? window.requireAuth() : !!currentUser)) return;
   createFolderBtn.classList.add('hidden');
   createFolderForm.classList.remove('hidden');
   newFolderName.value='';
@@ -2439,6 +2454,7 @@ createFolderCancel.onclick = ()=>{
   createFolderBtn.classList.remove('hidden');
 };
 createFolderConfirm.onclick = ()=>{
+  if(!(window.requireAuth ? window.requireAuth() : !!currentUser)) return;
   const name = (newFolderName.value||'').trim() || 'New folder';
   savedFolders.push({ id:'F'+Date.now().toString(36), name, parentId: (currentFolderId||null) });
   saveFoldersLocal(); renderFoldersUI();
