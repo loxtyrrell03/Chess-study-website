@@ -737,7 +737,7 @@ const saveFoldersLocal = ()=>{ saveJSON('outline_folders_v1', savedFolders); mar
   const saveTimerLocal = ()=>{ saveJSON('timer_state_v2', timerState); markDirty(); touchCloud(); };
 
 /*************** AI Scheduling (callable) ***************/
-async function aiGenerateSchedule(brief, constraints = {}){
+async function aiGenerateSchedule(brief, constraints = {}, options = {}){
   const fn = httpsCallable(functions, 'generateSchedule');
   const res = await fn({
     brief,
@@ -745,10 +745,11 @@ async function aiGenerateSchedule(brief, constraints = {}){
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       start_date: new Date().toISOString().slice(0,10),
       ...constraints
-    }
+    },
+    model: (options && typeof options.model === 'string') ? options.model : undefined
   });
   if(!res?.data?.ok) throw new Error(res?.data?.error || 'Generation failed');
-  return res.data.schedule;
+  return { schedule: res.data.schedule, model: res.data.model };
 }
 // Expose for wiring/UI later
 window.aiGenerateSchedule = aiGenerateSchedule;
@@ -1658,7 +1659,7 @@ const { renderSavedOutlines } = setupSavedOutlines({
       if(brief == null || !String(brief).trim()) return;
       const prev = btn.textContent; btn.disabled=true; btn.textContent='Generating…';
       // Call backend
-      const data = await window.aiGenerateSchedule(String(brief).trim());
+      const { schedule: data, model: usedModel } = await window.aiGenerateSchedule(String(brief).trim());
       // Map schedule -> outline
       const outline = (function mapScheduleToOutline(d){
         const oid = 'O' + Date.now().toString(36);
@@ -1689,7 +1690,7 @@ const { renderSavedOutlines } = setupSavedOutlines({
       saveOutlinesLocal();
       renderHomeSavedBar();
       try{ if(typeof renderSavedOutlines==='function') renderSavedOutlines(); }catch{}
-      showToast('AI outline created.', 'success');
+      showToast(`AI outline created (${usedModel}).`, 'success');
     }catch(e){ console.error(e); showToast(e?.message || 'AI generation failed', 'error'); }
     finally{ btn.disabled=false; btn.textContent='🪄 AI Scheduling'; }
   });

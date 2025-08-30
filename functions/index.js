@@ -36,10 +36,15 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
 
-  const { brief, constraints = {} } = req.data || {};
+  const { brief, constraints = {}, model: modelReq } = req.data || {};
   if (!brief || typeof brief !== "string") {
     throw new HttpsError("invalid-argument", "Provide brief:string");
   }
+
+  // Model allowlist for safety/cost control
+  const ALLOWED_MODELS = new Set(["gpt-5"]);
+  const model = (typeof modelReq === 'string' && ALLOWED_MODELS.has(modelReq.trim()))
+    ? modelReq.trim() : "gpt-5";
 
   const schema = {
     type: "object",
@@ -80,7 +85,7 @@ max_daily_minutes, consecutive_days. Use ISO dates (YYYY-MM-DD) and 24h times.`;
 
   try {
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model,
       messages: [
         { role: "system", content: system },
         { role: "user", content: userPrompt }
@@ -100,7 +105,7 @@ max_daily_minutes, consecutive_days. Use ISO dates (YYYY-MM-DD) and 24h times.`;
       throw new HttpsError("internal", "Model did not return valid JSON");
     }
 
-    return { ok: true, schedule: data };
+    return { ok: true, schedule: data, model };
   } catch (e) {
     logger.error("generateSchedule failed", e);
     throw new HttpsError("internal", "Failed to generate schedule");
