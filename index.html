@@ -345,6 +345,8 @@ vertical-align: middle;
           </div>
         </div>
       </div>
+      <!-- AI Scheduling button -->
+      <button id="aiScheduleBtn" class="px-3 py-2 rounded-xl text-sm text-white shadow-sm bg-gradient-to-r from-fuchsia-600 via-sky-500 to-emerald-500 hover:brightness-110">🪄 AI Scheduling</button>
     </div>
 
     <!-- Folders area -->
@@ -623,6 +625,7 @@ import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-functions.js";
 
 import { setupSavedOutlines } from "./saved-outlines.js";
 
@@ -672,6 +675,7 @@ let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:f
 /*************** Cloud ***************/
 const auth = getAuth(app);
 const db = getFirestore(app);
+const functions = getFunctions(app, "us-central1");
 const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: "select_account" });
 const cloudStatus = $('#cloudStatus');
 let currentUser = null;
@@ -681,7 +685,7 @@ const debounce = (fn,ms=1000)=>{ let t; return (...a)=>{ clearTimeout(t); t=setT
 let dirty = false;
 const markDirty = ()=> { dirty = true; };
 const setLocalMode = (m='Local mode')=> cloudStatus.textContent = m;
-const setCloudMode = (m='Cloud sync on')=> cloudStatus.textContent = m;
+  const setCloudMode = (m='Cloud sync on')=> cloudStatus.textContent = m;
 
 async function saveCloudNow(){
   if(!currentUser) return;
@@ -730,7 +734,24 @@ const saveShelf = ()=>{ saveJSON('linkShelf_v1', widgetShelf); markDirty(); touc
 const savePrefs = ()=>{ saveJSON('prefs_v1', prefs); markDirty(); touchCloud(); };
 const saveOutlinesLocal = ()=>{ saveJSON('saved_outlines_v1', savedOutlines); markDirty(); touchCloud(); };
 const saveFoldersLocal = ()=>{ saveJSON('outline_folders_v1', savedFolders); markDirty(); touchCloud(); };
-const saveTimerLocal = ()=>{ saveJSON('timer_state_v2', timerState); markDirty(); touchCloud(); };
+  const saveTimerLocal = ()=>{ saveJSON('timer_state_v2', timerState); markDirty(); touchCloud(); };
+
+/*************** AI Scheduling (callable) ***************/
+async function aiGenerateSchedule(brief, constraints = {}){
+  const fn = httpsCallable(functions, 'generateSchedule');
+  const res = await fn({
+    brief,
+    constraints: {
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      start_date: new Date().toISOString().slice(0,10),
+      ...constraints
+    }
+  });
+  if(!res?.data?.ok) throw new Error(res?.data?.error || 'Generation failed');
+  return res.data.schedule;
+}
+// Expose for wiring/UI later
+window.aiGenerateSchedule = aiGenerateSchedule;
 
 /*************** Tabs (delegated) ***************/
 function showTab(id){
@@ -1623,6 +1644,56 @@ const { renderSavedOutlines } = setupSavedOutlines({
   setFolders: (arr)=>{ savedFolders = arr; },
   saveFoldersLocal,
 });
+
+/*************** AI Scheduling button (Saved tab) ***************/
+(function(){
+  const btn = document.getElementById('aiScheduleBtn');
+  if(!btn) return;
+  btn.addEventListener('click', async ()=>{
+    try{
+      if(!window.aiGenerateSchedule){ showToast('AI not ready. Reload the page.', 'error'); return; }
+      if(!currentUser){ showToast('Sign in to use AI scheduling.', 'error'); return; }
+      // Prompt for a brief
+      const brief = await (window.sfPrompt ? window.sfPrompt('Describe your schedule or outline (days, times, goals, duration):', '') : Promise.resolve(prompt('Describe your schedule or outline:')));
+      if(brief == null || !String(brief).trim()) return;
+      const prev = btn.textContent; btn.disabled=true; btn.textContent='Generating…';
+      // Call backend
+      const data = await window.aiGenerateSchedule(String(brief).trim());
+      // Map schedule -> outline
+      const outline = (function mapScheduleToOutline(d){
+        const oid = 'O' + Date.now().toString(36);
+        const title = d?.title || 'AI Outline';
+        const sessions = Array.isArray(d?.sessions) ? d.sessions : [];
+        function parseMinutes(s){
+          if(typeof s?.duration_min === 'number' && s.duration_min > 0) return Math.round(s.duration_min);
+          const st = s?.start_time, et = s?.end_time;
+          if(st && et){
+            const [sh,sm] = String(st).split(':').map(n=>parseInt(n,10)||0);
+            const [eh,em] = String(et).split(':').map(n=>parseInt(n,10)||0);
+            let mins = (eh*60+em) - (sh*60+sm); if(mins<0) mins += 24*60; return Math.max(1, mins);
+          }
+          return 30; // sensible default
+        }
+        const sections = sessions.map((s, i)=>({
+          id: 'S'+ (Date.now()+i).toString(36),
+          name: s?.topic || `Session ${i+1}`,
+          minutes: parseMinutes(s),
+          links: Array.isArray(s?.materials) ? s.materials.filter(Boolean).map((m)=>({ label: m, url: m, icon: 'emoji', emoji: '🔗' })) : [],
+          desc: s?.description || ''
+        }));
+        return { id: oid, title, sections };
+      })(data);
+
+      // Save outline and refresh UI
+      savedOutlines.push(outline);
+      saveOutlinesLocal();
+      renderHomeSavedBar();
+      try{ if(typeof renderSavedOutlines==='function') renderSavedOutlines(); }catch{}
+      showToast('AI outline created.', 'success');
+    }catch(e){ console.error(e); showToast(e?.message || 'AI generation failed', 'error'); }
+    finally{ btn.disabled=false; btn.textContent='🪄 AI Scheduling'; }
+  });
+})();
 
 /*************** Auth UI ***************/
 const authOpenBtn = $('#authOpenBtn'); const userBadge = $('#userBadge'); const userEmail = $('#userEmail'); const signOutBtn = $('#signOutBtn');
