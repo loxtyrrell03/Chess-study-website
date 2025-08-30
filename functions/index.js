@@ -42,7 +42,7 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
   }
 
   // Model allowlist for safety/cost control
-  const ALLOWED_MODELS = new Set(["gpt-5-mini", "gpt-5", "gpt-4o", "gpt-4o-mini"]);
+  const ALLOWED_MODELS = new Set(["gpt-5-mini", "gpt-5", "gpt-5-nano", "gpt-4o", "gpt-4o-mini"]);
   const model = (typeof modelReq === 'string' && ALLOWED_MODELS.has(modelReq.trim()))
     ? modelReq.trim() : "gpt-5-mini";
 

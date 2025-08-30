@@ -673,7 +673,7 @@ let savedOutlines = loadJSON('saved_outlines_v1') || [];
 let savedFolders = loadJSON('outline_folders_v1') || []; // {id, name}
 let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0, awaitingNext:false };
 // AI generation preferences
-let aiPrefs = loadJSON('ai_prefs_v1') || { includeDescriptions:true, includeLinks:true, includeSubsections:true, maxLinksPerSection: 5 };
+let aiPrefs = loadJSON('ai_prefs_v1') || { includeDescriptions:true, includeLinks:true, includeSubsections:true, maxLinksPerSection: 5, model:'gpt-5-mini' };
 
 /*************** Cloud ***************/
 const auth = getAuth(app);
@@ -1672,6 +1672,14 @@ const { renderSavedOutlines } = setupSavedOutlines({
             <button class="btn-xxs" data-close="1">✕</button>
           </div>
           <div class="grid gap-3">
+            <label class="flex flex-col gap-1">
+              <span class="text-sm">Model</span>
+              <select id="aiOptModel" class="input">
+                <option value="gpt-5-mini" ${aiPrefs.model==='gpt-5-mini'?'selected':''}>gpt-5-mini (default)</option>
+                <option value="gpt-5" ${aiPrefs.model==='gpt-5'?'selected':''}>gpt-5</option>
+                <option value="gpt-5-nano" ${aiPrefs.model==='gpt-5-nano'?'selected':''}>gpt-5-nano</option>
+              </select>
+            </label>
             <label class="flex items-center gap-2"><input id="aiOptDesc" type="checkbox" ${aiPrefs.includeDescriptions?'checked':''}/> <span>Include descriptions</span></label>
             <label class="flex items-center gap-2"><input id="aiOptLinks" type="checkbox" ${aiPrefs.includeLinks?'checked':''}/> <span>Include link suggestions</span></label>
             <label class="flex items-center gap-2"><input id="aiOptSubs" type="checkbox" ${aiPrefs.includeSubsections?'checked':''}/> <span>Include subsections</span></label>
@@ -1686,11 +1694,13 @@ const { renderSavedOutlines } = setupSavedOutlines({
       m.addEventListener('click', (e)=>{ if(e.target?.dataset?.close==='1'){ close(); } });
       const saveBtn = m.querySelector('#aiOptSave');
       saveBtn.addEventListener('click', ()=>{
+        const modelSel = m.querySelector('#aiOptModel');
         const d = m.querySelector('#aiOptDesc');
         const l = m.querySelector('#aiOptLinks');
         const s = m.querySelector('#aiOptSubs');
         const k = m.querySelector('#aiOptMaxLinks');
         aiPrefs = {
+          model: (modelSel && modelSel.value) || 'gpt-5-mini',
           includeDescriptions: !!d.checked,
           includeLinks: !!l.checked,
           includeSubsections: !!s.checked,
@@ -1712,7 +1722,7 @@ const { renderSavedOutlines } = setupSavedOutlines({
       if(brief == null || !String(brief).trim()) return;
       const prev = btn.textContent; btn.disabled=true; btn.textContent='Generating…';
       // Call backend
-      const { schedule: data, model: usedModel } = await window.aiGenerateSchedule(String(brief).trim(), {}, { controls: {
+      const { schedule: data, model: usedModel } = await window.aiGenerateSchedule(String(brief).trim(), {}, { model: aiPrefs.model, controls: {
         include_descriptions: !!aiPrefs.includeDescriptions,
         include_links: !!aiPrefs.includeLinks,
         include_subsections: !!aiPrefs.includeSubsections,
