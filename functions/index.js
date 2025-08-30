@@ -88,7 +88,7 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
       },
       notes: { type: "string" }
     },
-    required: ["sessions"]
+    required: ["title", "timezone", "sessions", "notes"]
   };
 
   // Ensure every object in the schema explicitly has additionalProperties: false
@@ -118,7 +118,8 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
 
   const system = `You convert user briefs into a study outline and timed sections.
 Return ONLY JSON exactly matching the provided JSON Schema (no extra fields).
-For each session: include id, topic, description, duration_min (whole minutes),
+The root object must include title, timezone, sessions, and notes.
+For each session include id, topic, description, duration_min (whole minutes),
 materials (array, can be empty), and subsections (array, can be empty). Each
 subsection includes id, name, description and duration_min. Do not invent keys.`;
 
