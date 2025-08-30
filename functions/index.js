@@ -36,7 +36,7 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
 
-  const { brief, constraints = {}, model: modelReq } = req.data || {};
+  const { brief, constraints = {}, model: modelReq, controls = {} } = req.data || {};
   if (!brief || typeof brief !== "string") {
     throw new HttpsError("invalid-argument", "Provide brief:string");
   }
@@ -116,19 +116,29 @@ exports.generateSchedule = onCall({ region: "us-central1", secrets: [OPENAI_API_
 
   const client = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
 
+  const includeLinks = !!controls.include_links;
+  const includeDescriptions = !!controls.include_descriptions;
+  const includeSubsections = !!controls.include_subsections;
+
   const system = `You convert user briefs into a study outline and timed sections.
 Return ONLY JSON exactly matching the provided JSON Schema (no extra fields).
 The root object must include title, timezone, sessions, and notes.
 For each session include id, topic, description, duration_min (whole minutes),
 materials (array, can be empty), and subsections (array, can be empty). Each
-subsection includes id, name, description and duration_min. Do not invent keys.`;
+subsection includes id, name, description and duration_min. Do not invent keys.
+
+Output controls (apply strictly):
+- Include descriptions: ${includeDescriptions ? 'YES' : 'NO (set all description to empty string)'}
+- Include link suggestions (materials arrays): ${includeLinks ? 'YES' : 'NO (use empty arrays)'}
+- Include subsections: ${includeSubsections ? 'YES' : 'NO (use empty arrays)'}
+`;
 
   const userPrompt =
     `Brief:\n${brief}\n\nConstraints:\n${JSON.stringify(constraints, null, 2)}\n` +
     `Return ONLY JSON matching the schema.`;
 
   try {
-    const completion = await client.chat.completions.create({
+    const reqParams = {
       model,
       messages: [
         { role: "system", content: system },
@@ -137,9 +147,12 @@ subsection includes id, name, description and duration_min. Do not invent keys.`
       response_format: {
         type: "json_schema",
         json_schema: { name: "StudySchedule", schema, strict: true }
-      },
-      temperature: 1
-    });
+      }
+    };
+    // Some models only support default temperature; omit unless supported.
+    if (model === 'gpt-4o' || model === 'gpt-4o-mini') reqParams.temperature = 0.2;
+
+    const completion = await client.chat.completions.create(reqParams);
 
     const content = completion.choices?.[0]?.message?.content || "{}";
     let data;

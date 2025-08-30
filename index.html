@@ -345,8 +345,9 @@ vertical-align: middle;
           </div>
         </div>
       </div>
-      <!-- AI Scheduling button -->
+      <!-- AI Scheduling button + options -->
       <button id="aiScheduleBtn" class="px-3 py-2 rounded-xl text-sm text-white shadow-sm bg-gradient-to-r from-fuchsia-600 via-sky-500 to-emerald-500 hover:brightness-110">🪄 AI Scheduling</button>
+      <button id="aiOptionsBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">AI Options</button>
     </div>
 
     <!-- Folders area -->
@@ -671,6 +672,8 @@ let prefs = loadJSON('prefs_v1') || {
 let savedOutlines = loadJSON('saved_outlines_v1') || [];
 let savedFolders = loadJSON('outline_folders_v1') || []; // {id, name}
 let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:false, currentIndex:0, secondsLeft:0, outlineId:null, lastSyncTs:0, awaitingNext:false };
+// AI generation preferences
+let aiPrefs = loadJSON('ai_prefs_v1') || { includeDescriptions:true, includeLinks:true, includeSubsections:true, maxLinksPerSection: 5 };
 
 /*************** Cloud ***************/
 const auth = getAuth(app);
@@ -746,7 +749,12 @@ async function aiGenerateSchedule(brief, constraints = {}, options = {}){
       start_date: new Date().toISOString().slice(0,10),
       ...constraints
     },
-    model: (options && typeof options.model === 'string') ? options.model : undefined
+    model: (options && typeof options.model === 'string') ? options.model : undefined,
+    controls: (options && options.controls) ? options.controls : {
+      include_descriptions: !!aiPrefs.includeDescriptions,
+      include_links: !!aiPrefs.includeLinks,
+      include_subsections: !!aiPrefs.includeSubsections,
+    }
   });
   if(!res?.data?.ok) throw new Error(res?.data?.error || 'Generation failed');
   return { schedule: res.data.schedule, model: res.data.model };
@@ -1649,7 +1657,52 @@ const { renderSavedOutlines } = setupSavedOutlines({
 /*************** AI Scheduling button (Saved tab) ***************/
 (function(){
   const btn = document.getElementById('aiScheduleBtn');
+  const optBtn = document.getElementById('aiOptionsBtn');
   if(!btn) return;
+  if(optBtn){
+    optBtn.addEventListener('click', ()=>{
+      // Build a small modal to edit AI prefs
+      const m = document.createElement('div');
+      m.className = 'modal';
+      m.innerHTML = `
+        <div class="modal-backdrop" data-close="1"></div>
+        <div class="modal-panel max-w-[520px]">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-lg font-semibold">AI Options</h3>
+            <button class="btn-xxs" data-close="1">✕</button>
+          </div>
+          <div class="grid gap-3">
+            <label class="flex items-center gap-2"><input id="aiOptDesc" type="checkbox" ${aiPrefs.includeDescriptions?'checked':''}/> <span>Include descriptions</span></label>
+            <label class="flex items-center gap-2"><input id="aiOptLinks" type="checkbox" ${aiPrefs.includeLinks?'checked':''}/> <span>Include link suggestions</span></label>
+            <label class="flex items-center gap-2"><input id="aiOptSubs" type="checkbox" ${aiPrefs.includeSubsections?'checked':''}/> <span>Include subsections</span></label>
+            <label class="flex items-center gap-2"><span>Max links per section</span><input id="aiOptMaxLinks" type="number" min="0" max="12" step="1" value="${Number(aiPrefs.maxLinksPerSection||5)}" class="input w-24"/></label>
+          </div>
+          <div class="mt-4 flex justify-end gap-2">
+            <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
+            <button id="aiOptSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
+          </div>
+        </div>`;
+      document.body.appendChild(m);
+      m.addEventListener('click', (e)=>{ if(e.target?.dataset?.close==='1'){ close(); } });
+      const saveBtn = m.querySelector('#aiOptSave');
+      saveBtn.addEventListener('click', ()=>{
+        const d = m.querySelector('#aiOptDesc');
+        const l = m.querySelector('#aiOptLinks');
+        const s = m.querySelector('#aiOptSubs');
+        const k = m.querySelector('#aiOptMaxLinks');
+        aiPrefs = {
+          includeDescriptions: !!d.checked,
+          includeLinks: !!l.checked,
+          includeSubsections: !!s.checked,
+          maxLinksPerSection: Math.max(0, Math.min(50, Number(k.value||5)))
+        };
+        saveJSON('ai_prefs_v1', aiPrefs);
+        close();
+        showToast('AI options saved.','success');
+      });
+      function close(){ m.classList.add('hidden'); setTimeout(()=>m.remove(), 140); }
+    });
+  }
   btn.addEventListener('click', async ()=>{
     try{
       if(!window.aiGenerateSchedule){ showToast('AI not ready. Reload the page.', 'error'); return; }
@@ -1659,7 +1712,11 @@ const { renderSavedOutlines } = setupSavedOutlines({
       if(brief == null || !String(brief).trim()) return;
       const prev = btn.textContent; btn.disabled=true; btn.textContent='Generating…';
       // Call backend
-      const { schedule: data, model: usedModel } = await window.aiGenerateSchedule(String(brief).trim());
+      const { schedule: data, model: usedModel } = await window.aiGenerateSchedule(String(brief).trim(), {}, { controls: {
+        include_descriptions: !!aiPrefs.includeDescriptions,
+        include_links: !!aiPrefs.includeLinks,
+        include_subsections: !!aiPrefs.includeSubsections,
+      }});
       // Map schedule -> outline
       const outline = (function mapScheduleToOutline(d){
         const oid = 'O' + Date.now().toString(36);
@@ -1675,13 +1732,28 @@ const { renderSavedOutlines } = setupSavedOutlines({
           }
           return 30; // sensible default
         }
-        const sections = sessions.map((s, i)=>({
-          id: 'S'+ (Date.now()+i).toString(36),
-          name: s?.topic || `Session ${i+1}`,
-          minutes: parseMinutes(s),
-          links: Array.isArray(s?.materials) ? s.materials.filter(Boolean).map((m)=>({ label: m, url: m, icon: 'emoji', emoji: '🔗' })) : [],
-          desc: s?.description || ''
-        }));
+        function isValidUrl(u){ try{ const x = new URL(u); if(!/^https?:$/.test(x.protocol)) return false; return (x.hostname||'').includes('.'); }catch{ return false; } }
+        function labelFromUrl(u){ try{ const x=new URL(u); const host=(x.hostname||'').replace(/^www\./,''); const last=(x.pathname||'').split('/').filter(Boolean).pop()||''; return last? `${host}/${decodeURIComponent(last).slice(0,24)}` : host; }catch{ return u; } }
+        const sections = sessions.map((s, i)=>{
+          const id = 'S'+ (Date.now()+i).toString(36);
+          const name = s?.topic || `Session ${i+1}`;
+          const minutes = parseMinutes(s);
+          let links = [];
+          if(aiPrefs.includeLinks && Array.isArray(s?.materials)){
+            const seen = new Set();
+            for(const raw of s.materials){
+              if(!raw) continue;
+              const normalized = normalizeUrl(String(raw||''));
+              if(!normalized || !isValidUrl(normalized)) continue;
+              if(seen.has(normalized)) continue;
+              seen.add(normalized);
+              links.push({ label: labelFromUrl(normalized), url: normalized, icon: 'emoji', emoji: '🔗' });
+              if(links.length >= Math.max(0, Number(aiPrefs.maxLinksPerSection||5))) break;
+            }
+          }
+          const desc = aiPrefs.includeDescriptions ? (s?.description || '') : '';
+          return { id, name, minutes, links, desc };
+        });
         return { id: oid, title, sections };
       })(data);
 
