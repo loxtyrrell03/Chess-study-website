@@ -1,77 +1,263 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Skillflow — Structure your training. Master any skill.</title>
-<meta name="color-scheme" content="light dark"/>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="./styles.css"/>
-<style id="index-overrides">
-/* Stronger progress fill & proper layering (planner + focus) */
-#progressSegments{ z-index:0 !important; }
-#progressFill{
-z-index:2 !important;
-background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
-border-right:2px solid var(--accent-600) !important;
+
+
+// Helper: map schedule -> outline (flatten subsections)
+function mapScheduleToOutline(d, prefs){
+  const oid = 'O' + Date.now().toString(36);
+  const title = (d && d.title) ? d.title : 'AI Outline';
+  const sessions = Array.isArray(d?.sessions) ? d.sessions : [];
+  function parseMinutes(s){
+    if(typeof s?.duration_min === 'number' && s.duration_min > 0) return Math.round(s.duration_min);
+    const st = s?.start_time, et = s?.end_time;
+    if(st && et){ const [sh,sm] = String(st).split(':').map(n=>parseInt(n,10)||0); const [eh,em] = String(et).split(':').map(n=>parseInt(n,10)||0); let mins=(eh*60+em)-(sh*60+sm); if(mins<0) mins+=1440; return Math.max(1, mins); }
+    return 30;
+  }
+  function isValidUrl(u){ try{ const x = new URL(u); if(!/^https?:$/.test(x.protocol)) return false; return (x.hostname||'').includes('.'); }catch{ return false; } }
+  function labelFromUrl(u){ try{ const x=new URL(u); const host=(x.hostname||'').replace(/^www\./,''); const last=(x.pathname||'').split('/').filter(Boolean).pop()||''; return last? `${host}/${decodeURIComponent(last).slice(0,24)}` : host; }catch{ return u; } }
+
+  const sections = [];
+  sessions.forEach((s, si)=>{
+    const subs = Array.isArray(s?.subsections) ? s.subsections : [];
+    if(subs.length){
+      subs.forEach((sub, j)=>{
+        const id = 'S'+ (Date.now()+sections.length).toString(36);
+        const minutes = parseMinutes(sub);
+        let links = [];
+        if(prefs?.includeLinks && Array.isArray(sub?.materials)){
+          const seen = new Set();
+          for(const raw of sub.materials){ if(!raw) continue; const normalized=normalizeUrl(String(raw||'')); if(!normalized||!isValidUrl(normalized)) continue; if(seen.has(normalized)) continue; seen.add(normalized); links.push({ label: labelFromUrl(normalized), url: normalized, icon:'emoji', emoji:'??' }); if(links.length >= Math.max(0, Number(prefs.maxLinksPerSection||5))) break; }
+        }
+        sections.push({ id, name: sub?.name || `Step ${j+1} � ${s?.topic||('Session '+(si+1))}`, minutes, links, desc: (prefs?.includeDescriptions ? (sub?.description||'') : '') });
+      });
+    } else {
+      const id = 'S'+ (Date.now()+sections.length).toString(36);
+      const minutes = parseMinutes(s);
+      let links = [];
+      if(prefs?.includeLinks && Array.isArray(s?.materials)){
+        const seen = new Set();
+        for(const raw of s.materials){ if(!raw) continue; const normalized=normalizeUrl(String(raw||'')); if(!normalized||!isValidUrl(normalized)) continue; if(seen.has(normalized)) continue; seen.add(normalized); links.push({ label: labelFromUrl(normalized), url: normalized, icon:'emoji', emoji:'??' }); if(links.length >= Math.max(0, Number(prefs.maxLinksPerSection||5))) break; }
+      }
+      sections.push({ id, name: s?.topic || `Session ${si+1}`, minutes, links, desc: (prefs?.includeDescriptions ? (s?.description||'') : '') });
+    }
+  });
+  return { id: oid, title, sections };
 }
+
+// AI Preview modal logic
+let __aiDraft = null;
+function openAiPreview(outline, usedModel){
+  __aiDraft = structuredClone(outline||{ title:'AI Outline', sections:[] });
+  const modal = document.getElementById('aiPreviewModal'); if(!modal) return;
+  const titleInp = document.getElementById('aiPrevTitle');
+  const list = document.getElementById('aiPrevList');
+  const saveBtn = document.getElementById('aiPrevSaveBtn');
+  const cancelBtn = document.getElementById('aiPrevCancelBtn');
+  const reviseBtn = document.getElementById('aiPrevReviseBtn');
+  titleInp.value = __aiDraft.title || 'AI Outline';
+  titleInp.oninput = ()=> { __aiDraft.title = titleInp.value; };
+
+  function renderList(){
+    list.innerHTML = (__aiDraft.sections||[]).map((s, i)=>`
+      <li class="card p-3" data-idx="${i}">
+        <div class="flex items-center gap-2">
+          <input class="input flex-1" data-role="name" placeholder="Section name" value="${escapeHtml(s.name||'')}"/>
+          <label class="text-sm">mins <input class="input w-24 ml-1" data-role="mins" type="number" min="1" step="1" value="${Number(s.minutes||0)}"/></label>
+          <button class="btn-xxs" data-role="del">Delete</button>
+        </div>
+        <textarea class="input mt-2" data-role="desc" placeholder="Description">${escapeHtml(s.desc||'')}</textarea>
+      </li>
+    `).join('');
+    // wire events
+    list.querySelectorAll('li.card').forEach((li)=>{
+      const idx = Number(li.dataset.idx);
+      li.querySelector('[data-role="name"]').addEventListener('input', (e)=>{ __aiDraft.sections[idx].name = e.target.value; });
+      li.querySelector('[data-role="mins"]').addEventListener('input', (e)=>{ const v = Math.max(1, Math.round(Number(e.target.value||0))); __aiDraft.sections[idx].minutes = v; e.target.value = String(v); });
+      li.querySelector('[data-role="desc"]').addEventListener('input', (e)=>{ __aiDraft.sections[idx].desc = e.target.value; });
+      li.querySelector('[data-role="del"]').addEventListener('click', ()=>{ __aiDraft.sections.splice(idx,1); renderList(); });
+    });
+  }
+  renderList();
+
+  function close(){ modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
+  modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false');
+  modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ close(); } });
+  cancelBtn.onclick = close;
+  saveBtn.onclick = ()=>{
+    const outline = structuredClone(__aiDraft);
+    outline.id = 'O'+Date.now().toString(36);
+    outline.sections = (outline.sections||[]).map((s, i)=> ({ id: 'S'+Date.now().toString(36)+i, name: s.name||`Step ${i+1}`, minutes: Math.max(1, Math.round(Number(s.minutes||0))), links: Array.isArray(s.links)?structuredClone(s.links):[], desc: s.desc||'' }));
+    savedOutlines.push(outline);
+    saveOutlinesLocal(); renderHomeSavedBar(); try{ if(typeof renderSavedOutlines==='function') renderSavedOutlines(); }catch{}
+    showToast('AI outline saved.', 'success');
+    close();
+  };
+  reviseBtn.onclick = async ()=>{
+    try{
+      const instruction = await (window.sfPrompt ? window.sfPrompt('Tell AI how to revise this schedule (e.g., make tactics 10m longer, add an openings drill)', '') : Promise.resolve(prompt('Revise instruction:')));
+      if(instruction==null || !String(instruction).trim()) return;
+      const currentJson = JSON.stringify({ title: __aiDraft.title, sections: (__aiDraft.sections||[]).map(s=>({ name:s.name, duration_min:s.minutes, description:s.desc })) }, null, 2);
+      const brief = `Revise the schedule below according to the request. Keep structure and ordering unless the request requires changes.\n\nRequest:\n${instruction}\n\nCurrent schedule (approximate):\n${currentJson}`;
+      const { schedule: data, model: used } = await window.aiGenerateSchedule(brief, {}, { model: aiPrefs.model, controls: {
+        include_descriptions: !!aiPrefs.includeDescriptions,
+        include_links: !!aiPrefs.includeLinks,
+        include_subsections: !!aiPrefs.includeSubsections,
+      }});
+      __aiDraft = mapScheduleToOutline(data, aiPrefs);
+      document.getElementById('aiPrevTitle').value = __aiDraft.title || 'AI Outline';
+      renderList();
+      showToast(`Revised with ${used}.`, 'success');
+    }catch(err){ console.error(err); showToast(err?.message||'Revision failed','error'); }
+  };
+}
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="utf-8"/>
+
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+
+<title>Skillflow — Structure your training. Master any skill.</title>
+
+<meta name="color-scheme" content="light dark"/>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<link rel="stylesheet" href="./styles.css"/>
+
+<style id="index-overrides">
+
+/* Stronger progress fill & proper layering (planner + focus) */
+
+#progressSegments{ z-index:0 !important; }
+
+#progressFill{
+
+z-index:2 !important;
+
+background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
+
+border-right:2px solid var(--accent-600) !important;
+
+}
+
 #progressTicks{ z-index:3 !important; }
+
 #scrubOverlay{ z-index:4 !important; }
 
+
+
 #focusProgressSegments{ z-index:0 !important; }
+
 #focusProgressFill{
+
 z-index:2 !important;
+
 background:linear-gradient(90deg,var(--accent-100),color-mix(in srgb,var(--accent) 55%, transparent)) !important;
+
 border-right:2px solid var(--accent-600) !important;
+
 }
+
 #focusProgressTicks{ z-index:3 !important; }
+
 #focusScrubOverlay{ z-index:4 !important; }
 
+
+
 /* Reorder placeholder (shared) */
+
 .drop-placeholder{
+
 opacity:.6;
+
 border:2px dashed var(--accent);
+
 background:color-mix(in srgb, var(--accent-100) 60%, transparent);
+
 height:var(--ph,44px);
+
 border-radius:10px;
+
 margin:.125rem 0;
+
 }
+
+
 
 /* Compact inline editors height normalization */
+
 :root { --sf-editor-field-h: 44px; }
+
 #editMinsInline, #edtValue,
+
 #editUnitInline, #edtUnit {
+
 height: var(--sf-editor-field-h) !important;
+
 box-sizing: border-box;
+
 font-size: 0.95rem;
+
 line-height: normal;
+
 padding: 8px 12px 10px 12px;
+
 border-radius: 0.75rem;
+
 vertical-align: middle;
+
 }
+
 #editMinsInline, #edtValue { padding-right: .75rem; }
+
 #editUnitInline, #edtUnit { padding-right: 2rem; -webkit-appearance:none; -moz-appearance:none; appearance:none; }
 
+
+
 /* Make outline title editor narrower on Planner list */
+
 .outline-edit-title{ max-width:60%; }
 
+
+
 /* Taller description by default on Planner (~3x) */
+
 #sectionDesc{ min-height: 300px; }
+
 </style>
+
 </head>
 
+
+
 <body class="min-h-screen">
+
 <!-- ======= TOP BAR ======= -->
+
 <header id="topbar" class="topbar">
+
   <div class="brand">
+
     <span class="logo">📁</span>
+
     <div class="brand-text">
+
       <div class="brand-title">Skillflow</div>
+
       <div class="brand-sub">Structure your training. Master any skill.</div>
+
     </div>
+
   </div>
 
+
+
   <button id="navToggle" aria-label="Toggle navigation">☰</button>
+
+
 
   <nav class="tabs-bar topnav-links">
     <a class="tab-link active" data-tab="overviewTab" href="#overview">Overview</a>
@@ -85,107 +271,209 @@ vertical-align: middle;
     <!-- NEW: visible Pricing button wired into showTab -->
     <a class="tab-link" data-tab="pricingTab" href="#pricing">Pricing</a>
 
+
     <!-- Mobile-only container: settings + auth moved here via JS on small screens -->
+
     <div id="mobileExtraMenu"></div>
+
   </nav>
 
+
+
   <div class="topbar-actions">
+
     <button id="settingsBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]" title="Customize UI">⚙️ Settings</button>
+
     <div id="authArea" class="flex items-center gap-2">
+
       <button id="authOpenBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Sign in / Sign up</button>
+
       <div id="userBadge" class="hidden items-center gap-2">
+
         <span id="userEmail" class="text-sm muted"></span>
+
         <button id="signOutBtn" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white">Sign out</button>
+
       </div>
+
     </div>
+
     <span id="cloudStatus" class="text-xs muted">Local mode</span>
+
   </div>
+
 </header>
 
+
+
 <!-- Mobile drawer overlay (phones only) -->
+
 <div id="mobileNavOverlay" class="mobile-overlay" aria-hidden="true"></div>
 
+
+
 <!-- ======= MAIN WRAPPER ======= -->
+
 <div class="max-w-7xl mx-auto px-5 py-6">
 
+
+
   <!-- ======= OVERVIEW / LANDING ======= -->
+
   <section id="overviewTab">
+
     <div class="landing-hero card aurora-frame reveal">
+
       <div class="hero-copy">
+
         <h1 class="hero-title">Turn big goals into <em>mini‑goals</em> and stay on track.</h1>
+
         <p class="hero-sub">Skillflow is a session‑based planner with a live progress bar that keeps you focused inside a single time block.</p>
+
         <div class="hero-cta">
+
           <button class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm" data-tab-jump="homeTab">start session</button>
+
           <button id="learnBasicsBtn" class="px-4 py-2 rounded-xl border border-[var(--border)]">Learn the basics ▶</button>
+
         </div>
+
       </div>
+
       <div class="hero-demo">
+
         <div class="demo-progress">
+
           <div class="demo-fill"></div>
+
           <div class="demo-seg"></div><div class="demo-seg"></div><div class="demo-seg"></div>
+
         </div>
+
         <div class="demo-captions">
+
           <div>Live progress within your session</div>
+
           <div>Break work into meaningful mini‑goals</div>
+
         </div>
+
       </div>
+
     </div>
+
+
 
     <!-- NEW: vertical stack, aurora-outlined feature cards with friendly copy -->
+
     <div class="landing-stack">
+
       <section class="feature card aurora-frame reveal p-4">
+
         <h3 class="block-title mb-2">Why mini‑goals?</h3>
+
         <ul class="list-disc pl-5 space-y-1 text-sm muted">
+
           <li><strong>Specific beats vague.</strong> Swapping “do your best” for clear, bite‑size targets gives you a concrete next step and sharper focus.</li>
+
           <li><strong>Progress you can see.</strong> Watching the bar move (and sharing wins) keeps momentum high and makes finishing more likely.</li>
+
           <li><strong>Closer feels faster.</strong> As you near the next checkpoint, effort naturally ramps up—mini‑goals create these “finish lines” all through your session.</li>
+
         </ul>
+
       </section>
 
+
+
       <section class="feature card aurora-frame reveal p-4">
+
         <h3 class="block-title mb-2">Plan once. Stay present.</h3>
+
         <p class="muted text-sm">Design your outline up front, then work. Skillflow’s progress bar gives instant feedback and guards against drift.</p>
+
       </section>
 
+
+
       <section class="feature card aurora-frame reveal p-4">
+
         <h3 class="block-title mb-2">Flexible links & notes</h3>
+
         <p class="muted text-sm">Attach links and notes to each mini‑goal so everything you need is one click away.</p>
+
       </section>
+
+
 
       <!-- NEW: simple side‑by‑side comparison -->
+
       <section class="feature card aurora-frame reveal p-4">
+
         <h3 class="block-title mb-3">Mini‑goals vs “do your best”</h3>
+
         <div class="compare-grid">
+
           <div class="compare-card">
+
             <div class="compare-head">With mini‑goals ✅</div>
+
             <ul class="compare-list">
+
               <li>Clear next action; less dithering</li>
+
               <li>Visible progress boosts motivation</li>
+
               <li>Built‑in checkpoints to course‑correct</li>
+
               <li>Lower mental load (one step at a time)</li>
+
               <li>Easier to attach the right links/resources</li>
+
             </ul>
+
           </div>
+
           <div class="compare-card">
+
             <div class="compare-head bad">“Do your best” ✖︎</div>
+
             <ul class="compare-list bad">
+
               <li>Vague target → aimless effort</li>
+
               <li>Hard to tell if you’re on track</li>
+
               <li>Easier to drift or zone out</li>
+
               <li>Higher chance of procrastination</li>
+
               <li>Resources scattered; more context switching</li>
+
             </ul>
+
           </div>
+
         </div>
+
         <p class="text-xs muted mt-3">This guidance reflects well‑established findings on specific goals, progress monitoring, and the goal‑gradient effect.</p>
+
       </section>
+
     </div>
+
   </section>
 
+
+
   <!-- ======= PLANNER ======= -->
+
   <section id="homeTab" class="hidden">
+
     <!-- Progress -->
+
     <section class="mb-4">
+
       <div class="flex items-center justify-between mb-1">
         <div id="progressLabel" class="block-sub">Progress - click to jump</div>
         <div class="flex items-center gap-2">
@@ -194,145 +482,284 @@ vertical-align: middle;
         </div>
       </div>
       <div id="progressHost" class="relative w-full h-6 rounded-2xl overflow-hidden card">
+
         <div id="progressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
+
         <div id="progressSegments" class="absolute inset-0 flex"></div>
+
         <div id="progressTicks" class="absolute inset-0 pointer-events-none"></div>
+
         <div id="scrubOverlay" class="absolute inset-0 cursor-pointer"></div>
+
       </div>
+
       <div id="legend" class="mt-2 flex flex-wrap gap-2 text-sm"></div>
+
     </section>
+
+
 
     <!-- Controls -->
+
     <section class="flex flex-wrap items-center gap-3 mb-3">
+
       <button id="startBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm">Start Study Session</button>
+
       <button id="readyNextBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm hidden">I’m ready — start next ▶</button>
+
       <button id="prevBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">◀ Prev</button>
+
       <button id="nextBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Next ▶</button>
+
       <button id="focusModeBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Focus Mode</button>
       <!-- MOVED: clock now lives next to Focus Mode -->
+
       <div id="clock" class="clock-badge text-2xl tabular-nums">00:00</div>
+
       <button id="resetBtn" class="ml-auto px-3 py-2 rounded-xl border border-[var(--border)]">Reset</button>
+
       <button id="showOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] hidden">Show Outline ▸</button>
+
     </section>
 
+
+
     <div id="split">
+
       <!-- LEFT -->
+
       <section id="leftPane">
+
         <div class="card p-6 section-card">
+
           <div class="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+
             <div class="min-w-0 flex items-center gap-3">
+
               <h2 id="currentTitle" class="text-2xl font-extrabold truncate">—</h2>
+
               <span id="currentDurDisp" class="text-sm muted whitespace-nowrap">0m</span>
+
               <input id="editTitleInline" class="input text-2xl font-extrabold hidden align-middle shrink-0" placeholder="Section title"/>
+
               <div id="editDurInline" class="hidden flex items-stretch gap-1 flex-nowrap whitespace-nowrap">
+
                 <input id="editMinsInline" class="input h-9 w-24 text-sm" type="number" min="0.01" step="0.1" placeholder="Min"/>
+
                 <select id="editUnitInline" class="input h-9 w-24 text-sm">
+
                   <option value="minutes" selected>min</option>
+
                   <option value="seconds">sec</option>
+
                   <option value="hours">hr</option>
+
                 </select>
+
               </div>
+
             </div>
+
             <div class="flex items-center gap-2">
+
               <!-- Label simplified to “Save” when editing (see JS) -->
+
               <button id="editSectionBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Edit Section</button>
+
             </div>
+
           </div>
+
+
 
           <!-- Shelf -->
+
           <div id="shelfWrap" class="mt-4 hidden">
+
             <div class="flex items-center justify-between">
+
               <h3 class="block-title">Widget shelf</h3>
+
               <div class="flex items-center gap-2">
+
                 <button id="addWidgetBtn" class="btn-xs">+ New Widget</button>
+
                 <button id="resetShelfBtn" class="btn-xs">Reset Shelf</button>
+
               </div>
+
             </div>
+
             <div id="linkShelf" class="mt-2 editor-shelf"></div>
+
             <div class="text-xs muted mt-1">Drag from shelf → links below. Click any item to edit.</div>
+
           </div>
+
+
 
           <!-- Links -->
+
           <div id="linksWrap" class="mt-4">
+
             <div class="flex items-center justify-between">
+
               <h3 class="block-title">Links</h3>
+
               <button id="clearSectionLinks" class="btn-xs hidden">Clear</button>
+
             </div>
+
             <div id="links" class="section-links-bar mt-2"></div>
+
           </div>
+
+
 
           <!-- Description -->
+
           <div class="mt-4">
+
             <label class="block-title">Description</label>
+
             <textarea id="sectionDesc" class="w-full mt-1 input text-sm" placeholder="Add notes, mini-checklist, links…"></textarea>
+
           </div>
+
         </div>
+
       </section>
 
+
+
       <!-- HANDLE -->
+
       <div id="splitHandle"></div>
 
+
+
       <!-- RIGHT -->
+
       <aside id="rightPane">
+
         <div class="card p-4 h-full flex flex-col">
+
           <div id="homeSavedRow" class="mb-3">
+
             <div class="flex items-center justify-between">
+
               <h4 class="block-title">Saved Outlines</h4>
+
               <div class="flex items-center gap-2">
+
                 <button id="createOutlineFromHome" class="text-xs underline">+ Create</button>
+
                 <button id="manageOutlinesLink" class="text-xs underline" data-tab-jump="savedTab">Manage</button>
+
               </div>
+
             </div>
+
             <div id="homeSavedScroller" class="mt-2 flex gap-2 overflow-x-auto p-2 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
+
           </div>
 
+
+
           <div class="flex items-center justify-between">
+
             <h3 class="block-title">Session outline</h3>
+
             <button id="collapseOutlineBtn" class="text-xs px-2 py-1 rounded-md border border-[var(--border)]">▾ Hide</button>
+
           </div>
+
+
 
           <ul id="outline" class="mt-3 flex-1 overflow-auto"></ul>
 
+
+
           <!-- Inline Add -->
+
           <div id="inlineAddRow" class="mt-2 hidden">
+
             <div class="flex flex-wrap items-center gap-2">
+
               <input id="addTitleInput" class="input flex-1" placeholder="Section title"/>
+
               <input id="addMinsInput" class="input w-28" type="number" min="0.25" step="0.25" placeholder="Minutes"/>
+
               <button id="addConfirmBtn" class="btn-xs">Add</button>
+
               <button id="addCancelBtn" class="btn-xs">Cancel</button>
+
             </div>
+
           </div>
+
+
 
           <div class="mt-3 flex items-center gap-2">
+
             <button id="addOutlineItem" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Add Section</button>
+
             <div id="totalMins" class="ml-auto text-xs muted">Total: 0 minutes</div>
+
           </div>
+
         </div>
+
       </aside>
+
     </div>
+
+
 
     <footer class="mt-10 text-center text-xs muted">
+
       Skillflow — minimal, keyboard-friendly session manager. ♟️
+
     </footer>
+
   </section>
 
+
+
   <!-- ======= SAVED OUTLINES ======= -->
+
   <section id="savedTab" class="hidden">
+
     <!-- Optional merge bar (kept) -->
+
     <div id="mergeBar" class="card p-4 mb-4" style="display:none">
+
       <div class="flex flex-col gap-2">
+
         <div class="text-sm">Merge <strong id="mergeSourceName"></strong> ➕ <strong id="mergeTargetName"></strong></div>
+
         <div class="flex flex-wrap items-center gap-2">
+
           <label class="text-sm muted">New outline name</label>
+
           <input id="mergeTitleInput" class="input flex-1" placeholder="e.g. ‘Balanced + Openings’"/>
+
           <button id="mergeConfirmBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Merge</button>
+
           <button id="mergeCancelBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">Cancel</button>
+
         </div>
+
         <div class="text-xs muted">Original outlines are kept. Sections from the dragged outline are appended after the target’s sections.</div>
+
       </div>
+
     </div>
 
+
+
     <!-- Create outline (reworked as a small popover next to the button) -->
+
     <div class="mb-3 flex items-center gap-2">
       <div id="createOutlineWrap" class="pop-wrap">
         <button id="createOutlineBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ Create new outline</button>
@@ -350,90 +777,176 @@ vertical-align: middle;
       <button id="aiOptionsBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">AI Options</button>
     </div>
 
+
     <!-- Folders area -->
+
     <div id="foldersWrap" class="card p-4 mb-4">
+
       <div class="flex items-center justify-between">
+
         <div id="folderCrumbs" class="breadcrumbs"></div>
+
         <div id="createFolderWrap" class="flex items-center gap-2 pop-wrap">
+
           <button id="createFolderBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] text-sm">+ New folder</button>
+
           <div id="createFolderForm" class="popover hidden">
+
             <div class="flex items-center gap-2">
+
               <input id="newFolderName" class="input flex-1" placeholder="Folder name"/>
+
               <button id="createFolderConfirm" class="btn-xs">Create</button>
+
               <button id="createFolderCancel" class="btn-xs">Cancel</button>
+
             </div>
+
           </div>
+
         </div>
+
       </div>
 
+
+
       <div id="folderGrid" class="folder-grid mt-3"></div>
+
     </div>
+
+
 
     <hr class="sep-line"/>
 
+
+
     <div class="text-sm muted mb-3">Tip: drag one outline card onto another to propose a merge (only when NOT editing). Drag a card onto a folder (or breadcrumb) to move it.</div>
+
     <div id="savedList" class="grid lg:grid-cols-2 gap-4"></div>
+
   </section>
+
+
 
   <!-- ======= HOW TO ======= -->
+
   <section id="helpTab" class="hidden">
+
     <div class="card p-5 space-y-6">
+
       <div class="grid md:grid-cols-2 gap-6 items-center">
+
         <div>
+
           <h3 class="block-title mb-2">Plan once, then execute</h3>
+
           <p class="text-sm muted">Create a single focused session and divide it into ordered mini‑goals. The live progress bar shows exactly where you are.</p>
+
         </div>
+
         <div class="demo-box">
+
           <div class="demo-progress small"><div class="demo-fill"></div></div>
+
         </div>
+
       </div>
 
+
+
       <div class="grid md:grid-cols-2 gap-6 items-center">
+
         <div class="order-2 md:order-1 demo-box">
+
           <div class="chip">Openings <span class="opacity-70">(15m)</span></div>
+
           <div class="chip">Tactics <span class="opacity-70">(20m)</span></div>
+
           <div class="chip">Endgames <span class="opacity-70">(25m)</span></div>
+
         </div>
+
         <div class="order-1 md:order-2">
+
           <h3 class="block-title mb-2">Keep useful links at hand</h3>
+
           <p class="text-sm muted">Add links to each mini‑goal—resources open in one click so you never break flow.</p>
+
         </div>
+
       </div>
 
+
+
       <div class="grid md:grid-cols-2 gap-6 items-center">
+
         <div>
+
           <h3 class="block-title mb-2">Focus mode</h3>
+
           <p class="text-sm muted">A distraction‑reduced workspace with boxed sections, borders, and a larger clock. Perfect for deep work.</p>
+
         </div>
+
         <div class="demo-box">
+
           <div class="focus-demo card">
+
             <div class="clock-badge">12:34</div>
+
             <div class="demo-progress small"><div class="demo-fill"></div></div>
+
           </div>
+
         </div>
+
       </div>
+
     </div>
+
   </section>
+
+
 
   <!-- ======= PRICING ======= -->
+
   <section id="pricingTab" class="hidden">
+
     <div id="pricingMount"></div>
+
   </section>
+
 </div>
 
+
+
 <!-- ======= FOCUS MODE (centered card + Description header) ======= -->
+
 <div id="focusOverlay" class="fixed inset-0 hidden z-[100]">
+
   <div class="absolute inset-0 bg-[var(--bg)]"></div>
+
   <div class="relative z-10 w-full h-full flex items-center justify-center p-6">
+
     <!-- Centered card wrapper (includes Exit button) -->
+
     <div class="card w-full max-w-3xl p-5">
+
       <div class="flex items-start justify-between gap-3">
+
         <div class="min-w-0">
+
           <h2 id="focusTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight">—</h2>
+
           <div id="focusMeta" class="muted text-sm"></div>
+
         </div>
+
         <button id="focusExitBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] shrink-0">Exit Focus ✕</button>
+
       </div>
+
+
 
       <div class="mt-4 flex flex-col items-center text-center gap-5">
         <div id="focusClock" class="clock-badge text-4xl tabular-nums">00:00</div>
@@ -446,82 +959,155 @@ vertical-align: middle;
           <button id="focusNextBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Next ▶</button>
         </div>
 
+
         <!-- Progress -->
+
         <div class="w-full">
+
           <div class="mb-1 flex items-center justify-between">
+
             <div class="block-sub">Progress</div>
+
             <div id="focusProgressPct" class="text-xs muted">0%</div>
+
           </div>
+
           <div id="focusProgressHost" class="relative w-full h-8 rounded-2xl overflow-hidden card">
+
             <div id="focusProgressFill" class="absolute left-0 top-0 bottom-0 transition-[width]" style="width:0%"></div>
+
             <div id="focusProgressSegments" class="absolute inset-0 flex"></div>
+
             <div id="focusProgressTicks" class="absolute inset-0 pointer-events-none"></div>
+
             <div id="focusScrubOverlay" class="absolute inset-0 cursor-pointer"></div>
+
           </div>
+
         </div>
+
+
 
         <!-- Links -->
+
         <div id="focusLinksWrap" class="w-full">
+
           <div class="flex items-center justify-between mt-2"><h3 class="block-title">Links</h3></div>
+
           <div id="focusLinks" class="section-links-bar mt-2"></div>
+
         </div>
+
+
 
         <!-- Description (header added) -->
+
         <div class="w-full">
+
           <div class="flex items-center justify-between mt-2"><h3 class="block-title">Description</h3></div>
+
           <div id="focusDesc" class="text-sm whitespace-pre-wrap w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]"></div>
+
         </div>
+
       </div>
+
     </div>
+
   </div>
+
 </div>
 
+
+
 <!-- ======= SETTINGS (panel) ======= -->
+
 <div id="settingsModal" class="modal hidden" aria-hidden="true">
+
   <div class="modal-backdrop" data-close="1"></div>
+
   <div class="modal-panel max-w-[760px]" role="dialog" aria-modal="true">
     <div class="flex items-center justify-between mb-3">
+
       <h3 class="text-lg font-semibold">Settings</h3>
+
       <button class="btn-xxs" data-close="1">✕</button>
+
     </div>
+
+
 
     <div class="grid md:grid-cols-2 gap-4">
       <div class="card p-3">
+
         <h4 class="block-title mb-2">Appearance</h4>
+
         <div class="grid grid-cols-2 gap-3">
+
           <label class="flex flex-col gap-1"><span class="text-sm">Background</span><input id="setBg" type="color" class="input h-10 p-1"/></label>
+
           <label class="flex flex-col gap-1"><span class="text-sm">Text</span><input id="setFg" type="color" class="input h-10 p-1"/></label>
+
           <label class="flex flex-col gap-1"><span class="text-sm">Accent</span><input id="setAccent" type="color" class="input h-10 p-1"/></label>
+
           <label class="flex flex-col gap-1"><span class="text-sm">Border</span><input id="setBorder" type="color" class="input h-10 p-1"/></label>
+
           <label class="flex flex-col gap-1"><span class="text-sm">Border width (px)</span><input id="setBorderW" type="number" min="0" max="6" step="1" class="input"/></label>
+
           <label class="col-span-2 flex items-center gap-2 mt-1">
+
             <input id="setFocusDefault" type="checkbox"/> <span>Start in focus mode by default</span>
+
           </label>
+
         </div>
+
       </div>
+
+
 
       <div class="card p-3">
         <h4 class="block-title mb-2">Sound</h4>
         <div class="space-y-3">
+
           <div class="flex items-center gap-2">
+
             <label class="text-sm w-20">Volume</label>
+
             <input id="setVol" type="range" min="0" max="1" step="0.01" class="flex-1"/>
+
             <button id="tonePreviewBtn" class="btn-xxs">Preview</button>
+
           </div>
+
           <div class="flex items-center gap-2">
+
             <label class="text-sm w-20">Ringtone</label>
+
             <select id="setTone" class="input flex-1">
+
               <option value="beep">Beep</option>
+
               <option value="bell">Bell</option>
+
               <option value="woodblock">Woodblock</option>
+
             </select>
+
           </div>
+
           <div class="flex items-center gap-2">
+
             <label class="text-sm w-20">Duration</label>
+
             <input id="setToneDur" type="range" min="0.1" max="2" step="0.1" class="flex-1"/>
+
             <span id="durLabel" class="text-xs muted w-12 text-right">0.6s</span>
+
           </div>
+
         </div>
+
       </div>
 
       <div class="card p-3">
@@ -543,124 +1129,269 @@ vertical-align: middle;
       </div>
     </div>
 
+
     <div class="mt-4 flex items-center justify-between">
+
       <button id="settingsResetBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Reset defaults</button>
+
       <div class="flex items-center gap-2">
+
         <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Close</button>
+
         <button id="settingsSaveBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
+
       </div>
+
     </div>
+
   </div>
 </div>
 
-<!-- ======= AUTH MODAL (unchanged layout) ======= -->
-<div id="authModal" class="modal hidden" aria-hidden="true">
+<!-- ======= AI PREVIEW (modal) ======= -->
+<div id="aiPreviewModal" class="modal hidden" aria-hidden="true">
   <div class="modal-backdrop" data-close="1"></div>
-  <div class="modal-panel max-w-[520px]" role="dialog" aria-modal="true">
-    <div class="mb-4">
-      <div class="flex items-center justify-between">
-        <h3 id="authTitle" class="text-xl font-semibold">Welcome back</h3>
-        <button class="btn-xxs" data-close="1">✕</button>
+  <div class="modal-panel max-w-[860px]" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-lg font-semibold">AI Outline Preview</h3>
+      <button class="btn-xxs" data-close="1">✕</button>
+    </div>
+    <div class="grid gap-3">
+      <label class="text-sm">Title
+        <input id="aiPrevTitle" class="input mt-1" placeholder="Outline title"/>
+      </label>
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <h4 class="block-title">Sections</h4>
+          <div class="text-xs muted">Edit before saving. Subsections are flattened in order.</div>
+        </div>
+        <ul id="aiPrevList" class="grid gap-2"></ul>
       </div>
+    </div>
+    <div class="mt-4 flex items-center justify-end gap-2">
+      <button id="aiPrevReviseBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Revise with AI</button>
+      <div class="spacer"></div>
+      <button id="aiPrevCancelBtn" class="px-3 py-2 rounded-xl border border-[var(--border)]">Cancel</button>
+      <button id="aiPrevSaveBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save Outline</button>
+    </div>
+  </div>
+  
+</div>
+
+
+<!-- ======= AUTH MODAL (unchanged layout) ======= -->
+
+<div id="authModal" class="modal hidden" aria-hidden="true">
+
+  <div class="modal-backdrop" data-close="1"></div>
+
+  <div class="modal-panel max-w-[520px]" role="dialog" aria-modal="true">
+
+    <div class="mb-4">
+
+      <div class="flex items-center justify-between">
+
+        <h3 id="authTitle" class="text-xl font-semibold">Welcome back</h3>
+
+        <button class="btn-xxs" data-close="1">✕</button>
+
+      </div>
+
       <p id="authSubtitle" class="text-sm muted mt-1">Sign in to sync your data across devices.</p>
+
     </div>
 
+
+
     <div class="space-y-3">
+
       <button id="googleBtn" class="w-full px-3 py-2 rounded-xl border border-[var(--border)] flex items-center justify-center gap-2">
+
         <img alt="" src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5"/> Continue with Google
+
       </button>
+
+
 
       <div class="auth-sep"><span>or</span></div>
 
+
+
       <div id="emailFields" class="grid gap-2">
+
         <input id="emailInput" type="email" class="input" placeholder="Email"/>
+
         <input id="passInput" type="password" class="input" placeholder="Password"/>
+
       </div>
+
+
 
       <div id="signinRow" class="flex flex-wrap gap-3 justify-center">
+
         <button id="emailSignInBtn" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white btn-wide">Sign in</button>
+
         <button id="emailResetBtn" class="px-3 py-2 rounded-xl border border-[var(--border)] btn-wide">Reset password</button>
+
       </div>
+
+
 
       <div id="signupRow" class="hidden flex justify-center">
+
         <button id="emailSignUpBtn" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white btn-wide">Create account</button>
+
       </div>
+
+
 
       <div class="text-sm text-center mt-2">
+
         <span id="toggleAuthMode" class="underline cursor-pointer">New here? Create an account</span>
+
       </div>
+
     </div>
+
   </div>
+
 </div>
+
+
 
 <!-- ======= UI TOUR OVERLAY ======= -->
+
 <!-- Backdrop (below spotlight) -->
+
 <div id="tourOverlay" class="tour hidden" aria-hidden="true">
+
   <div class="tour-backdrop" data-close="1"></div>
+
 </div>
+
 <!-- Big spotbox for grouped highlights -->
+
 <div id="tourSpotBox" class="tour-spotbox hidden" aria-hidden="true"></div>
+
 <!-- Floating (always on top) arrow + panel -->
+
 <div id="tourArrow" class="tour-arrow hidden" aria-hidden="true"></div>
+
 <div id="tourPanel" class="tour-panel hidden" role="dialog" aria-live="polite">
+
   <div id="tourStepTitle" class="tour-title">Welcome to Skillflow</div>
+
   <div id="tourStepBody" class="tour-body">We’ll show you the basics in a few small steps.</div>
+
   <div class="tour-actions">
+
     <button id="tourPrev" class="btn-xxs" disabled>◀ Back</button>
+
     <div class="spacer"></div>
+
     <button id="tourNext" class="btn-xxs">Next ▶</button>
+
     <button id="tourFinish" class="btn-xxs hidden">Finish ✓</button>
+
   </div>
+
 </div>
+
+
 
 <!-- ======= TOAST HOST ======= -->
+
 <div id="toastHost" class="toast-host"></div>
 
+
+
 <!-- ======= APP SCRIPT ======= -->
+
 <script type="module">
+
 /*************** Firebase ***************/
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
+
 import {
+
   getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut,
+
   createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail
+
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+
 import { getFirestore, doc, getDoc, setDoc, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-functions.js";
 
+
 import { setupSavedOutlines } from "./saved-outlines.js";
 
+
+
 /*************** Firebase config ***************/
+
 const firebaseConfig = {
+
   apiKey: "AIzaSyAMyUlfqqOlnt-kHO-C-vB_rzJ-9eudxck",
+
   authDomain: "chessstudyplanner.firebaseapp.com",
+
   projectId: "chessstudyplanner",
+
   storageBucket: "chessstudyplanner.firebasestorage.app",
+
   messagingSenderId: "73363049381",
+
   appId: "1:73363049381:web:48da4a1e06b9744fccf64c",
+
   measurementId: "G-8PE090JLZH"
+
 };
+
 const app = initializeApp(firebaseConfig);
+
 getAnalytics(app);
 
+
+
 /*************** Local state + helpers ***************/
+
 const saveJSON = (k,v)=> localStorage.setItem(k, JSON.stringify(v));
+
 const loadJSON = (k)=> { try{ return JSON.parse(localStorage.getItem(k)); }catch{ return null } };
+
 const $ = (q)=> document.querySelector(q);
+
 const $$ = (q)=> Array.from(document.querySelectorAll(q));
 
+
+
 /* Mobile nav toggle handled later in dedicated section. */
+
 const navToggle = $('#navToggle');
+
 const topbar = $('#topbar');
 
+
+
 // Primary state
+
 let currentSession = loadJSON('current_session_v1') || [];
+
 let sectionNotes = loadJSON('section_notes_v1') || {};
+
 let widgetShelf = loadJSON('linkShelf_v1') || [
+
   { id:'w_lichess', label:'Lichess', url:'https://lichess.org', icon:'img', img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+
   { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img', img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+
   { id:'w_chessable',label:'Chessable', url:'https://www.chessable.com', icon:'emoji', emoji:'📘' }
+
 ];
+
 let prefs = loadJSON('prefs_v1') || {
   splitRatio:56,
   outlineCollapsed:false,
@@ -675,67 +1406,124 @@ let timerState = loadJSON('timer_state_v2') || { sessionStarted:false, running:f
 // AI generation preferences
 let aiPrefs = loadJSON('ai_prefs_v1') || { includeDescriptions:true, includeLinks:true, includeSubsections:true, maxLinksPerSection: 5, model:'gpt-5-mini' };
 
+
 /*************** Cloud ***************/
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app, "us-central1");
 const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: "select_account" });
+
 const cloudStatus = $('#cloudStatus');
+
 let currentUser = null;
+
 const userDocRef = (uid)=> doc(db, 'users', uid, 'apps', 'chess_planner_v2');
 
+
+
 const debounce = (fn,ms=1000)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms);} };
+
 let dirty = false;
+
 const markDirty = ()=> { dirty = true; };
+
 const setLocalMode = (m='Local mode')=> cloudStatus.textContent = m;
+
   const setCloudMode = (m='Cloud sync on')=> cloudStatus.textContent = m;
 
+
 async function saveCloudNow(){
+
   if(!currentUser) return;
+
   try{
+
     await setDoc(userDocRef(currentUser.uid), {
+
       currentSession,
+
       notes: sectionNotes,
+
       prefs,
+
       widgetShelf,
+
       savedOutlines,
+
       folders: savedFolders,
+
       sectionDone: (window.__sectionDone || {}),
+
       timer: timerState,
+
       updatedAt: serverTimestamp(),
+
       sessions: deleteField(),
+
       activePreset: deleteField()
+
     }, { merge:true });
+
     cloudStatus.textContent = 'Saved to cloud ?';
+
     dirty = false;
+
   }catch(e){ cloudStatus.textContent='Cloud save failed'; }
+
 }
 
+
+
 const saveCloudDebounced = debounce(async ()=>{
+
   if(!currentUser) return;
+
   try{
+
     await setDoc(userDocRef(currentUser.uid), {
+
       currentSession, notes: sectionNotes, prefs, widgetShelf, savedOutlines, folders: savedFolders,
+
       timer: timerState, updatedAt: serverTimestamp(), sessions: deleteField(), activePreset: deleteField()
+
     }, { merge:true });
+
     cloudStatus.textContent = 'Saved to cloud ✓';
+
     dirty = false;
+
   }catch(e){ cloudStatus.textContent='Cloud save failed'; }
+
 }, 1200);
+
+
 
 const touchCloud = ()=> { if(currentUser){ saveCloudNow(); } };
 
+
+
 // Periodic flush
+
 // Immediate save model: no interval
+
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ if(currentUser) saveCloudNow(); } });
+
 window.addEventListener('beforeunload', ()=>{ if(currentUser) saveCloudNow(); });
 
+
+
 // Local save wrappers
+
 const saveCurrentSession = ()=>{ saveJSON('current_session_v1', currentSession); markDirty(); touchCloud(); };
+
 const saveNotes = ()=>{ saveJSON('section_notes_v1', sectionNotes); markDirty(); touchCloud(); };
+
 const saveShelf = ()=>{ saveJSON('linkShelf_v1', widgetShelf); markDirty(); touchCloud(); };
+
 const savePrefs = ()=>{ saveJSON('prefs_v1', prefs); markDirty(); touchCloud(); };
 const saveOutlinesLocal = ()=>{ saveJSON('saved_outlines_v1', savedOutlines); markDirty(); touchCloud(); };
+
 const saveFoldersLocal = ()=>{ saveJSON('outline_folders_v1', savedFolders); markDirty(); touchCloud(); };
   const saveTimerLocal = ()=>{ saveJSON('timer_state_v2', timerState); markDirty(); touchCloud(); };
 
@@ -774,7 +1562,9 @@ async function aiGenerateSchedule(brief, constraints = {}, options = {}){
 // Expose for wiring/UI later
 window.aiGenerateSchedule = aiGenerateSchedule;
 
+
 /*************** Tabs (delegated) ***************/
+
 const __routeFor = { overviewTab:'overview', homeTab:'home', savedTab:'saved', helpTab:'help', pricingTab:'pricing' };
 const __tabFor = (route)=>{
   route = String(route||'').replace(/^#/,'').toLowerCase();
@@ -809,129 +1599,235 @@ function showTab(id, skipHash){
   }
 }
 const tabsBar = document.querySelector('.topnav-links');
+
 if(tabsBar){
+
   tabsBar.addEventListener('click', (e)=>{
     const btn = e.target.closest('.tab-link'); if(!btn) return;
     // Let hash routing handle it, but update immediately
     showTab(btn.dataset.tab);
   });
 
+
   // If pricing-tab.js also injects a button, keep only one
+
   const dup = tabsBar.querySelectorAll('.tab-link[data-tab="pricingTab"]');
+
   if(dup.length > 1){ dup.forEach((el,i)=>{ if(i>0) el.remove(); }); }
+
 }
 
+
+
 // Clickable brand logo → Overview (desktop + phone)
+
 try{
+
   const brandEl = document.querySelector('#topbar .brand');
+
   const goOverview = (e)=>{ e.preventDefault(); location.hash = '#overview'; showTab('overviewTab'); document.getElementById('topbar')?.classList.remove('nav-open'); document.body.classList.remove('drawer-open'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   if(brandEl){
+
     brandEl.addEventListener('click', goOverview);
+
     brandEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ goOverview(e); } });
+
     brandEl.setAttribute('role','button');
+
     brandEl.setAttribute('tabindex','0');
+
   }
+
 }catch{}
+
 document.querySelectorAll('[data-tab-jump]').forEach(b=> b.onclick = ()=>{ const id=b.dataset.tabJump; const route = __routeFor[id]||'overview'; location.hash = '#'+route; showTab(id); });
 
 // Hash routing: show tab from URL
 function applyRouteFromHash(){ const tab = __tabFor(location.hash||'overview'); showTab(tab, true); }
 window.addEventListener('hashchange', applyRouteFromHash);
 
+
 /*************** Reveal-on-scroll for Overview ***************/
+
 const revealEls = $$('.reveal');
+
 const io = new IntersectionObserver((entries)=>{
+
   entries.forEach(en=>{
+
     if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
+
   });
+
 }, { threshold: 0.12 });
+
 revealEls.forEach(el=> io.observe(el));
 
+
+
 /*************** Toast + in‑page dialogs ***************/
+
 const toastHost = $('#toastHost');
+
 function showToast(msg, type='info', ms=3000){
+
   const t = document.createElement('div');
+
   t.className = `toast ${type}`;
+
   t.textContent = msg;
+
   toastHost.appendChild(t);
+
   setTimeout(()=> t.classList.add('in'), 10);
+
   setTimeout(()=> { t.classList.remove('in'); setTimeout(()=>t.remove(), 220); }, ms);
+
 }
+
 function sfConfirm(message){
+
   return new Promise(resolve=>{
+
     const m = document.createElement('div');
+
     m.className = 'modal';
+
     m.innerHTML = `
+
       <div class="modal-backdrop" data-close="x"></div>
+
       <div class="modal-panel max-w-[420px]">
+
         <div class="mb-2 block-title">Please confirm</div>
+
         <p class="text-sm muted mb-3">${message}</p>
+
         <div class="flex justify-end gap-2">
+
           <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="x" data-val="0">Cancel</button>
+
           <button class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white" data-val="1">Confirm</button>
+
         </div>
+
       </div>`;
+
     document.body.appendChild(m);
+
     m.addEventListener('click', (e)=>{
+
       const v = e.target?.dataset?.val;
+
       if(v==='1'){ cleanup(); resolve(true); }
+
       if(e.target?.dataset?.close==='x'){ cleanup(); resolve(false); }
+
     });
+
     function cleanup(){ m.classList.add('hidden'); setTimeout(()=>m.remove(), 140); }
+
   });
+
 }
+
 function sfPrompt(label, initial=''){
+
   return new Promise(resolve=>{
+
     const m = document.createElement('div');
+
     m.className = 'modal';
+
     m.innerHTML = `
+
       <div class="modal-backdrop" data-close="x"></div>
+
       <div class="modal-panel max-w-[420px]">
+
         <div class="mb-2 block-title">${label}</div>
+
         <input id="dlgVal" class="input w-full mb-3" value="${initial}"/>
+
         <div class="flex justify-end gap-2">
+
           <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="x">Cancel</button>
+
           <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-ok="1">OK</button>
+
         </div>
+
       </div>`;
+
     document.body.appendChild(m);
+
     const inp = m.querySelector('#dlgVal'); inp.focus(); inp.select();
+
     m.addEventListener('click', (e)=>{
+
       if(e.target?.dataset?.ok==='1'){ finish(inp.value); }
+
       if(e.target?.dataset?.close==='x'){ finish(null); }
+
     });
+
     function finish(v){ m.classList.add('hidden'); setTimeout(()=>m.remove(), 140); resolve(v); }
+
   });
+
 }
+
 // make available to Saved Outlines module
+
 window.sfConfirm = sfConfirm;
 window.sfPrompt = sfPrompt;
 // Auth helpers usable from other modules
 window.openAuthModal = ()=>{ try{ showModal(authModal); }catch{} };
 window.requireAuth = ()=>{ if(!currentUser){ try{ showModal(authModal); }catch{} return false; } return true; };
 
+
 /*************** Progress / Timer ***************/
+
 const startBtn = $('#startBtn'); const prevBtn=$('#prevBtn'); const nextBtn=$('#nextBtn'); const resetBtn=$('#resetBtn');
 const readyNextBtn = $('#readyNextBtn');
 
+
 const currentTitleEl = $('#currentTitle'); const sectionDescEl=$('#sectionDesc'); const linksDiv=$('#links');
+
 const linkShelfDiv=$('#linkShelf'); const shelfWrap=$('#shelfWrap'); const editSectionBtn=$('#editSectionBtn'); const clearSectionLinksBtn=$('#clearSectionLinks');
+
 const addWidgetBtn=$('#addWidgetBtn'); const resetShelfBtn=$('#resetShelfBtn');
 
+
+
 const editTitleInline = $('#editTitleInline');
+
 const currentDurDisp = $('#currentDurDisp');
+
 const editDurInline = $('#editDurInline');
+
 const editMinsInline = $('#editMinsInline');
+
 const editUnitInline = $('#editUnitInline');
 
+
+
 const outline=$('#outline'); const addOutlineItemBtn=$('#addOutlineItem'); const inlineAddRow=$('#inlineAddRow');
+
 const addTitleInput=$('#addTitleInput'); const addMinsInput=$('#addMinsInput'); const addConfirmBtn=$('#addConfirmBtn'); const addCancelBtn=$('#addCancelBtn');
+
 const totalMins=$('#totalMins'); const clockEl=$('#clock');
 
+
+
 const progressHost=$('#progressHost'), progressFill=$('#progressFill'), progressSegments=$('#progressSegments'),
+
 progressTicks=$('#progressTicks'), progressPctEl=$('#progressPct'), legend=$('#legend'), scrubOverlay=$('#scrubOverlay');
 
+
+
 // Focus Mode elements
+
 const focusOverlay = $('#focusOverlay');
 const focusModeBtn = $('#focusModeBtn');
 const focusExitBtn = $('#focusExitBtn');
@@ -945,130 +1841,250 @@ const focusReadyBtn= $('#focusReadyNextBtn');
 const focusPrevBtn = $('#focusPrevBtn');
 const focusNextBtn = $('#focusNextBtn');
 
+
 const focusProgressHost=$('#focusProgressHost'), focusProgressFill=$('#focusProgressFill'),
+
 focusProgressSegments=$('#focusProgressSegments'), focusProgressTicks=$('#focusProgressTicks'),
+
 focusProgressPctEl=$('#focusProgressPct'), focusScrubOverlay=$('#focusScrubOverlay');
+
+
 
 const focusLinksDiv = $('#focusLinks');
 
+
+
 // Split panes (drag-to-resize)
+
 const splitEl = $('#split'), leftPane = $('#leftPane'), rightPane = $('#rightPane'), splitHandle = $('#splitHandle');
+
 function applySplitRatio(r){ splitEl?.style?.setProperty('--leftRatio', (r||56) + '%'); }
+
 applySplitRatio(prefs.splitRatio||56);
+
 let draggingSplit=false, splitLast= prefs.splitRatio||56;
+
 splitHandle?.addEventListener('pointerdown', (e)=>{
+
   draggingSplit=true; splitHandle.setPointerCapture(e.pointerId); document.body.classList.add('no-select'); onSplitMove(e);
+
 });
+
 splitHandle?.addEventListener('pointermove', (e)=>{ if(draggingSplit) onSplitMove(e); });
+
 splitHandle?.addEventListener('pointerup', ()=>{ if(!draggingSplit) return; draggingSplit=false; document.body.classList.remove('no-select'); prefs.splitRatio = Math.round(splitLast*10)/10; savePrefs(); });
+
 function onSplitMove(e){
+
   const rect = splitEl.getBoundingClientRect(); const x = Math.max(rect.left, Math.min(e.clientX, rect.right));
+
   const total = rect.width; const minPx = 360; const minPct = (minPx/total)*100;
+
   let pct = ((x - rect.left)/total)*100; pct = Math.max(minPct, Math.min(100 - minPct, pct)); splitLast = pct; applySplitRatio(pct);
+
 }
 
+
+
 function minsToSecs(m){ return Math.max(0, Math.round(m*60)); }
+
 function secsToClock(s){ const mm=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${mm}:${ss}`; }
+
 function scheduleTotalSecs(s){ return s.reduce((a,b)=>a+minsToSecs(b.minutes||0),0); }
+
 function elapsedSeconds(sched, idx, secsLeft){ const past=sched.slice(0,idx).reduce((a,b)=>a+minsToSecs(b.minutes||0),0); const cur=sched[idx]?minsToSecs(sched[idx].minutes||0)-secsLeft:0; return past+cur; }
+
 function toMinutesValue(value, unit){ const v=Number(value)||0; if(unit==='seconds') return v/60; if(unit==='hours') return v*60; return v; }
+
+
 
 let running=false, rafId=null, bgTickId=null, endTimeMs=null, secondsLeft=0, currentIndex=0, sessionStarted=false, totalSessionSecs=0, awaitingNext=false;
 
+
+
 function isAtVeryStart(){
+
   if(!currentSession.length) return true;
+
   return elapsedSeconds(currentSession, currentIndex, secondsLeft) === 0;
+
 }
+
+
 
 function setClockText(txt){ if(clockEl) clockEl.textContent = txt; if(focusClockEl) focusClockEl.textContent = txt; }
+
 function updateClockColor(){
+
   const apply = (el)=>{ if(!el) return; el.classList.remove('text-emerald-600','text-rose-600'); if(sessionStarted){ (running?el.classList.add('text-emerald-600'):el.classList.add('text-rose-600')); } };
+
   apply(clockEl); apply(focusClockEl);
-}
-function updateStartBtnLabel(){
-  const label = running ? 'Pause Session' : (isAtVeryStart() ? 'Start Study Session' : 'Resume Session');
-  if(startBtn) startBtn.textContent = label;
-  if(focusStartBtn) focusStartBtn.textContent = label;
-  const disable = !!awaitingNext;
-  if(startBtn) startBtn.disabled = disable;
-  if(focusStartBtn) focusStartBtn.disabled = disable;
+
 }
 
-function setTimerFromState(st){
-  sessionStarted=!!st.sessionStarted; running=false; currentIndex=st.currentIndex||0; secondsLeft=Math.max(0,Math.round(st.secondsLeft||0));
-  awaitingNext = !!st.awaitingNext;
-  if(st.running && st.lastSyncTs){
-    let delta=Math.floor((Date.now()-st.lastSyncTs)/1000), idx=currentIndex, remain=secondsLeft;
-    while(delta>0 && currentSession[idx]){
-      if(delta>=remain){ delta-=remain; idx++; remain=currentSession[idx]?minsToSecs(currentSession[idx].minutes||0):0; }
-      else{ remain-=delta; delta=0; }
-    }
-    currentIndex=Math.min(idx, Math.max(0,currentSession.length-1)); secondsLeft=Math.max(0,remain||0);
-  }
-  totalSessionSecs=scheduleTotalSecs(currentSession);
-  renderAll();
-  if(awaitingNext) showNextGate(); else hideNextGate();
-  updateStartBtnLabel();
+function updateStartBtnLabel(){
+  const label = running ? 'Pause Session' : (isAtVeryStart() ? 'Start Study Session' : 'Resume Session');
+
+  if(startBtn) startBtn.textContent = label;
+
+  if(focusStartBtn) focusStartBtn.textContent = label;
+
+  const disable = !!awaitingNext;
+
+  if(startBtn) startBtn.disabled = disable;
+
+  if(focusStartBtn) focusStartBtn.disabled = disable;
+
 }
-function syncEnd(){ endTimeMs = performance.now() + secondsLeft * 1000; }
-function tick(){
-  if(!running) return;
-  const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
-  if(remaining !== secondsLeft){
-    secondsLeft = remaining;
-    setClockText(secsToClock(secondsLeft));
-    updateProgress();
+
+
+
+function setTimerFromState(st){
+
+  sessionStarted=!!st.sessionStarted; running=false; currentIndex=st.currentIndex||0; secondsLeft=Math.max(0,Math.round(st.secondsLeft||0));
+
+  awaitingNext = !!st.awaitingNext;
+
+  if(st.running && st.lastSyncTs){
+
+    let delta=Math.floor((Date.now()-st.lastSyncTs)/1000), idx=currentIndex, remain=secondsLeft;
+
+    while(delta>0 && currentSession[idx]){
+
+      if(delta>=remain){ delta-=remain; idx++; remain=currentSession[idx]?minsToSecs(currentSession[idx].minutes||0):0; }
+
+      else{ remain-=delta; delta=0; }
+
+    }
+
+    currentIndex=Math.min(idx, Math.max(0,currentSession.length-1)); secondsLeft=Math.max(0,remain||0);
+
   }
+
+  totalSessionSecs=scheduleTotalSecs(currentSession);
+
+  renderAll();
+
+  if(awaitingNext) showNextGate(); else hideNextGate();
+
+  updateStartBtnLabel();
+
+}
+
+function syncEnd(){ endTimeMs = performance.now() + secondsLeft * 1000; }
+
+function tick(){
+
+  if(!running) return;
+
+  const remaining = Math.max(0, Math.ceil((endTimeMs - performance.now())/1000));
+
+  if(remaining !== secondsLeft){
+
+    secondsLeft = remaining;
+
+    setClockText(secsToClock(secondsLeft));
+
+    updateProgress();
+
+  }
+
   if(secondsLeft <= 0){
+
     if(currentIndex < currentSession.length - 1){
       try{ const cur = currentSession[currentIndex]; sendNotify('Section complete', (cur?.name||'Next section ready')); }catch{}
       stopTimer();
+
       awaitingNext = true;
+
       showNextGate();
+
       tone(); // use prefs
+
       markTimer();
+
       return;
+
     } else {
+
       stopTimer();
+
       tone();
+
       sessionStarted = false;
       updateStartBtnLabel();
       try{ sendNotify('Session complete', 'Great work!'); }catch{}
       markTimer();
+
       showToast('Session complete! 🎉','success', 3500);
+
       return;
+
     }
+
   }
+
 }
+
 function startTimer(){
+
   if(running) return;
+
   running = true; syncEnd();
+
   loop();
+
   if(bgTickId) clearInterval(bgTickId);
+
   bgTickId = setInterval(tick, 1000);
+
   updateStartBtnLabel(); updateClockColor(); markTimer();
+
 }
+
 function stopTimer(){
+
   running = false;
+
   if(rafId) cancelAnimationFrame(rafId); rafId = null;
+
   if(bgTickId) clearInterval(bgTickId); bgTickId = null;
+
   updateStartBtnLabel(); updateClockColor(); markTimer();
+
 }
+
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'hidden'){ if(running) tick(); }});
+
 function loop(){ if(!running) return; tick(); rafId = requestAnimationFrame(loop); }
+
+
 
 const markTimer = ()=>{ timerState={ sessionStarted,running,currentIndex,secondsLeft,lastSyncTs:Date.now(), awaitingNext }; saveTimerLocal(); };
 
+
+
 function proceedNext(){
+
   if(!awaitingNext) return;
+
   awaitingNext=false; hideNextGate();
+
   if(currentIndex<currentSession.length-1){
+
     currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); syncEnd(); startTimer(); renderAll(); markTimer();
+
   }
+
 }
+
 function showNextGate(){ readyNextBtn.classList.remove('hidden'); if(focusReadyBtn) focusReadyBtn.classList.remove('hidden'); updateStartBtnLabel(); }
+
 function hideNextGate(){ readyNextBtn.classList.add('hidden'); if(focusReadyBtn) focusReadyBtn.classList.add('hidden'); updateStartBtnLabel(); }
+
 readyNextBtn.onclick = proceedNext; focusReadyBtn && (focusReadyBtn.onclick = proceedNext);
+
+
 
 startBtn.onclick = async ()=>{
   if(!currentSession.length) return;
@@ -1091,44 +2107,81 @@ focusNextBtn && (focusNextBtn.onclick = ()=> nextBtn.click());
 
 
 
+
 prevBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex>0){ currentIndex--; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } updateStartBtnLabel(); };
+
 nextBtn.onclick = ()=>{ awaitingNext=false; hideNextGate(); if(currentIndex<currentSession.length-1){ currentIndex++; secondsLeft=minsToSecs(currentSession[currentIndex].minutes||0); if(running) syncEnd(); renderAll(); markTimer(); } else stopTimer(); updateStartBtnLabel(); };
 
+
+
 // Full reset: restore from Saved if an active outline exists
+
 resetBtn.onclick = async ()=>{
   awaitingNext=false; hideNextGate(); stopTimer(); sessionStarted=false; try{ window.__sectionDone = window.__sectionDone || {}; const sd = window.__sectionDone; for(const k in sd){ if(Object.prototype.hasOwnProperty.call(sd,k)) delete sd[k]; } markDirty(); if(typeof saveCloudNow=="function") saveCloudNow(); }catch{}
   const activeId = (timerState && timerState.outlineId) || null;
+
   if(activeId){
+
     const o = savedOutlines.find(x=>x.id===activeId);
+
     if(o){
+
       applyOutlineToCurrent(o); // clones + resets seconds
+
       showToast('Outline restored from Saved.','info');
+
       return;
+
     }
+
   }
+
   currentIndex=0; secondsLeft=minsToSecs((currentSession[0]||{}).minutes||0); renderAll(); updateStartBtnLabel(); markTimer();
+
 };
 
+
+
 // Manual completion flags for legend (persist during this session)
+
 window.__sectionDone = window.__sectionDone || {};
+
 const sectionDone = window.__sectionDone;
+
 function buildProgress(){
+
   const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
+
   progressSegments.innerHTML=''; legend.innerHTML=''; progressTicks.innerHTML='';
+
   sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; progressSegments.appendChild(seg); });
+
   let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); progressTicks.appendChild(tick); }
+
   sched.forEach((sec,i)=>{ const key=(sec&&sec.id)?('id:'+sec.id):('idx:'+i); const chip=document.createElement('button'); chip.type='button'; chip.className='chip'; chip.dataset.idx=String(i); const nameSpan=document.createElement('span'); nameSpan.textContent=String(sec?.name||''); const timeSpan=document.createElement('span'); timeSpan.className='opacity-80'; timeSpan.textContent=`(${sec.minutes||0}m)`; const box=document.createElement('input'); box.type='checkbox'; box.className='legend-tick'; box.checked=!!sectionDone[key]; if(box.checked) chip.classList.add('legend-done'); box.addEventListener('click',(e)=>{ e.stopPropagation(); }); box.addEventListener('change',()=>{ sectionDone[key]=!!box.checked; chip.classList.toggle('legend-done', box.checked); try{ markDirty(); saveCloudNow(); }catch{} }); chip.onclick=()=>jumpToSection(i); chip.appendChild(nameSpan); chip.appendChild(timeSpan); chip.appendChild(box); legend.appendChild(chip); });
+
   updateProgress(); buildFocusProgress();
+
 }
+
 function buildFocusProgress(){
+
   if(!focusProgressHost) return;
+
   const sched=currentSession; const total=scheduleTotalSecs(sched)||1;
+
   focusProgressSegments.innerHTML=''; focusProgressTicks.innerHTML='';
+
   sched.forEach(sec=>{ const w=(minsToSecs(sec.minutes||0)/total)*100; const seg=document.createElement('div'); seg.className='h-full relative bg-white/50'; seg.style.width=`${w}%`; focusProgressSegments.appendChild(seg); });
+
   let cum=0; for(let i=1;i<sched.length;i++){ cum+=minsToSecs(sched[i-1].minutes||0); const pct=(cum/total)*100; const tick=document.createElement('div'); Object.assign(tick.style,{position:'absolute',left:pct+'%',top:'0',bottom:'0',width:'2px',background:'rgba(0,0,0,.55)'}); focusProgressTicks.appendChild(tick); }
+
   updateFocusProgress();
+
 }
+
 function updateLegendActive(){ legend.querySelectorAll('.chip').forEach((el, i)=> el.classList.toggle('chip-active', i===currentIndex)); }
+
 function updateProgress(){
   const sched = currentSession;
   const total = scheduleTotalSecs(sched);
@@ -1172,518 +2225,1030 @@ function disableNotifications(){ prefs.notifyEnabled=false; savePrefs(); updateN
 function updateNotifyBtn(){ /* legacy button removed */ }
 function sendNotify(title, body){ try{ if(prefs.notifyEnabled && canNotify() && Notification.permission==='granted'){ new Notification(title, { body, icon:'./logo2.png' }); } }catch{} }
 function updateFocusProgress(){
+
   if(!focusProgressFill || !focusProgressPctEl) return;
+
   const sched=currentSession; const total=scheduleTotalSecs(sched);
+
   if(!total){ focusProgressFill.style.width='0%'; focusProgressPctEl.textContent='0%'; return; }
+
   const pct=Math.min(100,Math.max(0,(elapsedSeconds(sched,currentIndex,secondsLeft)/total)*100));
+
   focusProgressFill.style.width = pct + '%'; focusProgressPctEl.textContent = Math.floor(pct) + '%';
+
 }
+
+
 
 function pctFromEvent(e){
+
   const rect=progressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width));
+
 }
+
 function pctFromEventFocus(e){
+
   const rect=focusProgressHost.getBoundingClientRect(); const x=(e.clientX ?? (e.touches?.[0]?.clientX ?? 0))-rect.left; return Math.max(0,Math.min(1,x/rect.width));
+
 }
+
 function jumpFromPct(p){
+
   const sched=currentSession; const total=scheduleTotalSecs(sched); let target=p*total; let cum=0;
+
   for(let i=0;i<sched.length;i++){
+
     const dur=minsToSecs(sched[i].minutes||0);
+
     if(target<cum+dur){
+
       currentIndex=i; secondsLeft=Math.max(0,Math.ceil(dur-(target-cum)));
+
       if(running) syncEnd(); renderAll(); markTimer(); awaitingNext=false; hideNextGate(); updateStartBtnLabel(); return;
+
     } cum+=dur;
+
   }
+
   currentIndex=sched.length-1; secondsLeft=0; stopTimer(); renderAll(); markTimer(); awaitingNext=false; hideNextGate(); updateStartBtnLabel();
+
 }
+
 let scrubbing=false;
+
 scrubOverlay.addEventListener('pointerdown',(e)=>{scrubbing=true;scrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEvent(e));});
+
 scrubOverlay.addEventListener('pointermove',(e)=>{if(scrubbing)jumpFromPct(pctFromEvent(e));});
+
 scrubOverlay.addEventListener('pointerup',()=>{scrubbing=false;});
+
 scrubOverlay.addEventListener('pointercancel',()=>{scrubbing=false;});
+
 let focusScrubbing=false;
+
 if(focusScrubOverlay){
+
   focusScrubOverlay.addEventListener('pointerdown',(e)=>{focusScrubbing=true;focusScrubOverlay.setPointerCapture(e.pointerId);jumpFromPct(pctFromEventFocus(e));});
+
   focusScrubOverlay.addEventListener('pointermove',(e)=>{if(focusScrubbing)jumpFromPct(pctFromEventFocus(e));});
+
   focusScrubOverlay.addEventListener('pointerup',()=>{focusScrubbing=false;});
+
   focusScrubOverlay.addEventListener('pointercancel',()=>{focusScrubbing=false;});
+
 }
+
 function jumpToSection(i){
+
   if(!currentSession[i]) return;
+
   awaitingNext=false; hideNextGate();
+
   currentIndex=i; secondsLeft=minsToSecs(currentSession[i].minutes||0);
+
   if(running) syncEnd(); renderAll(); markTimer(); updateStartBtnLabel();
+
 }
+
+
 
 /*************** Helpers ***************/
+
 function escapeHtml(s){ return (s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
 function parseDropPayload(dt){
+
   let data = ''; const types = dt?.types ? Array.from(dt.types) : [];
+
   if(types.includes('text/plain')) data = dt.getData('text/plain');
+
   if(!data && types.includes('text')) data = dt.getData('text');
+
   if(!data) data = dt.getData('application/json') || dt.getData('Text') || '';
+
   try{ return JSON.parse(data); }catch{ return null; }
+
 }
+
 function normalizeUrl(input){
+
   let u = (input || '').trim(); if(!u) return '';
+
   if(/^https?:\/\//i.test(u)) return u;
+
   u = u.replace(/^\/\//,'');
+
   const slash = u.indexOf('/'); let host = slash >= 0 ? u.slice(0, slash) : u; const rest = slash >= 0 ? u.slice(slash) : '';
+
   if(!/^www\./i.test(host)){ const parts = host.split('.'); if(parts.length === 2){ host = 'www.' + host; } }
+
   return 'https://' + host + rest;
+
 }
+
+
 
 function openWidgetEditor(widget, onSave, onCancel){
+
   // kept as an in‑page modal (no browser popup)
+
   const modal = document.createElement('div');
+
   modal.className = 'modal';
+
   modal.innerHTML = `
+
   <div class="modal-backdrop" data-close="1"></div>
+
   <div class="modal-panel max-w-[520px]">
+
     <div class="flex items-center justify-between mb-3">
+
       <h3 class="text-lg font-semibold">Edit link</h3>
+
       <button class="btn-xxs" data-close="1">✕</button>
+
     </div>
+
     <div class="grid gap-2">
+
       <label class="text-sm">Title <input id="wLabel" class="input mt-1" value="${escapeHtml(widget.label || '')}"/></label>
+
       <label class="text-sm">URL <input id="wUrl" class="input mt-1" value="${escapeHtml(widget.url || '')}" placeholder="https://… or aimchess.com"/></label>
+
       <label class="text-sm">Icon type
+
         <select id="wIcon" class="input mt-1">
+
           <option value="emoji" ${widget.icon!=='img'?'selected':''}>Emoji/Text</option>
+
           <option value="img" ${widget.icon==='img'?'selected':''}>Image URL</option>
+
         </select>
+
       </label>
+
       <label class="text-sm" id="emojiRow">Emoji/Text <input id="wEmoji" class="input mt-1" value="${escapeHtml(widget.emoji || '')}" placeholder="♟️"/></label>
+
       <label class="text-sm hidden" id="imgRow">Image URL <input id="wImg" class="input mt-1" value="${escapeHtml(widget.img || '')}" placeholder="https://…/icon.png"/></label>
+
     </div>
+
     <div class="mt-3 flex items-center justify-end gap-2">
+
       <button class="px-3 py-2 rounded-xl border border-[var(--border)]" data-close="1">Cancel</button>
+
       <button id="wSave" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">Save</button>
+
     </div>
+
   </div>`;
+
   document.body.appendChild(modal);
+
   const iconSel = modal.querySelector('#wIcon');
+
   const emojiRow = modal.querySelector('#emojiRow');
+
   const imgRow = modal.querySelector('#imgRow');
+
   const syncRows = ()=>{ const useImg = iconSel.value==='img'; emojiRow.classList.toggle('hidden', useImg); imgRow.classList.toggle('hidden', !useImg); };
+
   syncRows(); iconSel.addEventListener('change', syncRows);
+
   const close = ()=>{
+
     modal.classList.add('hidden'); setTimeout(()=>modal.remove(), 140);
+
   };
+
   modal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1'){ onCancel && onCancel(); close(); } });
+
   const onEsc = (e)=>{ if(e.key==='Escape'){ onCancel && onCancel(); close(); document.removeEventListener('keydown', onEsc);} };
+
   document.addEventListener('keydown', onEsc);
+
   modal.querySelector('#wSave').onclick = ()=>{
+
     const label = modal.querySelector('#wLabel').value.trim() || 'Untitled';
+
     let url = modal.querySelector('#wUrl').value.trim() || '';
+
     url = normalizeUrl(url);
+
     const icon = iconSel.value==='img' ? 'img' : 'emoji';
+
     let emoji='', img='';
+
     if(icon==='img') img = modal.querySelector('#wImg').value.trim();
+
     else emoji = modal.querySelector('#wEmoji').value.trim() || '🔗';
+
     onSave({ label, url, icon, emoji, img });
+
     onCancel = null; close();
+
   };
+
 }
+
+
 
 // Expose for modules (Saved tab uses window.openWidgetEditor)
+
 window.openWidgetEditor = openWidgetEditor;
 
+
+
 /*************** Current panel (Home) ***************/
+
 let isEditingSection=false;
 
+
+
 const titleMeasureEl = document.createElement('span');
+
 titleMeasureEl.style.cssText = 'position:fixed;top:-9999px;left:-9999px;visibility:hidden;white-space:pre;font-weight:800;font-size:1.5rem;font-family:inherit;padding:0.5rem 0.75rem;';
+
 document.body.appendChild(titleMeasureEl);
 
+
+
 function autosizeTitleInput(){
+
   if(!editTitleInline) return;
+
   const val = editTitleInline.value || ' ';
+
   titleMeasureEl.textContent = val;
+
   const desired = Math.min(titleMeasureEl.offsetWidth + 24, Math.floor(window.innerWidth * 0.7));
+
   editTitleInline.style.width = Math.max(desired, 140) + 'px';
+
 }
+
+
 
 function saveMetaEdits(){
+
   const s = currentSession[currentIndex]; if(!s) return;
+
   const prevMinutes = Number(s.minutes) || 0; const prevTotalSec = minsToSecs(prevMinutes);
+
   const elapsedSec = Math.max(0, prevTotalSec - secondsLeft);
+
   const newTitle = (editTitleInline.value || '').trim() || s.name || 'Untitled';
+
   const newMinutes = Math.max(0.01, toMinutesValue(editMinsInline.value, editUnitInline.value));
+
   s.name = newTitle; s.minutes = newMinutes;
+
   if(currentSession[currentIndex]?.id === s.id){
+
     const newTotal = minsToSecs(newMinutes);
+
     secondsLeft = Math.max(0, newTotal - elapsedSec);
+
     if(running) syncEnd();
+
   }
+
   saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent(); updateStartBtnLabel(); markTimer(); syncSavedFromCurrent();
+
 }
+
+
 
 editSectionBtn.onclick = ()=>{ if(!isEditingSection){ isEditingSection = true; updateEditUI(); } else { saveMetaEdits(); isEditingSection = false; updateEditUI(); } };
+
 function updateEditUI(){
+
   shelfWrap.classList.toggle('hidden', !isEditingSection);
+
   clearSectionLinksBtn.classList.toggle('hidden', !isEditingSection);
+
   // Label simplified while editing
+
   editSectionBtn.textContent = isEditingSection ? 'Save' : 'Edit Section';
 
+
+
   const s = currentSession[currentIndex] || {};
+
   currentTitleEl.classList.toggle('hidden', isEditingSection);
+
   currentDurDisp.classList.toggle('hidden', isEditingSection);
+
   editTitleInline.classList.toggle('hidden', !isEditingSection);
+
   editDurInline.classList.toggle('hidden', !isEditingSection);
 
+
+
   if(isEditingSection){
+
     editTitleInline.value = s.name || '';
+
     autosizeTitleInput(); editTitleInline.focus(); editTitleInline.select();
+
     editMinsInline.value = (Number(s.minutes) || 0).toString();
+
     editUnitInline.value = 'minutes';
+
   }
+
   sectionDescEl.disabled = !isEditingSection;
+
   renderCurrentLinks(); renderShelf();
+
 }
+
 editTitleInline.addEventListener('input', autosizeTitleInput);
+
 window.addEventListener('resize', ()=>{ if(isEditingSection) autosizeTitleInput(); });
+
+
 
 function currentSectionRef(){ return currentSession[currentIndex]; }
 
+
+
 // Add widget
+
 addWidgetBtn.onclick = ()=>{ if(!isEditingSection) editSectionBtn.click();
+
   const wid = 'W'+Date.now().toString(36);
+
   const placeholder = { id: wid, label:'', url:'', icon:'emoji', emoji:'🔗', img:'' };
+
   widgetShelf = [...widgetShelf, placeholder]; saveShelf(); renderShelf();
+
   const onCancel = ()=>{ const idx = widgetShelf.findIndex(x=>x.id===wid); if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); } };
+
   openWidgetEditor(placeholder, (upd)=>{ upd.url = normalizeUrl(upd.url); const it = widgetShelf.find(x=>x.id===wid); if(it){ Object.assign(it, upd); saveShelf(); renderShelf(); } }, onCancel);
+
 };
+
 resetShelfBtn.onclick = async ()=>{ if(!await sfConfirm('Reset link shelf to defaults?')) return;
+
   widgetShelf = [
+
     { id:'w_lichess', label:'Lichess', url:'https://lichess.org', icon:'img', img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+
     { id:'w_analysis', label:'Lichess Analysis', url:'https://lichess.org/analysis', icon:'img', img:'https://lichess1.org/assets/logo/lichess-favicon-256.png' },
+
     { id:'w_chessable',label:'Chessable', url:'https://www.chessable.com', icon:'emoji', emoji:'📘' }
+
   ];
+
   saveShelf(); renderShelf();
+
 };
+
+
 
 function widgetCardHTML(w){
+
   const iconHtml = (w.icon==='img' && w.img)
+
     ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>`
+
     : `<span class="link-icon">${escapeHtml(w.emoji || '🔗')}</span>`;
+
   return `
+
   <div class="widget" data-wid="${escapeHtml(w.id)}">
+
     <div class="link-card draggable-shelf" draggable="${isEditingSection?'true':'false'}" data-wid="${escapeHtml(w.id)}" title="${escapeHtml(w.url || '')}" style="cursor:${isEditingSection?'grab':'default'}">
+
       ${iconHtml}
+
       <div class="min-w-0">
+
         <div class="truncate" style="font-size:.95rem">${escapeHtml(w.label || 'Untitled')}</div>
+
         <div class="text-xs muted truncate">${escapeHtml(w.url || '')}</div>
+
       </div>
+
     </div>
+
     ${isEditingSection ? `<button class="bin" data-act="del-shelf" title="Delete from shelf">🗑️</button>` : ''}
+
   </div>`;
+
 }
+
+
 
 // Widget shelf (edit mode)
+
 function renderShelf(){
+
   linkShelfDiv.innerHTML = widgetShelf.map(widgetCardHTML).join('');
 
+
+
   // Click to edit
+
   linkShelfDiv.querySelectorAll('.draggable-shelf').forEach(card=>{
+
     card.addEventListener('click', ()=>{ if(!isEditingSection) return;
+
       const w = widgetShelf.find(x=>x.id===card.dataset.wid); if(!w) return;
+
       openWidgetEditor(w, (upd)=>{ upd.url = normalizeUrl(upd.url); Object.assign(w, upd); saveShelf(); renderShelf(); });
+
     });
+
+
 
     // Drag payload
+
     card.addEventListener('dragstart', e=>{
+
       if(!isEditingSection){ e.preventDefault(); return; }
+
       const payloadStr = JSON.stringify({ type:'shelf', id:card.dataset.wid });
+
       try{
+
         e.dataTransfer.setData('text/plain', payloadStr);
+
         const img = new Image(); img.src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+
         if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img,0,0);
+
       }catch{}
+
       e.dataTransfer.effectAllowed='copy';
+
       card.classList.add('drag-ghost');
+
     });
+
     card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
+
   });
+
+
 
   // Delete from shelf
+
   linkShelfDiv.querySelectorAll('[data-act="del-shelf"]').forEach(btn=>{
+
     btn.addEventListener('click', (e)=>{
+
       e.stopPropagation();
+
       if(!isEditingSection) return;
+
       const wid = btn.closest('[data-wid]')?.dataset.wid || btn.parentElement?.dataset.wid;
+
       const idx = widgetShelf.findIndex(x=>x.id===wid);
+
       if(idx>=0){ widgetShelf.splice(idx,1); saveShelf(); renderShelf(); }
+
     });
+
   });
+
 }
+
+
 
 // Current section links — accepts shelf drops
+
 function renderCurrentLinks(){
+
   const sec=currentSectionRef(); const arr=sec?.links||[];
+
   linksDiv.innerHTML = arr.map((w,i)=>`
+
     <div class="widget" data-link-idx="${i}">
+
       <div class="link-card section-link" draggable="${isEditingSection?'true':'false'}" data-idx="${i}">
+
         ${w.icon==='img' && w.img ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>` : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`}
+
         <span class="truncate max-w-[14rem]">${escapeHtml(w.label||'Untitled')}</span>
+
       </div>
+
       ${isEditingSection ? `<button class="bin" data-act="del-link" title="Delete">🗑️</button>` : ''}
+
     </div>`).join('');
 
+
+
   // Drag existing pills (for reorder)
+
   linksDiv.querySelectorAll('.section-link').forEach(card=>{
+
     card.addEventListener('dragstart', e=>{
+
       if(!isEditingSection){ e.preventDefault(); return; }
+
       const index=Number(card.dataset.idx);
+
       const payloadStr = JSON.stringify({type:'reorder', index});
+
       try{
+
         e.dataTransfer.setData('text/plain', payloadStr);
+
         const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+
         if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
+
       }catch{}
+
       e.dataTransfer.effectAllowed='move';
+
       card.classList.add('drag-ghost');
+
     });
+
     card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
 
+
+
     // Click → edit (when editing) or open (when not)
+
     card.addEventListener('click', ()=>{
+
       const i = Number(card.dataset.idx); const target = sec.links[i]; if(!target) return;
+
       if(isEditingSection){
+
         openWidgetEditor(target, (upd)=>{
+
           upd.url = normalizeUrl(upd.url);
+
           Object.assign(target, upd);
+
           saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+
         });
+
       }else{
+
         const url = normalizeUrl(target.url||''); if(url) window.open(url,'_blank','noopener');
+
       }
+
     });
+
   });
+
+
 
   // Delete link
+
   if(isEditingSection){
+
     linksDiv.querySelectorAll('[data-act="del-link"]').forEach(btn=>{
+
       btn.addEventListener('click', (e)=>{
+
         e.stopPropagation();
+
         const pill = btn.closest('.widget')?.querySelector('.section-link'); const i = Number(pill?.dataset.idx ?? -1);
+
         if(i>=0){ sec.links.splice(i,1); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); }
+
       });
+
     });
+
   }
+
+
 
   // Accept drops (more permissive)
+
   if(isEditingSection){
+
     let over=0;
+
     linksDiv.addEventListener('dragenter', ()=>{ over++; linksDiv.classList.add('drag-over-outline'); });
+
     linksDiv.addEventListener('dragleave', ()=>{ over=Math.max(0,over-1); if(!over) linksDiv.classList.remove('drag-over-outline'); });
+
     linksDiv.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+
     linksDiv.addEventListener('drop', (e)=>{
+
       e.preventDefault(); linksDiv.classList.remove('drag-over-outline');
+
       let p=null; try{ p = parseDropPayload(e.dataTransfer); }catch{}
+
       if(!p) return;
 
+
+
       if(p.type==='shelf'){
+
         const wid = p.id; const w = widgetShelf.find(x=>x.id===wid); if(!w) return;
+
         sec.links = sec.links || [];
+
         sec.links.push({ label:w.label, url:normalizeUrl(w.url||''), emoji:w.emoji, icon:w.icon, img:w.img });
+
       }else if(p.type==='reorder'){
+
         const from = Number(p.index);
+
         if(!Number.isNaN(from) && from>=0 && from<sec.links.length){
+
           sec.links.push( sec.links.splice(from,1)[0] ); // move to end
+
         }
+
       }
+
       saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+
     });
+
   }
 
+
+
   renderFocusLinks();
+
 }
+
+
 
 // Clear all links in current section
+
 clearSectionLinksBtn.onclick = async ()=>{
+
   if(!isEditingSection) return;
+
   const sec = currentSectionRef(); if(!sec || !(sec.links||[]).length) return;
+
   const ok = await sfConfirm('Clear all links from this mini‑goal?'); if(!ok) return;
+
   sec.links.length = 0;
+
   saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent();
+
 };
+
+
 
 const syncSavedFromCurrentDebounced = debounce(()=>{ try{ syncSavedFromCurrent(); }catch{} }, 400);
+
 sectionDescEl.addEventListener('input', ()=>{ if(sectionDescEl.disabled) return; const s=currentSession[currentIndex]; if(!s) return; sectionNotes[s.id] = sectionDescEl.value; saveNotes(); syncSavedFromCurrentDebounced(); });
 
+
+
 /*************** Outline (Home) with reorder + delete ***************/
+
 function renderOutline(){
+
   outline.innerHTML = currentSession.map((s,i)=>`
+
     <li class="outline-row ${i===currentIndex?'outline-active':''}" data-id="${s.id}" draggable="true">
+
       <div class="flex items-center gap-3">
+
         <button class="text-left min-w-0 flex-1 truncate text-sm font-semibold focus:outline-none">${escapeHtml(s.name||'')}</button>
+
         <div class="flex items-center gap-2 shrink-0">
+
           <span class="text-xs w-16 text-right">${Number(s.minutes||0)}m</span>
+
           <button class="btn-xs" data-act="edit">Edit</button>
+
           <button class="btn-xs" data-act="del">Delete</button>
+
         </div>
+
       </div>
+
     </li>`).join('');
 
+
+
   outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
+
     li.addEventListener('click', (e)=>{ if(li.classList.contains('editing')) return; if(e.target.closest('[data-act], input, select, textarea, button')) return; jumpToSection(idx); });
+
   });
+
+
 
   // Inline edit UI
+
   outline.querySelectorAll('[data-act="edit"]').forEach(btn=>{
+
     btn.addEventListener('click', ()=>{
+
       const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
+
       const cur=currentSession[idx];
+
       li.classList.add('editing'); li.draggable = false;
+
       li.innerHTML = `
+
         <div class="flex items-center gap-2">
+
           <input class="input flex-1 text-sm outline-edit-title" id="edtTitle" value="${escapeHtml(cur.name||'')}" />
+
           <input class="input w-24 text-sm" id="edtValue" type="number" step="0.1" min="0.01" value="${(+cur.minutes||0).toFixed(2).replace(/\.00$/,'')}" />
+
           <select id="edtUnit" class="input h-9 w-20 text-sm">
+
             <option value="minutes" selected>min</option>
+
             <option value="seconds">sec</option>
+
             <option value="hours">hr</option>
+
           </select>
+
           <button class="btn-xxs" id="edtSave">Save</button>
+
         </div>`;
+
       const edtTitle=li.querySelector('#edtTitle'), edtValue=li.querySelector('#edtValue'), edtUnit=li.querySelector('#edtUnit');
+
       const saveInline = ()=>{
+
         const prevMin = cur.minutes, prevTotal = minsToSecs(prevMin);
+
         const elapsedSec = currentSession[currentIndex]?.id===cur.id ? Math.max(0, prevTotal - secondsLeft) : 0;
+
         cur.name = (edtTitle.value.trim() || cur.name);
+
         cur.minutes = Math.max(0.01, toMinutesValue(edtValue.value, edtUnit.value));
+
         if(currentSession[currentIndex]?.id===cur.id){ const newTotal = minsToSecs(cur.minutes); secondsLeft = Math.max(0, newTotal - elapsedSec); if(running) syncEnd(); }
+
         saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent(); updateStartBtnLabel(); markTimer(); syncSavedFromCurrent();
+
       };
+
       li.querySelector('#edtSave').onclick = saveInline;
+
       [edtTitle, edtValue].forEach(el=> el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveInline(); }}));
+
     });
+
   });
+
+
 
   // Delete section
+
   outline.querySelectorAll('[data-act="del"]').forEach(btn=>{
+
     btn.addEventListener('click', async ()=>{
+
       const li = btn.closest('li[data-id]'); const id = li.dataset.id; const idx=currentSession.findIndex(x=>x.id===id); if(idx<0) return;
+
       const ok = await sfConfirm('Delete this section from the current session?'); if(!ok) return;
+
       currentSession.splice(idx,1);
+
       currentIndex = Math.min(currentIndex, Math.max(0, currentSession.length-1));
+
       secondsLeft = minsToSecs((currentSession[currentIndex]||{}).minutes||0);
+
       saveCurrentSession(); renderAll(); markTimer(); syncSavedFromCurrent();
+
     });
+
   });
+
+
 
   // Drag reorder
+
   let dragging = null;
+
   const makePh = (h, titleText)=>{ const ph = document.createElement('li'); ph.className='outline-row drop-placeholder'; ph.style.setProperty('--ph', `${Math.max(36,h)}px`); ph.innerHTML = `<div class="text-xs muted px-2 truncate">${escapeHtml(titleText||'')}</div>`; return ph; };
+
   outline.querySelectorAll('li[data-id]').forEach((li, idx)=>{
+
     li.addEventListener('dragstart', (e)=>{
+
       if(li.classList.contains('editing')){ e.preventDefault(); return; }
+
       const titleText = (li.querySelector('button')?.textContent || '').trim();
+
       dragging = { from: idx, el: li, placeholder: makePh(li.offsetHeight, titleText) };
+
       li.classList.add('dragging'); li.after(dragging.placeholder);
+
       try{
+
         e.dataTransfer.setData('text/plain', JSON.stringify({type:'outline-move', from: idx}));
+
         const img = new Image(); img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
+
         if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 0, 0);
+
       }catch{} e.dataTransfer.effectAllowed='move';
+
     });
+
     li.addEventListener('dragend', ()=>{ li.classList.remove('dragging'); dragging?.placeholder?.remove(); dragging = null; });
+
     const onOver = (e)=>{ if(!dragging) return; e.preventDefault(); const r = li.getBoundingClientRect(); const before = e.clientY < (r.top + r.height/2); const ph = dragging.placeholder; if(before){ if(li.previousSibling !== ph) outline.insertBefore(ph, li); }else{ if(li.nextSibling !== ph) li.after(ph); } };
+
     li.addEventListener('dragover', onOver); li.addEventListener('dragenter', onOver);
+
   });
+
   outline.addEventListener('dragover', (e)=>{ if(!dragging) return; e.preventDefault(); if(!outline.contains(dragging.placeholder)) outline.appendChild(dragging.placeholder); });
+
   outline.addEventListener('drop', (e)=>{
+
     if(!dragging) return; e.preventDefault();
+
     const from = dragging.from;
+
     const rows = Array.from(outline.querySelectorAll('li.outline-row'));
+
     const phIndex = rows.indexOf(dragging.placeholder);
+
     const to = phIndex < 0 ? rows.length-1 : phIndex;
+
     const finalTo = (to > from) ? to - 1 : to;
+
     if(from !== finalTo && from >= 0 && finalTo >= 0){
+
       const [moved] = currentSession.splice(from,1); currentSession.splice(finalTo,0,moved);
+
       if(currentIndex === from) currentIndex = finalTo;
+
       else if(currentIndex > from && currentIndex <= finalTo) currentIndex -= 1;
+
       else if(currentIndex < from && currentIndex >= finalTo) currentIndex += 1;
+
       saveCurrentSession(); renderOutline(); buildProgress(); updateProgress(); renderCurrent(); syncSavedFromCurrent();
+
     }
+
     dragging.el.classList.remove('dragging'); dragging.placeholder.remove(); dragging = null;
+
   });
+
+
 
   totalMins.textContent=`Total: ${Math.round(scheduleTotalSecs(currentSession)/60)} minutes`;
+
 }
+
+
 
 // Inline add
+
 addOutlineItemBtn.onclick = ()=>{ inlineAddRow.classList.remove('hidden'); addTitleInput.value=''; addMinsInput.value=''; addTitleInput.focus(); };
+
 addCancelBtn.onclick = ()=> inlineAddRow.classList.add('hidden');
+
 addConfirmBtn.onclick = ()=>{ const title=(addTitleInput.value||'').trim() || 'New section'; const mins=Math.max(0.25, Number(addMinsInput.value)||5);
+
   currentSession.push({ id:'S'+Date.now(), name:title, minutes:mins, links:[] }); inlineAddRow.classList.add('hidden'); saveCurrentSession(); renderAll(); markTimer(); syncSavedFromCurrent();
+
 };
 
+
+
 /*************** Two‑way sync glue (Home ↔ Saved) ***************/
+
 function getActiveOutlineId(){ return (timerState && timerState.outlineId) ? timerState.outlineId : null; }
+
 function syncSavedFromCurrent(){
+
   const activeId = getActiveOutlineId(); if(!activeId) return;
+
   const idx = savedOutlines.findIndex(o=>o.id===activeId); if(idx<0) return;
+
   const saved = savedOutlines[idx];
+
   const newSections = currentSession.map(sec=>{
+
     let sid = sec.id; if(!sid){ sid = 'S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); sec.id = sid; }
+
     return { id: sid, name: sec.name, minutes: sec.minutes, links: structuredClone(sec.links || []), desc: sectionNotes[sid] ?? '' };
+
   });
+
   saved.sections = newSections; saveOutlinesLocal(); renderHomeSavedBar(); touchCloud();
-}
-function syncCurrentFromSaved(outlineObj){
-  const activeId = getActiveOutlineId(); if(!activeId || !outlineObj || outlineObj.id !== activeId) return;
-  const oldActive = currentSession[currentIndex] || null; const oldActiveId = oldActive?.id || null; const oldActiveMins = Number(oldActive?.minutes || 0);
-  const elapsedInActive = oldActiveId ? Math.max(0, minsToSecs(oldActiveMins) - secondsLeft) : 0;
-  currentSession = (outlineObj.sections || []).map(s=>({ id: s.id || ('S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)), name: s.name, minutes: s.minutes, links: structuredClone(s.links || []) }));
-  sectionNotes = {}; (outlineObj.sections || []).forEach(s=>{ if(s?.id) sectionNotes[s.id] = s.desc || ''; });
-  let newIdx = 0, newLeft = 0;
-  if(oldActiveId){ const i = currentSession.findIndex(x=>x.id===oldActiveId);
-    if(i>=0){ newIdx = i; const newTotal = minsToSecs(currentSession[i].minutes || 0); newLeft = Math.max(0, newTotal - Math.min(elapsedInActive, newTotal)); }
-    else { newIdx = Math.min(currentIndex, Math.max(0, currentSession.length-1)); newLeft = minsToSecs((currentSession[newIdx]||{}).minutes || 0); }
-  } else { newIdx = Math.min(currentIndex, Math.max(0, currentSession.length-1)); newLeft = minsToSecs((currentSession[newIdx]||{}).minutes || 0); }
-  currentIndex = newIdx; secondsLeft = newLeft; totalSessionSecs = scheduleTotalSecs(currentSession); if(running) syncEnd();
-  saveCurrentSession(); saveNotes(); renderAll(); updateStartBtnLabel(); markTimer();
+
 }
 
+function syncCurrentFromSaved(outlineObj){
+
+  const activeId = getActiveOutlineId(); if(!activeId || !outlineObj || outlineObj.id !== activeId) return;
+
+  const oldActive = currentSession[currentIndex] || null; const oldActiveId = oldActive?.id || null; const oldActiveMins = Number(oldActive?.minutes || 0);
+
+  const elapsedInActive = oldActiveId ? Math.max(0, minsToSecs(oldActiveMins) - secondsLeft) : 0;
+
+  currentSession = (outlineObj.sections || []).map(s=>({ id: s.id || ('S'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)), name: s.name, minutes: s.minutes, links: structuredClone(s.links || []) }));
+
+  sectionNotes = {}; (outlineObj.sections || []).forEach(s=>{ if(s?.id) sectionNotes[s.id] = s.desc || ''; });
+
+  let newIdx = 0, newLeft = 0;
+
+  if(oldActiveId){ const i = currentSession.findIndex(x=>x.id===oldActiveId);
+
+    if(i>=0){ newIdx = i; const newTotal = minsToSecs(currentSession[i].minutes || 0); newLeft = Math.max(0, newTotal - Math.min(elapsedInActive, newTotal)); }
+
+    else { newIdx = Math.min(currentIndex, Math.max(0, currentSession.length-1)); newLeft = minsToSecs((currentSession[newIdx]||{}).minutes || 0); }
+
+  } else { newIdx = Math.min(currentIndex, Math.max(0, currentSession.length-1)); newLeft = minsToSecs((currentSession[newIdx]||{}).minutes || 0); }
+
+  currentIndex = newIdx; secondsLeft = newLeft; totalSessionSecs = scheduleTotalSecs(currentSession); if(running) syncEnd();
+
+  saveCurrentSession(); saveNotes(); renderAll(); updateStartBtnLabel(); markTimer();
+
+}
+
+
+
 /*************** Saved Outlines wiring (+folders) ***************/
+
 const homeSavedScroller = $('#homeSavedScroller');
+
 function renderHomeSavedBar(){
+
   const activeId = (timerState && timerState.outlineId) || null;
+
   homeSavedScroller.innerHTML =
+
   (savedOutlines.length
+
     ? savedOutlines.map(o=>`
+
       <button type="button" class="chip ${o.id===activeId ? 'chip-active' : ''}" data-oid="${escapeHtml(o.id)}" title="${escapeHtml(o.title || 'Outline')}">
+
         ${escapeHtml(o.title || 'Untitled')}
+
       </button>`).join('')
+
     : `<div class="text-xs muted">No saved outlines yet.</div>`);
+
   homeSavedScroller.querySelectorAll('[data-oid]').forEach(btn=>{
+
     btn.onclick = ()=>{ const o = savedOutlines.find(x=>x.id===btn.dataset.oid); if(o){ applyOutlineToCurrent(o); requestAnimationFrame(renderHomeSavedBar); } };
+
   });
+
 }
+
 function applyOutlineToCurrent(outlineObj){
+
   const clone = outlineObj.sections.map(s=>({ id:s.id||('S'+Math.random().toString(16).slice(2)), name:s.name, minutes:s.minutes, links:structuredClone(s.links||[]) }));
+
   currentSession = clone; sectionNotes = {}; clone.forEach(sec=>{ const src = outlineObj.sections.find(ss=>ss.id===sec.id); if(src && src.desc!=null) sectionNotes[sec.id] = src.desc; });
+
   timerState = { sessionStarted:false, running:false, currentIndex:0, secondsLeft:minsToSecs((clone[0]||{}).minutes||0), outlineId: outlineObj.id, lastSyncTs: Date.now(), awaitingNext:false };
+
   awaitingNext=false; hideNextGate(); saveCurrentSession(); saveNotes(); saveTimerLocal(); renderAll(); updateStartBtnLabel();
+
 }
+
+
 
 const { renderSavedOutlines } = setupSavedOutlines({
   getSavedOutlines: ()=> savedOutlines,
+
   setSavedOutlines: (arr)=>{ savedOutlines = arr; },
+
   saveOutlinesLocal,
+
   getWidgetShelf: ()=> widgetShelf,
+
   setWidgetShelf: (arr)=>{ widgetShelf = arr; saveShelf(); },
+
   applyOutline: applyOutlineToCurrent,
+
   touchCloud,
+
   renderHomeSavedBar,
+
   getActiveOutlineId,
+
   syncCurrentFromSaved,
+
   // folders
+
   getFolders: ()=> savedFolders,
+
   setFolders: (arr)=>{ savedFolders = arr; },
+
   saveFoldersLocal,
+
 });
 
 /*************** AI Scheduling button (Saved tab) ***************/
@@ -1759,114 +3324,124 @@ const { renderSavedOutlines } = setupSavedOutlines({
         include_links: !!aiPrefs.includeLinks,
         include_subsections: !!aiPrefs.includeSubsections,
       }});
-      // Map schedule -> outline
-      const outline = (function mapScheduleToOutline(d){
-        const oid = 'O' + Date.now().toString(36);
-        const title = d?.title || 'AI Outline';
-        const sessions = Array.isArray(d?.sessions) ? d.sessions : [];
-        function parseMinutes(s){
-          if(typeof s?.duration_min === 'number' && s.duration_min > 0) return Math.round(s.duration_min);
-          const st = s?.start_time, et = s?.end_time;
-          if(st && et){
-            const [sh,sm] = String(st).split(':').map(n=>parseInt(n,10)||0);
-            const [eh,em] = String(et).split(':').map(n=>parseInt(n,10)||0);
-            let mins = (eh*60+em) - (sh*60+sm); if(mins<0) mins += 24*60; return Math.max(1, mins);
-          }
-          return 30; // sensible default
-        }
-        function isValidUrl(u){ try{ const x = new URL(u); if(!/^https?:$/.test(x.protocol)) return false; return (x.hostname||'').includes('.'); }catch{ return false; } }
-        function labelFromUrl(u){ try{ const x=new URL(u); const host=(x.hostname||'').replace(/^www\./,''); const last=(x.pathname||'').split('/').filter(Boolean).pop()||''; return last? `${host}/${decodeURIComponent(last).slice(0,24)}` : host; }catch{ return u; } }
-        const sections = sessions.map((s, i)=>{
-          const id = 'S'+ (Date.now()+i).toString(36);
-          const name = s?.topic || `Session ${i+1}`;
-          const minutes = parseMinutes(s);
-          let links = [];
-          if(aiPrefs.includeLinks && Array.isArray(s?.materials)){
-            const seen = new Set();
-            for(const raw of s.materials){
-              if(!raw) continue;
-              const normalized = normalizeUrl(String(raw||''));
-              if(!normalized || !isValidUrl(normalized)) continue;
-              if(seen.has(normalized)) continue;
-              seen.add(normalized);
-              links.push({ label: labelFromUrl(normalized), url: normalized, icon: 'emoji', emoji: '🔗' });
-              if(links.length >= Math.max(0, Number(aiPrefs.maxLinksPerSection||5))) break;
-            }
-          }
-          const desc = aiPrefs.includeDescriptions ? (s?.description || '') : '';
-          return { id, name, minutes, links, desc };
-        });
-        return { id: oid, title, sections };
-      })(data);
-
-      // Save outline and refresh UI
-      savedOutlines.push(outline);
-      saveOutlinesLocal();
-      renderHomeSavedBar();
-      try{ if(typeof renderSavedOutlines==='function') renderSavedOutlines(); }catch{}
-      showToast(`AI outline created (${usedModel}).`, 'success');
+      // Build a draft and open preview modal for review before saving
+      const outline = mapScheduleToOutline(data, aiPrefs);
+      openAiPreview(outline, usedModel);
     }catch(e){ console.error(e); showToast(e?.message || 'AI generation failed', 'error'); }
     finally{ btn.disabled=false; btn.textContent='🪄 AI Scheduling'; }
   });
 })();
 
+
 /*************** Auth UI ***************/
+
 const authOpenBtn = $('#authOpenBtn'); const userBadge = $('#userBadge'); const userEmail = $('#userEmail'); const signOutBtn = $('#signOutBtn');
+
 const authModal = $('#authModal'); const authTitle=$('#authTitle'); const authSubtitle=$('#authSubtitle');
+
 const emailInput=$('#emailInput'); const passInput=$('#passInput');
+
 const googleBtn=$('#googleBtn'); const emailSignInBtn=$('#emailSignInBtn'); const emailSignUpBtn=$('#emailSignUpBtn'); const emailResetBtn=$('#emailResetBtn');
+
 const signinRow=$('#signinRow'); const signupRow=$('#signupRow'); const toggleAuthMode=$('#toggleAuthMode');
 
+
+
 let authMode='signin';
+
 function showModal(modal){ modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false'); }
+
 function hideModal(modal){ modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
+
 function setAuthMode(mode){
+
   authMode=mode; const isSignUp = mode==='signup';
+
   signinRow.classList.toggle('hidden', isSignUp);
+
   signupRow.classList.toggle('hidden', !isSignUp);
+
   toggleAuthMode.textContent = isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account';
+
   authTitle.textContent = isSignUp ? 'Create your account' : 'Welcome back';
+
   authSubtitle.textContent = isSignUp ? 'Make an account to enable cloud sync.' : 'Sign in to sync your data across devices.';
+
 }
+
 toggleAuthMode.onclick = ()=> setAuthMode(authMode==='signin'?'signup':'signin');
+
 authOpenBtn.onclick = ()=>{ emailInput.value=''; passInput.value=''; setAuthMode('signin'); showModal(authModal); };
+
 authModal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') hideModal(authModal); });
+
 document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ hideModal(authModal); hideModal(settingsModal); if(!focusOverlay.classList.contains('hidden')) hideFocus(); } });
 
+
+
 googleBtn.onclick = ()=> signInWithPopup(auth, provider).catch(err=> showToast(err.message||'Google sign-in failed','error'));
+
 emailSignInBtn.onclick = async ()=>{ try{ await signInWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); } catch(e){ showToast(e.message||'Sign-in failed','error'); } };
+
 emailSignUpBtn.onclick = async ()=>{ try{ await createUserWithEmailAndPassword(auth, emailInput.value.trim(), passInput.value); } catch(e){ showToast(e.message||'Sign-up failed','error'); } };
+
 emailResetBtn.onclick = async ()=>{ try{ if(!emailInput.value.trim()) return showToast('Enter your email first.','error'); await sendPasswordResetEmail(auth, emailInput.value.trim()); showToast('Reset email sent.','success'); } catch(e){ showToast(e.message||'Reset failed','error'); } };
+
 signOutBtn.onclick = ()=> signOut(auth).catch(()=>{});
+
 
 onAuthStateChanged(auth, async (user)=>{
   currentUser = user || null;
   try{ window.currentUser = currentUser; }catch{}
   if(user){
     authOpenBtn.classList.add('hidden'); userBadge.classList.remove('hidden'); userEmail.textContent = user.email || user.uid; setCloudMode('Syncing…');
+
     hideModal(authModal);
+
     try{
+
       const snap = await getDoc(userDocRef(user.uid));
+
       if(snap.exists()){
+
         const d = snap.data()||{};
+
         if(d.currentSession) currentSession = d.currentSession;
+
         if(d.notes) sectionNotes = d.notes;
+
         if(d.prefs) prefs = d.prefs;
+
         if(d.widgetShelf) widgetShelf = d.widgetShelf;
+
         if(d.savedOutlines) savedOutlines = d.savedOutlines;
+
         if(d.folders) savedFolders = d.folders;
+
         if(d.sectionDone && typeof d.sectionDone === 'object'){
+
           try{
+
             window.__sectionDone = window.__sectionDone || {};
+
             const tgt = window.__sectionDone; Object.keys(tgt).forEach(k=> delete tgt[k]); Object.assign(tgt, d.sectionDone);
+
           }catch{}
+
         }
+
         if(d.timer) timerState = d.timer;
+
         applyTheme(prefs.theme||{}); applySplitRatio(prefs.splitRatio||56);
+
         setTimerFromState(timerState); renderAll(); renderHomeSavedBar(); setCloudMode('Saved to cloud ✓');
+
         if(prefs.focusDefault) showFocus();
+
       } else { setCloudMode('Cloud sync on'); if(prefs.focusDefault) showFocus(); }
+
     }catch{ setLocalMode('Cloud read failed'); if(prefs.focusDefault) showFocus(); }
+
   } else {
     authOpenBtn.classList.remove('hidden'); userBadge.classList.add('hidden'); setLocalMode('Local mode');
     // Clear outlines and folders when signed out
@@ -1885,29 +3460,48 @@ onAuthStateChanged(auth, async (user)=>{
   }
 });
 
+
 /*************** Settings panel ***************/
+
 const settingsModal = $('#settingsModal');
 const setBg=$('#setBg'), setFg=$('#setFg'), setAccent=$('#setAccent'), setBorder=$('#setBorder'), setBorderW=$('#setBorderW'), setFocusDefault=$('#setFocusDefault');
 const settingsSaveBtn=$('#settingsSaveBtn'), settingsResetBtn=$('#settingsResetBtn');
 const setVol=$('#setVol'), setTone=$('#setTone'), setToneDur=$('#setToneDur'), durLabel=$('#durLabel'), tonePreviewBtn=$('#tonePreviewBtn');
 const notifStatusPill=$('#notifStatusPill'); const toggleSectionAlerts=$('#toggleSectionAlerts'); const sendTestNotifBtn=$('#sendTestNotifBtn'); const notifHint=$('#notifHint');
 
+
 function applyTheme(t){
+
   document.documentElement.style.setProperty('--bg', t.bg || '#ffffff');
+
   document.documentElement.style.setProperty('--fg', t.fg || '#0f172a');
+
   document.documentElement.style.setProperty('--accent', t.accent || '#0ea5e9');
+
   document.documentElement.style.setProperty('--border', t.border || '#94a3b8');
+
   document.documentElement.style.setProperty('--panel', t.panel || '#ffffff');
+
   document.documentElement.style.setProperty('--panel-muted', t.panelMuted || '#f8fafc');
+
   document.documentElement.style.setProperty('--borderW', (t.borderW ?? 2) + 'px');
+
 }
+
 function openSettings(){
+
   setBg.value = prefs.theme?.bg || '#ffffff';
   setFg.value = prefs.theme?.fg || '#0f172a';
+
   setAccent.value = prefs.theme?.accent || '#0ea5e9';
+
   setBorder.value = prefs.theme?.border || '#94a3b8';
+
   setBorderW.value = String(prefs.theme?.borderW ?? 2);
+
   setFocusDefault.checked = !!prefs.focusDefault;
+
+
 
   setVol.value = String(prefs.audio?.volume ?? 0.5);
   // Notifications UI
@@ -1944,504 +3538,1000 @@ function openSettings(){
   }
   if(sendTestNotifBtn){ sendTestNotifBtn.addEventListener('click', ()=>{ if(Notification?.permission==='granted'){ sendNotify('Test notification','You will receive alerts when a section completes.'); } else { showToast('Allow notifications first.','error'); } }); }
   setTone.value = String(prefs.audio?.tone || 'beep');
+
   setToneDur.value = String(prefs.audio?.duration ?? 0.6);
+
   durLabel.textContent = `${Number(setToneDur.value).toFixed(1)}s`;
 
+
+
   showModal(settingsModal);
+
 }
+
 function closeSettings(){ hideModal(settingsModal); }
+
 document.querySelectorAll('#settingsModal [data-close="1"]').forEach(b=> b.addEventListener('click', closeSettings));
+
 settingsModal.addEventListener('click', (e)=>{ if(e.target.dataset.close==='1') closeSettings(); });
+
 $('#settingsBtn').onclick = openSettings;
 
+
+
 // Live feedback while choosing theme colors
+
 [setBg,setFg,setAccent,setBorder,setBorderW].forEach(el=>{
+
   el.addEventListener('input', ()=>{
+
     const temp = { bg:setBg.value, fg:setFg.value, accent:setAccent.value, border:setBorder.value, borderW:Math.max(0, Number(setBorderW.value)||2) };
+
     applyTheme(temp);
+
   });
+
 });
+
+
 
 // Clicking outside a focused color input closes it
+
 document.addEventListener('pointerdown', (ev)=>{
+
   const active = document.activeElement;
+
   if(active && active.tagName==='INPUT' && active.type==='color'){
+
     if(!ev.target.closest('input[type="color"]')) active.blur();
+
   }
+
 });
 
+
+
 settingsSaveBtn.onclick = ()=>{
+
   prefs.theme = { bg:setBg.value, fg:setFg.value, accent:setAccent.value, border:setBorder.value, borderW:Math.max(0, Number(setBorderW.value)||2) };
+
   prefs.focusDefault = !!setFocusDefault.checked;
+
   prefs.audio = { volume: Number(setVol.value||0.5), tone: setTone.value, duration: Number(setToneDur.value||0.6) };
+
   applyTheme(prefs.theme); savePrefs(); closeSettings(); showToast('Settings saved.','success');
+
 };
+
 settingsResetBtn.onclick = async ()=>{
+
   const ok = await sfConfirm('Reset all settings (appearance + sound) to defaults?'); if(!ok) return;
+
   prefs.theme = { bg:'#ffffff', fg:'#0f172a', accent:'#0ea5e9', border:'#94a3b8', borderW:2 };
+
   prefs.focusDefault = false;
+
   prefs.audio = { volume:0.5, tone:'beep', duration:0.6 };
+
   applyTheme(prefs.theme); savePrefs(); openSettings(); showToast('Defaults restored.','success');
+
 };
+
 setToneDur.addEventListener('input', ()=> durLabel.textContent = `${Number(setToneDur.value).toFixed(1)}s`);
+
 tonePreviewBtn.addEventListener('click', ()=> playTone(setTone.value, Number(setToneDur.value||0.6), Number(setVol.value||0.5)));
+
+
 
 applyTheme(prefs.theme||{});
 
+
+
 /*************** Focus Mode helpers ***************/
+
 function renderFocusLinks(){
+
   const sec = currentSectionRef(); const arr = sec?.links || [];
+
   focusLinksDiv.innerHTML = arr.length ? arr.map((w,i)=>`
+
     <div class="widget" data-flink-idx="${i}">
+
       <div class="link-card section-link" data-idx="${i}">
+
         ${w.icon==='img' && w.img ? `<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" draggable="false" style="width:18px;height:18px;"/>` : `<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`}
+
         <span class="truncate max-w-[14rem]">${escapeHtml(w.label||'Untitled')}</span>
+
       </div>
+
     </div>`).join('') : `<div class="text-xs muted">No links for this section.</div>`;
+
   focusLinksDiv.querySelectorAll('.section-link').forEach(card=> card.addEventListener('click', ()=>{ const i = Number(card.dataset.idx); const target = (sec?.links||[])[i]; if(!target) return; const url = normalizeUrl(target.url||''); if(url) window.open(url, '_blank', 'noopener'); }));
+
 }
+
 function renderFocusUI(){
+
   const sec = currentSession[currentIndex]; const count = currentSession.length;
+
   if(!sec){ focusTitleEl.textContent = '—'; focusMetaEl.textContent = ''; focusDescEl.textContent = ''; }
+
   else{
+
     focusTitleEl.textContent = sec.name || 'Untitled';
+
     focusMetaEl.textContent = `Section ${Math.min(currentIndex+1,count)} of ${count} • ${(sec.minutes||0)}m`;
+
     const note = sectionNotes[sec.id] || '';
+
     focusDescEl.textContent = note ? note : 'No notes for this section.';
+
   }
+
   buildFocusProgress(); renderFocusLinks(); setClockText(secsToClock(secondsLeft)); updateClockColor(); updateStartBtnLabel();
+
 }
+
 function showFocus(){ if(!focusOverlay) return; renderFocusUI(); focusOverlay.classList.remove('hidden'); }
+
 function hideFocus(){ if(!focusOverlay) return; focusOverlay.classList.add('hidden'); }
+
 focusModeBtn && (focusModeBtn.onclick = showFocus); focusExitBtn && (focusExitBtn.onclick = hideFocus);
 
+
+
 /*************** Sound (WebAudio) ***************/
+
 let ctx = null;
+
 function unlockAudio(){ try{ if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if(ctx.state === 'suspended') ctx.resume(); }catch{} }
+
 ['click','keydown','touchstart','pointerdown'].forEach(ev=>{ document.addEventListener(ev, unlockAudio, { once:true, passive:true }); });
 
+
+
 function playTone(type='beep', duration=0.6, volume=0.5){
+
   try{
+
     if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+
     if(ctx.state === 'suspended') ctx.resume();
+
     const now = ctx.currentTime;
+
     const endT = now + Math.max(0.1, duration);
 
+
+
     if(type==='beep'){
+
       const osc = ctx.createOscillator(); const g = ctx.createGain();
+
       osc.connect(g); g.connect(ctx.destination);
+
       osc.type = 'square'; osc.frequency.value = 880;
+
       g.gain.setValueAtTime(Math.max(0,volume), now);
+
       g.gain.exponentialRampToValueAtTime(0.0001, endT);
+
       osc.start(now); osc.stop(endT+0.02);
+
     } else if(type==='bell'){
+
       const o1 = ctx.createOscillator(); const o2 = ctx.createOscillator(); const g = ctx.createGain();
+
       o1.type='sine'; o2.type='sine'; o1.frequency.setValueAtTime(880, now); o2.frequency.setValueAtTime(1320, now);
+
       const g2 = ctx.createGain(); const g3 = ctx.createGain();
+
       g.gain.setValueAtTime(volume*0.7, now);
+
       g2.gain.setValueAtTime(volume*0.4, now); g2.gain.exponentialRampToValueAtTime(0.0001, endT);
+
       g3.gain.setValueAtTime(volume*0.25, now); g3.gain.exponentialRampToValueAtTime(0.0001, endT);
+
       o1.connect(g2); o2.connect(g3); g2.connect(g); g3.connect(g); g.connect(ctx.destination);
+
       o1.start(now); o2.start(now); o1.stop(endT+0.02); o2.stop(endT+0.02);
+
     } else { // woodblock-ish
+
       const bufferSize = Math.floor(ctx.sampleRate * duration);
+
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+
       const data = buffer.getChannelData(0);
+
       for (let i=0;i<bufferSize;i++){ data[i] = (Math.random()*2-1) * Math.pow(1 - i/bufferSize, 3); }
+
       const src = ctx.createBufferSource(); src.buffer = buffer;
+
       const bi = ctx.createBiquadFilter(); bi.type='bandpass'; bi.frequency.value=1500; bi.Q.value=1.5;
+
       const g = ctx.createGain(); g.gain.value = volume*0.9;
+
       src.connect(bi); bi.connect(g); g.connect(ctx.destination);
+
       src.start(now);
+
     }
+
   }catch{}
+
 }
+
 function tone(){ playTone(prefs.audio?.tone || 'beep', Number(prefs.audio?.duration || 0.6), Number(prefs.audio?.volume || 0.5)); }
 
+
+
 /*************** TOUR (Overview → Planner → Saved) ***************/
+
 const learnBtn = $('#learnBasicsBtn'); const tourOverlay = $('#tourOverlay');
+
 const tourTitle = $('#tourStepTitle'); const tourBody = $('#tourStepBody');
+
 const tourPanel = document.getElementById('tourPanel');
+
 const tourArrow = document.getElementById('tourArrow');
+
 const tourPrev = $('#tourPrev'); const tourNext = $('#tourNext'); const tourFinish = $('#tourFinish');
+
 const tourSpot = $('#tourSpotBox');
 
+
+
 // Helper to prefer exact element
+
 const qs = (sel)=> document.querySelector(sel);
 
+
+
 // Track whether the tour is active to prevent re-opening on scroll/resize
+
 let tourActive = false;
 
+
+
 const steps = [
+
   { tab:'overviewTab', title:'Welcome to Skillflow', body:'A 30‑second tour. You can close any time.', anchor:null },
+
   { tab:'homeTab', title:'Progress — click to jump', body:'This live bar shows where you are. Click any segment to jump to that mini‑goal.', anchor:'#progressHost', elevate:['#progressHost','#progressLabel','#progressPct'], spot:['#progressHost','#progressLabel'] },
+
   { tab:'homeTab', title:'Your current mini‑goal', body:'This left card is the mini‑goal you\'re on. Add links you\'ll need, jot a quick description or mini‑checklist, and keep momentum.', anchor:'#leftPane .section-card' },
+
   { tab:'homeTab', title:'Right‑pane outline', body:'This shows the outline of your session. Drag rows to reorder your current session, click Edit to rename or change durations, and click a row to jump.', anchor:'#rightPane .card' },
+
   { tab:'savedTab', title:'Create & organize', body:'Click "+ Create new outline" to start, and "+ New folder" to organize outlines. You can drag any outline card into a folder (or breadcrumb) to move it.', anchor:'#createOutlineBtn', elevate:['#createOutlineBtn','#createFolderBtn'], spot:['#createOutlineBtn','#createFolderBtn'] },
+
 ];
+
 let stepIndex = 0;
+
 let currentAnchorEl = null;
+
 let dndGhostEl = null;
+
 let draggingPanel = false;
+
 let dragOffset = { x:0, y:0 };
 
+
+
 // Tour tweaks per request: rename and split Saved steps
+
 try{
+
   // Rename Right-pane step to Saved outlines and retarget to the saved row
+
   if (Array.isArray(steps) && steps[3]){
+
     steps[3] = {
+
       tab: 'homeTab',
+
       title: 'Saved outlines',
+
       body: 'Quick access to your saved outlines. Click to load one into your current session.',
+
       anchor: '#homeSavedRow'
+
     };
+
   }
+
   // Replace combined Create & organize with two separate steps
+
   if (Array.isArray(steps) && steps[4]){
+
     const createStep = {
+
       tab: 'savedTab',
+
       title: '+ Create new outline',
+
       body: 'Create a brand new outline. Give it a name now or later, then add sections and links as you plan.',
+
       anchor: '#createOutlineBtn',
+
       elevate: ['#createOutlineBtn'],
+
       spot: ['#createOutlineBtn'],
+
       noSpotlight: true
+
     };
+
     const folderStep = {
+
       tab: 'savedTab',
+
       title: '+ New folder',
+
       body: 'Create a folder to organize your saved outlines. Drag outline cards into a folder or breadcrumb to move them.',
+
       anchor: '#createFolderBtn',
+
       elevate: ['#createFolderBtn','#folderCrumbs'],
+
       spot: ['#createFolderBtn'],
+
       noSpotlight: true
+
     };
+
     steps.splice(4, 1, createStep, folderStep);
+
   }
+
 }catch{}
 
+
+
 function removeSpotlights(){
+
   $$('.spotlight').forEach(el=>el.classList.remove('spotlight'));
+
   $$('.tour-elevate').forEach(el=>el.classList.remove('tour-elevate'));
+
   document.body.classList.remove('is-tour-progress');
+
   // Remove any demo ghost and its extras
+
   if(dndGhostEl && dndGhostEl._cleanup) { try{ dndGhostEl._cleanup(); }catch{} }
+
   if(dndGhostEl){ dndGhostEl.remove(); dndGhostEl = null; }
+
   // Hard cleanup in case any fakes linger
+
   document.querySelectorAll('.tour-fake-folder, .tour-fake-outline').forEach(el=> el.remove());
+
   if(tourSpot){ tourSpot.classList.add('hidden'); }
+
 }
+
+
 
 function clamp(val, min, max){ return Math.max(min, Math.min(max, val)); }
+
 function rectsOverlap(a, b, pad=8){
+
   return !(a.right + pad < b.left || a.left - pad > b.right || a.bottom + pad < b.top || a.top - pad > b.bottom);
+
 }
+
+
 
 /* Draw a single rounded rectangle around multiple elements (used for progress + label) */
+
 function drawSpotbox(selectors){
+
   if(!tourSpot) return;
+
   const els = (selectors||[]).map(sel=> qs(sel)).filter(Boolean);
+
   if(!els.length){ tourSpot.classList.add('hidden'); return; }
+
   const pad = 10;
+
   let l=Infinity, t=Infinity, r=-Infinity, b=-Infinity;
+
   els.forEach(el=>{
+
     const rr = el.getBoundingClientRect();
+
     l = Math.min(l, rr.left); t = Math.min(t, rr.top);
+
     r = Math.max(r, rr.right); b = Math.max(b, rr.bottom);
+
   });
+
   const W = r - l, H = b - t;
+
   Object.assign(tourSpot.style, {
+
     left: (l - pad) + 'px',
+
     top:  (t - pad) + 'px',
+
     width: (W + pad*2) + 'px',
+
     height:(H + pad*2) + 'px'
+
   });
+
   tourSpot.classList.remove('hidden');
+
 }
 
+
+
 function placePanelNear(anchorEl){
+
   // Default center-top
+
   const vpW = window.innerWidth, vpH = window.innerHeight, pad = 12;
 
+
+
   // reset to measure
+
   Object.assign(tourPanel.style, { left:'', top:'', transform:'', right:'', bottom:'' });
+
   tourPanel.classList.remove('hidden');
+
   tourArrow.classList.remove('hidden');
 
+
+
   const ph = tourPanel.offsetHeight || 220;
+
   const pw = tourPanel.offsetWidth || 360;
 
+
+
   if(!anchorEl){
+
     tourArrow.style.display='none';
+
     tourPanel.style.left = `${Math.max(pad, Math.min(vpW - pw - pad, (vpW - pw)/2))}px`;
+
     tourPanel.style.top = `${pad + 8}px`;
+
     return;
+
   }
 
+
+
   const r = anchorEl.getBoundingClientRect();
+
   const spaces = { top: r.top, bottom: vpH - r.bottom, left: r.left, right: vpW - r.right };
 
+
+
   let pos = 'bottom';
+
   if(spaces.bottom >= ph + pad) pos='bottom';
+
   else if(spaces.top >= ph + pad) pos='top';
+
   else if(spaces.right >= pw + pad) pos='right';
+
   else if(spaces.left >= pw + pad) pos='left';
+
+
 
   const cx = r.left + r.width/2, cy = r.top + r.height/2;
 
+
+
   if(pos==='bottom'){
+
     tourPanel.style.top = `${Math.min(vpH - ph - pad, r.bottom + pad)}px`;
+
     tourPanel.style.left = `${Math.max(pad, Math.min(vpW - pw - pad, cx - pw/2))}px`;
+
     tourArrow.style.display='block';
+
     Object.assign(tourArrow.style, { transform:'rotate(45deg)', top:`${r.bottom + pad - 7}px`, left:`${clamp(cx, pad+10, vpW - pad - 10) - 7}px` });
+
   }else if(pos==='top'){
+
     tourPanel.style.top = `${Math.max(pad, r.top - ph - pad)}px`;
+
     tourPanel.style.left = `${Math.max(pad, Math.min(vpW - pw - pad, cx - pw/2))}px`;
+
     tourArrow.style.display='block';
+
     Object.assign(tourArrow.style, { transform:'rotate(45deg)', top:`${r.top - pad - 7}px`, left:`${clamp(cx, pad+10, vpW - pad - 10) - 7}px` });
+
   }else if(pos==='right'){
+
     tourPanel.style.left = `${Math.min(vpW - pw - pad, r.right + pad)}px`;
+
     tourPanel.style.top = `${Math.max(pad, Math.min(vpH - ph - pad, cy - ph/2))}px`;
+
     tourArrow.style.display='block';
+
     Object.assign(tourArrow.style, { transform:'rotate(45deg)', top:`${cy - 7}px`, left:`${r.right + pad - 7}px` });
+
   }else{ // left
+
     tourPanel.style.left = `${Math.max(pad, r.left - pw - pad)}px`;
+
     tourPanel.style.top = `${Math.max(pad, Math.min(vpH - ph - pad, cy - ph/2))}px`;
+
     tourArrow.style.display='block';
+
     Object.assign(tourArrow.style, { transform:'rotate(45deg)', top:`${cy - 7}px`, left:`${r.left - pad - 7}px` });
+
   }
+
+
 
   // final nudge if overlapping
+
   const panelRect = tourPanel.getBoundingClientRect();
+
   if(rectsOverlap(panelRect, r, 8)){
+
     // Nudge vertically if we can
+
     const shiftDown = Math.max(0, (r.bottom + pad) - panelRect.top);
+
     const shiftUp = Math.max(0, (panelRect.bottom) - (r.top - pad));
+
     if(spaces.bottom > spaces.top){
+
       tourPanel.style.top = `${clamp(panelRect.top + shiftDown, pad, vpH - ph - pad)}px`;
+
     }else{
+
       tourPanel.style.top = `${clamp(panelRect.top - shiftUp, pad, vpH - ph - pad)}px`;
+
     }
+
   }
+
 }
+
+
 
 function showDndDemo(){
+
   if(dndGhostEl){ dndGhostEl.remove(); dndGhostEl=null; }
+
   const savedList = qs('#savedList'); const folderGrid = qs('#folderGrid');
+
   if(!savedList) return;
 
+
+
   // Try to find a real outline card to highlight/clone
+
   let srcCard = savedList.querySelector('.card[data-oid]');
+
   if(!srcCard){
+
     // Force render outlines list if empty and user has saved outlines
+
     // Otherwise, create a fake outline card that looks real
+
     const fake = document.createElement('div');
+
     fake.className = 'card p-4';
+
     fake.innerHTML = `<div class="flex items-center gap-2" data-role="outline-head">
+
       <div class="flex-1 font-bold text-lg truncate">Demo outline</div>
+
       <button class="btn-xs">Load</button>
+
     </div>`;
+
     fake.style.position = 'absolute'; fake.style.left='-9999px'; document.body.appendChild(fake);
+
     srcCard = fake;
+
   } else {
+
     srcCard.classList.add('spotlight');
+
   }
+
+
 
   // Destination: a real folder, else a fake folder target near top right
+
   let toCard = folderGrid?.querySelector('.folder-card');
+
   let cleanupFakeFolder = null;
+
   if(!toCard){
+
     const fakeFolder = document.createElement('div');
+
     fakeFolder.className = 'folder-card tour-fake-folder';
+
     fakeFolder.style.position = 'fixed';
+
     fakeFolder.style.right = '24px'; fakeFolder.style.top = '120px';
+
     fakeFolder.innerHTML = `<div class="folder-icon"></div><div class="folder-name">Folder</div>`;
+
     document.body.appendChild(fakeFolder);
+
     toCard = fakeFolder;
+
     cleanupFakeFolder = ()=> fakeFolder.remove();
+
   }
+
+
 
   // Build a floating clone that matches outline card size
+
   const r1 = srcCard.getBoundingClientRect();
+
   const r2 = toCard.getBoundingClientRect();
+
   const start = { x: r1.left, y: r1.top };
+
   const end   = { x: r2.left + r2.width/2 - Math.min(220, r1.width)/2, y: r2.top + r2.height/2 - 24 };
 
+
+
   dndGhostEl = srcCard.cloneNode(true);
+
   dndGhostEl.classList.add('tour-ghost','tour-fake-outline');
+
   Object.assign(dndGhostEl.style, {
+
     left: `${start.x}px`,
+
     top: `${start.y}px`,
+
     width: Math.min(360, r1.width) + 'px',
+
     '--dx': `${end.x - start.x}px`,
+
     '--dy': `${end.y - start.y}px`
+
   });
+
   document.body.appendChild(dndGhostEl);
 
+
+
   // Cleanup on next step
+
   dndGhostEl._cleanup = ()=>{
+
     if(cleanupFakeFolder) cleanupFakeFolder();
+
     if(srcCard && srcCard.parentElement) srcCard.classList.remove('spotlight');
+
   };
+
 }
+
+
 
 function showStep(i){
+
   stepIndex = Math.max(0, Math.min(steps.length-1, i));
+
   const s = steps[stepIndex];
+
   showTab(s.tab);
 
+
+
   tourTitle.textContent = s.title;
+
   tourBody.textContent = s.body;
+
   tourPrev.disabled = stepIndex===0;
+
   tourNext.classList.toggle('hidden', stepIndex===steps.length-1);
+
   tourFinish.classList.toggle('hidden', stepIndex!==steps.length-1);
 
+
+
   removeSpotlights();
+
+
 
   currentAnchorEl = null;
+
   if(s.anchor){
+
     currentAnchorEl = qs(s.anchor);
+
     if(currentAnchorEl){
+
       // Keep the anchor crisp and above the blur
+
       currentAnchorEl.classList.add('tour-elevate');
+
       if(!s.noSpotlight){ currentAnchorEl.classList.add('spotlight'); }
+
       (s.elevate||[]).forEach(sel => qs(sel)?.classList.add('tour-elevate'));
+
       (s.spot||[]).forEach(sel => qs(sel)?.classList.add('tour-elevate')); // keep both visible
+
       currentAnchorEl.scrollIntoView({ behavior:'smooth', block:'center' });
+
     }
+
   }
+
+
 
   // Draw grouped spotbox for certain steps
+
   if(s.spot && s.spot.length){ drawSpotbox(s.spot); }
+
   // Make label brighter on progress demo
+
   document.body.classList.toggle('is-tour-progress', s.title.startsWith('Progress'));
 
+
+
   // Place panel smartly near the anchor
+
   tourOverlay.classList.remove('hidden');
+
   tourPanel.classList.remove('hidden');
+
   tourArrow.classList.remove('hidden');
+
   placePanelNear(currentAnchorEl);
 
+
+
   // Demo for saved drag→folder
+
   if(s.demo === 'dnd'){ showDndDemo(); }
+
 }
+
+
 
 function startTour(){
+
   tourActive = true;
+
   tourOverlay.classList.remove('hidden');
+
   tourPanel.classList.remove('hidden');
+
   tourArrow.classList.remove('hidden');
+
   showStep(0);
+
 }
+
 function endTour(){
+
   tourActive = false;
+
   // Hide UI immediately
+
   tourOverlay.classList.add('hidden');
+
   tourPanel.classList.add('hidden');
+
   tourArrow.classList.add('hidden');
+
   // Also override inline display states for safety
+
   try{ tourArrow.style.display = 'none'; }catch{}
+
   // Clean up demo artifacts before clearing refs
+
   if(dndGhostEl && dndGhostEl._cleanup) { try{ dndGhostEl._cleanup(); }catch{} }
+
   if(dndGhostEl) { try{ dndGhostEl.remove(); }catch{} }
+
   // Belt-and-suspenders: remove any lingering fakes
+
   document.querySelectorAll('.tour-fake-folder, .tour-fake-outline').forEach(el=> el.remove());
+
   removeSpotlights();
+
 }
+
+
 
 learnBtn && (learnBtn.onclick = ()=> startTour());
+
 tourPrev.onclick = ()=> showStep(stepIndex-1);
+
 tourNext.onclick = ()=> showStep(stepIndex+1);
+
 tourFinish.onclick = endTour;
+
 tourOverlay.addEventListener('click', (e)=>{ if(e.target.classList.contains('tour-backdrop')) endTour(); });
 
+
+
 // Keep panel placed as user scrolls
+
 window.addEventListener('scroll', ()=>{
+
   if(!tourActive) return;
+
   if(!draggingPanel) placePanelNear(currentAnchorEl||qs(steps[stepIndex].anchor||''));
+
   if(steps[stepIndex]?.spot) drawSpotbox(steps[stepIndex].spot);
+
 }, { passive:true });
+
 window.addEventListener('resize', ()=>{
+
   if(!tourActive) return;
+
   placePanelNear(currentAnchorEl||qs(steps[stepIndex].anchor||''));
+
   if(steps[stepIndex]?.spot) drawSpotbox(steps[stepIndex].spot);
+
 });
 
+
+
 // Drag the tour panel (avoid overlapping anchor)
+
 function onPointerDown(e){
+
   // Only start dragging when grabbing the panel title, not buttons/links
+
   if (e.button !== 0) return; // left button / primary pointer only
+
   const t = e.target;
+
   // Disallow drag when interacting with controls
+
   if (t.closest('.tour-actions, button, a, input, textarea, select, [contenteditable]')) return;
+
   // Restrict drag start to the title area for clearer UX
+
   if (!t.closest('#tourStepTitle')) return;
 
+
+
   draggingPanel = true; tourPanel.dataset.dragging = '1';
+
   const rect = tourPanel.getBoundingClientRect();
+
   dragOffset.x = e.clientX - rect.left;
+
   dragOffset.y = e.clientY - rect.top;
+
   tourPanel.setPointerCapture(e.pointerId);
+
 }
+
 function onPointerMove(e){
+
   if(!draggingPanel) return;
+
   const vpW = window.innerWidth, vpH = window.innerHeight; const pad=8;
+
   const pw = tourPanel.offsetWidth, ph = tourPanel.offsetHeight;
+
   let nx = clamp(e.clientX - dragOffset.x, pad, vpW - pw - pad);
+
   let ny = clamp(e.clientY - dragOffset.y, pad, vpH - ph - pad);
+
   const panelRect = { left:nx, top:ny, right:nx+pw, bottom:ny+ph };
+
   if(currentAnchorEl){
+
     const r = currentAnchorEl.getBoundingClientRect();
+
     if(rectsOverlap(panelRect, r, 8)){
+
       // Snap horizontally if overlapping
+
       if(panelRect.left < r.left){ nx = r.left - pw - pad; }
+
       else { nx = r.right + pad; }
+
       nx = clamp(nx, pad, vpW - pw - pad);
+
     }
+
   }
+
   tourPanel.style.left = `${nx}px`;
+
   tourPanel.style.top = `${ny}px`;
+
 }
+
 function onPointerUp(e){
+
   if(!draggingPanel) return;
+
   draggingPanel = false; tourPanel.dataset.dragging = '0';
+
   try{ tourPanel.releasePointerCapture(e.pointerId); }catch{}
+
 }
+
 tourPanel.addEventListener('pointerdown', onPointerDown);
+
 tourPanel.addEventListener('pointermove', onPointerMove);
+
 tourPanel.addEventListener('pointerup', onPointerUp);
+
 tourPanel.addEventListener('pointercancel', onPointerUp);
 
+
+
 /*************** Initial render ***************/
+
 function renderCurrent(){ const s=currentSession[currentIndex];
+
   if(!s){ currentTitleEl.textContent='—'; currentDurDisp.textContent='0m'; sectionDescEl.value=''; linksDiv.innerHTML=''; renderFocusUI(); return; }
+
   currentTitleEl.textContent = s.name || 'Untitled'; currentDurDisp.textContent = `${Number(s.minutes||0)}m`;
+
   sectionNotes[s.id] = sectionNotes[s.id] || ''; sectionDescEl.value = sectionNotes[s.id]; sectionDescEl.disabled = !isEditingSection;
+
   renderCurrentLinks(); setClockText(secsToClock(secondsLeft)); renderFocusUI();
+
 }
+
 function renderAll(){ renderOutline(); buildProgress(); updateProgress(); renderCurrent(); }
+
+
 
 setTimerFromState(timerState); renderAll(); renderHomeSavedBar();
 // Land on route from URL (default Overview)
 applyRouteFromHash();
 if(prefs.focusDefault) showFocus();
 
+
+
 /*************** Folders UI helpers (Saved tab container) ***************/
+
 const folderGrid = $('#folderGrid'); const createFolderBtn = $('#createFolderBtn');
+
 const createFolderForm = $('#createFolderForm'); const newFolderName = $('#newFolderName');
+
 const createFolderConfirm = $('#createFolderConfirm'); const createFolderCancel = $('#createFolderCancel');
+
 const folderCrumbs = $('#folderCrumbs');
+
 const createOutlineFromHome = $('#createOutlineFromHome');
+
 if(createOutlineFromHome){
+
   createOutlineFromHome.onclick = ()=>{
+
     showTab('savedTab');
+
     requestAnimationFrame(()=> document.getElementById('createOutlineBtn')?.click());
+
   };
+
 }
+
+
 
 let currentFolderId = null;
 
+
+
 // Replace the "+ New folder" button with its popover while open (prevents layout shift)
+
 createFolderBtn.onclick = ()=>{
   if(!(window.requireAuth ? window.requireAuth() : !!currentUser)) return;
   createFolderBtn.classList.add('hidden');
@@ -2450,9 +4540,13 @@ createFolderBtn.onclick = ()=>{
   newFolderName.focus();
 };
 createFolderCancel.onclick = ()=>{
+
   createFolderForm.classList.add('hidden');
+
   createFolderBtn.classList.remove('hidden');
+
 };
+
 createFolderConfirm.onclick = ()=>{
   if(!(window.requireAuth ? window.requireAuth() : !!currentUser)) return;
   const name = (newFolderName.value||'').trim() || 'New folder';
@@ -2462,227 +4556,460 @@ createFolderConfirm.onclick = ()=>{
   createFolderBtn.classList.remove('hidden');
 };
 
+
+
 function renderFoldersUI(){
+
   // Breadcrumbs
+
   folderCrumbs.innerHTML = '';
+
   const main = document.createElement('span'); main.className='crumb'; main.textContent='Main';
+
   if(currentFolderId===null) main.classList.add('active');
+
   main.onclick = ()=>{ currentFolderId=null; renderFoldersUI(); renderSavedOutlines(); };
+
   folderCrumbs.appendChild(main);
+
   if(currentFolderId){
+
     const sep=document.createElement('span'); sep.className='crumb-sep'; sep.textContent='›'; folderCrumbs.appendChild(sep);
+
     const f = savedFolders.find(x=>x.id===currentFolderId);
+
     const child=document.createElement('span'); child.className='crumb active'; child.textContent=f?f.name:'Folder';
+
     child.onclick = ()=>{ /* stay */ }; folderCrumbs.appendChild(child);
+
   }
+
   // Build full breadcrumb path (root → ... → current)
+
   try{
+
     const path=[]; let fidWalk=currentFolderId; while(fidWalk){ const f=savedFolders.find(x=>x.id===fidWalk); if(!f) break; path.unshift(f); fidWalk=f.parentId||null; }
+
     folderCrumbs.innerHTML='';
+
     const mainCr=document.createElement('span'); mainCr.className='crumb'; mainCr.textContent='Main'; mainCr.dataset.fid=''; if(currentFolderId===null) mainCr.classList.add('active'); mainCr.onclick=()=>{ currentFolderId=null; renderFoldersUI(); renderSavedOutlines(); }; folderCrumbs.appendChild(mainCr);
+
     path.forEach((f, idx)=>{ const sep=document.createElement('span'); sep.className='crumb-sep'; sep.textContent='>'; folderCrumbs.appendChild(sep); const c=document.createElement('span'); c.className='crumb'; c.textContent=f.name; c.dataset.fid=f.id; if(idx===path.length-1) c.classList.add('active'); c.onclick=()=>{ currentFolderId=f.id; renderFoldersUI(); renderSavedOutlines(); }; folderCrumbs.appendChild(c); });
+
   }catch{}
+
   // Dropping onto breadcrumbs to move outline
+
   folderCrumbs.querySelectorAll('.crumb').forEach((c, idx)=>{
+
     c.addEventListener('dragover', e=>{ if(window.__draggingOutlineId || window.__draggingFolderId){ e.preventDefault(); c.classList.add('crumb-drop'); }});
+
     c.addEventListener('dragleave', ()=> c.classList.remove('crumb-drop'));
+
     c.addEventListener('drop', e=>{
+
       e.preventDefault(); c.classList.remove('crumb-drop');
+
       if(window.__draggingOutlineId){
+
         const oid = window.__draggingOutlineId; const o = savedOutlines.find(x=>x.id===oid); if(!o) return;
+
         o.folderId = (idx===0 ? null : currentFolderId);
+
         saveOutlinesLocal(); touchCloud(); renderSavedOutlines();
+
       }
+
       if(window.__draggingFolderId){
+
         const srcId = window.__draggingFolderId; const src = savedFolders.find(x=>x.id===srcId); if(!src) return;
+
         const targetFid = (idx===0 ? null : currentFolderId);
+
         // prevent cycles
+
         let p = targetFid, blocked=false; while(p){ if(p===srcId){ blocked=true; break } const pf=savedFolders.find(x=>x.id===p); p=pf?.parentId||null; }
+
         if(!blocked){ src.parentId = targetFid; saveFoldersLocal(); renderFoldersUI(); }
+
         window.__draggingFolderId = null;
+
       }
+
     });
+
   });
+
+
 
   // Folder icons grid (with delete bins)
+
   folderGrid.innerHTML = savedFolders.filter(f=> (f.parentId||null) === (currentFolderId||null)).map(f=>`
+
     <div class="folder-card" data-fid="${f.id}" title="${escapeHtml(f.name)}" draggable="true">
+
       <button class="folder-del" data-act="del-folder" title="Delete folder">🗑️</button>
+
       <div class="folder-icon"></div>
+
       <div class="folder-name truncate">${escapeHtml(f.name)}</div>
+
     </div>`).join('');
+
   folderGrid.querySelectorAll('.folder-card').forEach(card=>{
+
     // Drag start for folder
+
     card.addEventListener('dragstart', (e)=>{ window.__draggingFolderId = card.dataset.fid; try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'folder', id:card.dataset.fid})); }catch{} });
+
     // Inject rename button to the card header area
+
     try{
+
       const delBtn = card.querySelector('[data-act="del-folder"]');
+
       if(delBtn){
+
         const r=document.createElement('button'); r.className='folder-rename'; r.setAttribute('data-act','rename-folder'); r.title='Rename folder'; r.textContent='✎';
+
         delBtn.parentElement.insertBefore(r, delBtn);
+
         r.addEventListener('click', (ev)=>{
+
           ev.stopPropagation();
+
           const fid=card.dataset.fid; const f=savedFolders.find(x=>x.id===fid); if(!f) return;
+
           const nameEl=card.querySelector('.folder-name'); if(!nameEl) return;
+
           const input=document.createElement('input'); input.className='input'; input.value=f.name||''; input.style.width='90%'; input.style.padding='4px 8px'; input.style.fontSize='0.95rem'; input.style.textAlign='center';
+
           nameEl.replaceWith(input); input.focus(); input.select();
+
           const finish=(commit)=>{ const val=(input.value||'').trim()||f.name||'Folder'; if(commit){ f.name=val; saveFoldersLocal(); } renderFoldersUI(); };
+
           input.addEventListener('keydown',(ke)=>{ if(ke.key==='Enter'){ ke.preventDefault(); finish(true);} if(ke.key==='Escape'){ ke.preventDefault(); finish(false);} });
+
           input.addEventListener('blur', ()=> finish(true));
+
         });
+
       }
+
     }catch{}
+
     card.addEventListener('click', (e)=>{ if(e.target.closest('[data-act]')) return; currentFolderId = card.dataset.fid; renderFoldersUI(); renderSavedOutlines(); });
+
     // Allow dropping outline onto folder
+
     card.addEventListener('dragover', e=>{ if(window.__draggingOutlineId || window.__draggingFolderId){ e.preventDefault(); card.classList.add('folder-drop'); }});
+
     card.addEventListener('dragleave', ()=> card.classList.remove('folder-drop'));
+
     card.addEventListener('drop', e=>{
+
       e.preventDefault(); card.classList.remove('folder-drop');
+
       const targetId = card.dataset.fid;
+
       if(window.__draggingOutlineId){ const oid = window.__draggingOutlineId; const o = savedOutlines.find(x=>x.id===oid); if(o){ o.folderId = targetId; saveOutlinesLocal(); touchCloud(); renderSavedOutlines(); } }
+
       if(window.__draggingFolderId){ const srcId = window.__draggingFolderId; const src = savedFolders.find(x=>x.id===srcId); if(src){ let p=targetId, blocked=false; while(p){ if(p===srcId){ blocked=true; break } const pf=savedFolders.find(x=>x.id===p); p=pf?.parentId||null; } if(!blocked){ src.parentId = targetId; saveFoldersLocal(); renderFoldersUI(); } } window.__draggingFolderId = null; }
+
     });
+
   });
+
   // Delete handlers
+
   folderGrid.querySelectorAll('[data-act="del-folder"]').forEach(btn=>{
+
     btn.addEventListener('click', async (e)=>{
+
       e.stopPropagation();
+
       const fid = btn.closest('.folder-card')?.dataset.fid;
+
       if(!fid) return;
+
       if(!await sfConfirm('Delete this folder (its outlines will move to Main)?')) return;
+
       // Move outlines back to Main
+
       savedOutlines.forEach(o=>{ if(o.folderId===fid) o.folderId=null; });
+
       // Delete the folder
+
       const i = savedFolders.findIndex(f=>f.id===fid);
+
       if(i>=0){ savedFolders.splice(i,1); saveFoldersLocal(); }
+
       renderFoldersUI(); renderSavedOutlines();
+
     });
+
   });
+
 }
 
+
+
 // Expose for Saved Outlines module to query current folder
+
 window.__getCurrentFolderId = ()=> currentFolderId;
+
 renderFoldersUI();
+
 </script>
+
+
 
 <!-- Mobile nav + actions wiring (moves settings/auth into mobile menu on phones only) -->
+
 <script>
+
   (function(){
+
     const topbar = document.getElementById('topbar');
+
     const navToggle = document.getElementById('navToggle');
+
     const settingsBtn = document.getElementById('settingsBtn');
+
     const authArea = document.getElementById('authArea');
+
     const actionsHost = document.querySelector('.topbar-actions');
+
     const mobileHost = document.getElementById('mobileExtraMenu');
+
     const topnav = document.querySelector('.topnav-links');
+
     const overlay = document.getElementById('mobileNavOverlay');
 
+
+
     function isPhone(){
+
       try{
+
         if (navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean'){
+
           return navigator.userAgentData.mobile; // true on phones
+
         }
+
       }catch{}
+
       const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toString();
+
       const isIphone = /iPhone|iPod/i.test(ua);
+
       const isAndroidPhone = /Android/i.test(ua) && /Mobile/i.test(ua);
+
       const isWindowsPhone = /IEMobile|Windows Phone/i.test(ua);
+
       const isBlackBerry = /BlackBerry|BB10/i.test(ua);
+
       // Detect tablets (exclude from phone)
+
       const isIpad = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+
       const isAndroidTablet = /Android/i.test(ua) && !/Mobile/i.test(ua);
+
       const isTabletUA = /Tablet/i.test(ua) || isIpad || isAndroidTablet;
+
       // Fallback heuristic: touch-first + physically small screen
+
       const coarse = window.matchMedia('(pointer:coarse)').matches;
+
       const smallSide = Math.min(window.screen.width, window.screen.height);
+
       const looksPhone = coarse && smallSide <= 820 && !/Windows NT|Macintosh|Linux x86_64/i.test(ua);
+
       return ((isIphone || isAndroidPhone || isWindowsPhone || isBlackBerry) && !isTabletUA) || looksPhone;
+
     }
+
+
 
     function applyPhoneClass(){
+
       const phone = isPhone();
+
       document.body.classList.toggle('is-phone', phone);
+
       return phone;
+
     }
+
+
 
     function placeExtras(){
+
       const phone = document.body.classList.contains('is-phone') || applyPhoneClass();
+
       if (!settingsBtn || !authArea || !actionsHost || !mobileHost) return;
+
       if (phone){
+
         if (settingsBtn.parentElement !== mobileHost){ mobileHost.appendChild(settingsBtn); }
+
         if (authArea.parentElement !== mobileHost){ mobileHost.appendChild(authArea); }
+
       } else {
+
         if (settingsBtn.parentElement !== actionsHost){ actionsHost.insertBefore(settingsBtn, actionsHost.firstChild); }
+
         if (authArea.parentElement !== actionsHost){ actionsHost.insertBefore(authArea, settingsBtn.nextSibling); }
+
         topbar.classList.remove('nav-open');
+
         document.body.classList.remove('drawer-open');
+
       }
+
     }
+
+
 
     function closeOnNavClick(e){
+
       const t = e.target;
+
       if (t && t.classList && t.classList.contains('tab-link')){
+
         topbar.classList.remove('nav-open');
+
       }
+
     }
+
+
 
     function positionMobileDrawer(){
+
       if (!document.body.classList.contains('is-phone')) return;
+
       if (!topbar || !topnav) return;
+
       // Drawer should occupy from the very top (covering the topbar)
+
       if (topbar.classList.contains('nav-open')){
+
         topnav.style.top = '0px';
+
         topnav.style.height = '100vh';
+
       } else {
+
         topnav.style.top = '';
+
         topnav.style.height = '';
+
       }
+
     }
+
+
 
     window.addEventListener('resize', ()=>{ applyPhoneClass(); placeExtras(); positionMobileDrawer(); });
+
     window.addEventListener('orientationchange', ()=>{ applyPhoneClass(); placeExtras(); positionMobileDrawer(); });
+
     window.addEventListener('DOMContentLoaded', ()=>{ applyPhoneClass(); placeExtras(); positionMobileDrawer(); });
 
+
+
     function openDrawer(){ if(!document.body.classList.contains('is-phone')) return; topbar.classList.add('nav-open'); document.body.classList.add('drawer-open'); positionMobileDrawer(); }
+
     function closeDrawer(){ topbar.classList.remove('nav-open'); document.body.classList.remove('drawer-open'); positionMobileDrawer(); }
 
+
+
     if (navToggle){
+
       let lastToggleAt = 0;
+
       const onToggle = (e)=>{
+
         e.preventDefault(); e.stopPropagation();
+
         const now = Date.now();
+
         if(now - lastToggleAt < 250) return; // debounce multi-events (touch/click)
+
         lastToggleAt = now;
+
         if(topbar.classList.contains('nav-open')) closeDrawer(); else openDrawer();
+
       };
+
       navToggle.addEventListener('click', onToggle);
+
       navToggle.addEventListener('touchend', onToggle, { passive:false });
+
     }
+
     // Fallback: delegate on document (in case of re-renders)
+
     document.addEventListener('click', (e)=>{
+
       const tgt = e.target && (e.target.id === 'navToggle' ? e.target : (e.target.closest ? e.target.closest('#navToggle') : null));
+
       if(tgt){ e.preventDefault(); e.stopPropagation(); if(topbar.classList.contains('nav-open')) closeDrawer(); else openDrawer(); }
+
     });
+
     // Ensure tab clicks actually switch tabs on phones using the same showTab()
+
     if (topnav){ topnav.addEventListener('click', (e)=>{ const btn=e.target && (e.target.closest ? e.target.closest('.tab-link') : null); if(btn){ e.preventDefault(); showTab(btn.dataset.tab); closeDrawer(); } }); }
+
     if (overlay){ overlay.addEventListener('click', closeDrawer); }
 
+
+
     // Close drawer when clicking anywhere outside the drawer (no overlay)
+
     document.addEventListener('click', (e)=>{
+
       if(!document.body.classList.contains('is-phone')) return;
+
       if(!topbar.classList.contains('nav-open')) return;
+
       const inDrawer = e.target && (e.target.closest ? e.target.closest('.topnav-links') : null);
+
       const onToggle = e.target && (e.target.id === 'navToggle' || (e.target.closest ? e.target.closest('#navToggle') : null));
+
       if(!inDrawer && !onToggle){ closeDrawer(); }
+
     }, true);
+
     window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeDrawer(); });
+
   })();
+
 </script>
 
+
+
 <!-- Pricing tab (kept; it can enhance #pricingTab if needed) -->
+
 <script src="./pricing-tab.js"></script>
+
 </body>
+
 </html>
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -230,8 +230,9 @@ export function setupSavedOutlines({
       if(!card) return;
 
       // Header actions
-      card.querySelector('[data-act="load"]')?.addEventListener('click', ()=>{ applyOutline && applyOutline(o); goHome(); });
+      card.querySelector('[data-act="load"]')?.addEventListener('click', ()=>{ if(!requireAuth()) return; applyOutline && applyOutline(o); goHome(); });
       card.querySelector('[data-act="duplicate"]')?.addEventListener('click', async ()=>{
+        if(!requireAuth()) return;
         const list = (getSavedOutlines && getSavedOutlines()) || [];
         const src  = byId(list, o.id); if(!src) return;
         const copy = structuredClone(src);
@@ -548,6 +549,7 @@ export function setupSavedOutlines({
   // Confirm create and hide popover
   if(createOk){
     createOk.onclick = (e)=>{
+      if(!requireAuth()) return;
       e?.preventDefault?.();
       const t = (createTitle?.value || '').trim() || 'New outline';
       const list = (getSavedOutlines && getSavedOutlines()) || [];
