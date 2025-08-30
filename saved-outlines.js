@@ -412,6 +412,19 @@ export function setupSavedOutlines({
 
         const secEl = li.querySelector('.section-edit');
         const linksBar = secEl?.querySelector('[data-role="links-bar"]'); if (linksBar) linksBar.innerHTML = linksBarInnerHtml(sec.links || []);
+        const showShelf = !(window.prefs && window.prefs.showWidgetShelf===false);
+        if(!showShelf){
+          const shelfWrap = secEl?.querySelector('[data-role="inline-shelf"]'); if(shelfWrap) shelfWrap.remove();
+          // Add quick + Add link button when shelf is hidden
+          const addBtn = document.createElement('button'); addBtn.className='btn-xs'; addBtn.textContent = '+ Add link'; addBtn.setAttribute('data-act','add-link');
+          linksBar?.appendChild(addBtn);
+          addBtn.addEventListener('click', ()=>{
+            const list = (getSavedOutlines && getSavedOutlines()) || []; const me = byId(list, o.id); if(!me) return;
+            const s = me.sections?.find(x=>x.id===sec.id); if(!s) return;
+            const blank = { label:'New link', url:'https://', icon:'emoji', emoji:'🔗', img:'' };
+            openWidgetEditor(blank, (upd)=>{ upd.url = normalizeUrl(upd.url); s.links = s.links||[]; s.links.push(upd); setSavedOutlines(list); persist(o.id); renderSavedOutlines(); });
+          });
+        }
 
         // Save button
         secEl?.querySelector('[data-act="save-section"]')?.addEventListener('click', ()=>{

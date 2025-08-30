@@ -1015,6 +1015,11 @@ vertical-align: middle;
           </div>
         </div>
       </div>
+      <div class="card p-3">
+        <h4 class="block-title mb-2">Links & Widgets</h4>
+        <label class="flex items-center gap-2"><input id="setShowShelf" type="checkbox"/> <span>Show widget shelf (recommended)</span></label>
+        <div class="text-xs muted mt-1">When off, the widget shelf is hidden everywhere and a + Add link button appears directly in the Links bar.</div>
+      </div>
     </div>
 
 
@@ -3281,7 +3286,7 @@ function openAiPreview(outline, usedModel){
 
   function previewRowHtml(s, i){
     return `
-      <li class="outline-row section-row card p-3" data-idx="${i}" data-view="preview">
+      <li class="outline-row section-row card p-3" data-idx="${i}" data-view="preview" draggable="true">
         <div class="flex items-center gap-2">
           <div class="title truncate flex-1">${escapeHtml(s.name||'Untitled')}</div>
           <span class="mins text-xs muted">${Number(s.minutes||0)}m</span>
@@ -3299,6 +3304,7 @@ function openAiPreview(outline, usedModel){
             <div class="mins-wrap"><span class="lbl">mins</span><input class="input mins-input w-20" type="number" min="1" step="1" data-role="mins" value="${Number(s.minutes||0)}"/></div>
             <button class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white" data-act="save-section">Save</button>
           </div>
+          <div class="row" data-role="inline-shelf"></div>
           <div class="row">
             <div class="lbl">Description</div>
             <textarea class="input w-full h-36" data-role="desc" placeholder="Description">${escapeHtml(s.desc||'')}</textarea>
@@ -3307,7 +3313,6 @@ function openAiPreview(outline, usedModel){
             <div class="lbl">Links</div>
             <div data-role="links-bar" class="section-links-bar"></div>
           </div>
-          <div class="row" data-role="inline-shelf"></div>
         </div>
       </li>`;
   }
@@ -3589,6 +3594,7 @@ onAuthStateChanged(auth, async (user)=>{
 
 const settingsModal = $('#settingsModal');
 const setBg=$('#setBg'), setFg=$('#setFg'), setAccent=$('#setAccent'), setBorder=$('#setBorder'), setBorderW=$('#setBorderW'), setFocusDefault=$('#setFocusDefault');
+const setShowShelf=$('#setShowShelf');
 const settingsSaveBtn=$('#settingsSaveBtn'), settingsResetBtn=$('#settingsResetBtn');
 const setVol=$('#setVol'), setTone=$('#setTone'), setToneDur=$('#setToneDur'), durLabel=$('#durLabel'), tonePreviewBtn=$('#tonePreviewBtn');
 const notifStatusPill=$('#notifStatusPill'); const toggleSectionAlerts=$('#toggleSectionAlerts'); const sendTestNotifBtn=$('#sendTestNotifBtn'); const notifHint=$('#notifHint');
@@ -3624,6 +3630,7 @@ function openSettings(){
   setBorderW.value = String(prefs.theme?.borderW ?? 2);
 
   setFocusDefault.checked = !!prefs.focusDefault;
+  if(setShowShelf) setShowShelf.checked = !(prefs.showWidgetShelf===false);
 
 
 
@@ -3722,8 +3729,11 @@ settingsSaveBtn.onclick = ()=>{
   prefs.focusDefault = !!setFocusDefault.checked;
 
   prefs.audio = { volume: Number(setVol.value||0.5), tone: setTone.value, duration: Number(setToneDur.value||0.6) };
+  if(setShowShelf) prefs.showWidgetShelf = !!setShowShelf.checked;
 
-  applyTheme(prefs.theme); savePrefs(); closeSettings(); showToast('Settings saved.','success');
+  applyTheme(prefs.theme); savePrefs();
+  try{ if(window.renderSavedOutlines) window.renderSavedOutlines(); }catch{}
+  closeSettings(); showToast('Settings saved.','success');
 
 };
 
