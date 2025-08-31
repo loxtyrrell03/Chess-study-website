@@ -2641,6 +2641,17 @@ function renderCurrentLinks(){
 
     </div>`).join('');
 
+  // When widget shelf is hidden, expose a + Add link button directly in the Links bar while editing
+  const showShelf = !(prefs && prefs.showWidgetShelf===false);
+  if(isEditingSection && !showShelf){
+    const addBtn = document.createElement('button'); addBtn.className='btn-xs'; addBtn.textContent = '+ Add link'; addBtn.setAttribute('data-act','add-link');
+    linksDiv.appendChild(addBtn);
+    addBtn.addEventListener('click', ()=>{
+      const blank = { label:'New link', url:'https://', icon:'emoji', emoji:'🔗', img:'' };
+      openWidgetEditor(blank, (upd)=>{ upd.url = normalizeUrl(upd.url); const sec = currentSectionRef(); if(!sec) return; sec.links = sec.links || []; sec.links.push(upd); saveCurrentSession(); renderCurrentLinks(); renderFocusLinks(); syncSavedFromCurrent(); });
+    });
+  }
+
 
 
   // Drag existing pills (for reorder)
