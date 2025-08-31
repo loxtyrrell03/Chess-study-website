@@ -3367,7 +3367,18 @@ function openAiPreview(outline, usedModel){
           e.preventDefault();
           const payload = (()=>{ try{ return JSON.parse(e.dataTransfer.getData('text/plain')||''); }catch{ return null } })();
           const s2 = __aiDraft.sections[i]; if(!s2) return;
-          if(payload && payload.type==='reorder'){ const from = Number(payload.index); const cards = [...linksHost.querySelectorAll('.section-link')]; let to=cards.length; for(let k=0;k<cards.length;k++){ const r=cards[k].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=k; break; } } if(!Number.isNaN(from)){ const [m] = s2.links.splice(from,1); s2.links.splice(to,0,m); renderLinks(); } }
+          if(payload && payload.type==='reorder'){
+            const from = Number(payload.index);
+            const cards = [...linksHost.querySelectorAll('.section-link')];
+            let to=cards.length; for(let k=0;k<cards.length;k++){ const r=cards[k].getBoundingClientRect(); if(e.clientY < r.top + r.height/2){ to=k; break; } }
+            if(!Number.isNaN(from)){ const [m] = s2.links.splice(from,1); s2.links.splice(to,0,m); renderLinks(); }
+            return;
+          }
+          if(payload && payload.type==='shelf'){
+            const w=(window.widgetShelf||[]).find(x=>x.id===payload.id); if(!w) return;
+            s2.links = s2.links||[]; s2.links.push({ label:w.label, url: normalizeUrl(w.url||''), icon:w.icon, emoji:w.emoji, img:w.img });
+            renderLinks();
+          }
         });
         linksHost.querySelectorAll('.section-link').forEach(pill=>{
           pill.addEventListener('dragstart', (e)=>{ const index = Number(pill.dataset.idx); try{ e.dataTransfer.setData('text/plain', JSON.stringify({type:'reorder', index})); }catch{} e.dataTransfer.effectAllowed='move'; pill.classList.add('drag-ghost'); });
@@ -3383,7 +3394,12 @@ function openAiPreview(outline, usedModel){
           <div class="mt-1 editor-shelf flex flex-wrap gap-2">${shelf.map(w=>{
             const icon = (w.icon==='img'&&w.img)?`<img src="${escapeHtml(w.img)}" alt="" class="rounded-[4px] object-cover" style="width:18px;height:18px;"/>`:`<span class="link-icon">${escapeHtml(w.emoji||'🔗')}</span>`; return `<div class="link-card draggable-shelf" title="${escapeHtml(w.url||'')}" data-wid="${escapeHtml(w.id)}">${icon}<div class="min-w-0"><div class="truncate" style="font-size:.95rem">${escapeHtml(w.label||'Untitled')}</div><div class="text-xs muted truncate">${escapeHtml(w.url||'')}</div></div></div>`; }).join('')}</div>`;
         shelfHost.querySelectorAll('.draggable-shelf').forEach(card=>{
+          // Click to add
           card.addEventListener('click', ()=>{ const id = card.dataset.wid; const w = (widgetShelf||[]).find(x=>x.id===id); if(!w) return; const s = __aiDraft.sections[i]; if(!s) return; s.links = s.links||[]; s.links.push({ label:w.label, url: normalizeUrl(w.url||''), icon:w.icon, emoji:w.emoji, img:w.img }); renderLinks(); });
+          // Drag to add
+          try{ card.setAttribute('draggable','true'); }catch{}
+          card.addEventListener('dragstart', (e)=>{ try{ e.dataTransfer.setData('text/plain', JSON.stringify({ type:'shelf', id: card.dataset.wid })); }catch{} e.dataTransfer.effectAllowed='copy'; card.classList.add('drag-ghost'); });
+          card.addEventListener('dragend', ()=> card.classList.remove('drag-ghost'));
         });
       };
       const showShelf = !(window.prefs && window.prefs.showWidgetShelf===false);
