@@ -3386,7 +3386,16 @@ function openAiPreview(outline, usedModel){
           card.addEventListener('click', ()=>{ const id = card.dataset.wid; const w = (widgetShelf||[]).find(x=>x.id===id); if(!w) return; const s = __aiDraft.sections[i]; if(!s) return; s.links = s.links||[]; s.links.push({ label:w.label, url: normalizeUrl(w.url||''), icon:w.icon, emoji:w.emoji, img:w.img }); renderLinks(); });
         });
       };
-      renderLinks(); renderShelf();
+      const showShelf = !(window.prefs && window.prefs.showWidgetShelf===false);
+      renderLinks();
+      if(showShelf){ renderShelf(); }
+      else {
+        if(shelfHost){ shelfHost.remove(); }
+        // Provide + Add link when shelf hidden
+        const addBtn = document.createElement('button'); addBtn.className='btn-xs'; addBtn.textContent = '+ Add link'; addBtn.setAttribute('data-act','add-link');
+        linksHost?.appendChild(addBtn);
+        addBtn.addEventListener('click', ()=>{ const s3 = __aiDraft.sections[i]; if(!s3) return; const blank = { label:'New link', url:'https://', icon:'emoji', emoji:'🔗', img:'' }; if(window.openWidgetEditor){ openWidgetEditor(blank, (upd)=>{ upd.url = normalizeUrl(upd.url); s3.links = s3.links||[]; s3.links.push(upd); const evt = new Event('links-updated'); linksHost.dispatchEvent(evt); }); } });
+      }
       const apply = ()=>{
         const s = __aiDraft.sections[i]; if(!s) return;
         s.name = nameEl.value || 'Untitled';
@@ -5133,6 +5142,7 @@ renderFoldersUI();
 </body>
 
 </html>
+
 
 
 
